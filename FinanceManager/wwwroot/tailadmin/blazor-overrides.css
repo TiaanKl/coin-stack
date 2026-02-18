@@ -1,0 +1,51 @@
+/*
+  Tailadmin's compiled Tailwind CSS is now loaded after Bootstrap/app.css.
+  These overrides just ensure the base font/link colors match Tailadmin.
+*/
+
+html,
+body {
+  font-family: var(--font-outfit, Outfit, ui-sans-serif, system-ui, sans-serif);
+}
+
+a {
+  color: inherit;
+}
+
+/* Toast slide-down animation for Settings save confirmation */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* Modal backdrop fade-in */
+@keyframes modalBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Modal panel slide-up + scale */
+@keyframes modalPanelIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-backdrop-enter {
+  animation: modalBackdropIn 0.3s ease-out both;
+}
+
+.modal-panel-enter {
+  animation: modalPanelIn 0.3s ease-out both;
+}

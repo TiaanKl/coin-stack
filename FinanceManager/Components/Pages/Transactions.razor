@@ -1,0 +1,397 @@
+﻿@page "/transactions"
+@rendermode InteractiveServer
+@using FinanceManager.Data.Entities
+@using FinanceManager.Services
+@inject FinanceManager.Services.ITransactionService TransactionService
+@inject FinanceManager.Services.IBucketService BucketService
+@inject FinanceManager.Services.IDebtService DebtService
+@inject FinanceManager.Services.IGameLoopService GameLoop
+
+<PageTitle>Transactions</PageTitle>
+
+<div>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Transactions</h2>
+
+        <button
+            class="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+            @onclick="OpenCreateModal">
+            Log Expense
+        </button>
+    </div>
+
+    <!-- Game Result Toast -->
+    @if (_gameResult is not null && _gameResult.PointsChanged != 0)
+    {
+        <div class="mb-4 rounded-2xl p-4 @(_gameResult.PointsChanged >= 0 ? "bg-success-50 border border-success-200 dark:bg-success-500/10 dark:border-success-500/30" : "bg-error-50 border border-error-200 dark:bg-error-500/10 dark:border-error-500/30")">
+            <div class="flex items-center gap-3">
+                <span class="text-lg font-bold @(_gameResult.PointsChanged >= 0 ? "text-success-600 dark:text-success-500" : "text-error-600 dark:text-error-500")">
+                    @(_gameResult.PointsChanged >= 0 ? "+" : "")@_gameResult.PointsChanged pts
+                </span>
+                <span class="text-sm @(_gameResult.PointsChanged >= 0 ? "text-success-700 dark:text-success-400" : "text-error-700 dark:text-error-400")">
+                    @_gameResult.Message
+                </span>
+                @if (_gameResult.TriggeredReflection)
+                {
+                    <a href="/" class="ml-auto text-sm font-medium text-brand-500 hover:text-brand-600">Reflect →</a>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+            <h3 class="text-base font-medium text-gray-800 dark:text-white/90">Recent Transactions</h3>
+        </div>
+
+        <div class="p-6">
+            @if (_isLoading)
+            {
+                <div class="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
+            }
+            else if (_transactions.Count == 0)
+            {
+                <div class="text-sm text-gray-500 dark:text-gray-400">No transactions yet.</div>
+            }
+            else
+            {
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="border-b border-gray-100 dark:border-gray-800">
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Date</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Description</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Bucket</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Debt</th>
+                                <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Type</th>
+                                <th class="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">Amount</th>
+                                <th class="px-4 py-3 text-right text-sm font-medium text-gray-500 dark:text-gray-400">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                            @foreach (var tx in _transactions)
+                            {
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
+                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">@tx.OccurredAtUtc.ToString("MMM dd")</td>
+                                    <td class="px-4 py-4">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-800 dark:text-white/90">@tx.Description</p>
+                                            @if (tx.IsImpulse)
+                                            {
+                                                <span class="text-xs text-warning-600 dark:text-warning-400">Impulse</span>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                        @if (tx.BucketId.HasValue)
+                                        {
+                                            var bucket = _buckets.FirstOrDefault(b => b.Id == tx.BucketId.Value);
+                                            if (bucket is not null)
+                                            {
+                                                <div class="flex items-center gap-2">
+                                                    <div class="h-2.5 w-2.5 rounded-full" style="background-color: @(bucket.ColorHex ?? "#6577F3");"></div>
+                                                    @bucket.Name
+                                                </div>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-gray-400">—</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                        @if (tx.DebtAccountId.HasValue)
+                                        {
+                                            var debt = _debts.FirstOrDefault(d => d.Id == tx.DebtAccountId.Value);
+                                            @if (debt is not null)
+                                            {
+                                                @debt.Name
+                                            }
+                                            else
+                                            {
+                                                <span class="text-gray-400">—</span>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <span class="text-gray-400">—</span>
+                                        }
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium @GetTypeClasses(tx.Type)">
+                                            @tx.Type
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-4 text-right text-sm font-medium @(tx.Type == TransactionType.Income ? "text-success-600 dark:text-success-500" : "text-gray-800 dark:text-white/90")">
+                                        @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("0.00")
+                                    </td>
+                                    <td class="px-4 py-4 text-right">
+                                        <div class="flex items-center justify-end gap-1">
+                                            <button
+                                                @onclick="() => OpenEditModal(tx)"
+                                                class="text-gray-400 transition-colors hover:text-brand-500 dark:hover:text-brand-400"
+                                                title="Edit">
+                                                <svg class="fill-current" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path fill-rule="evenodd" clip-rule="evenodd" d="M15.4901 3.21967C15.783 2.92678 16.2578 2.92678 16.5507 3.21967L20.7807 7.44967C21.0736 7.74256 21.0736 8.21744 20.7807 8.51033L9.53073 19.7603C9.38998 19.9011 9.19912 19.9803 9.00007 19.9803H4.77007C4.35586 19.9803 4.02007 19.6446 4.02007 19.2303V15.0003C4.02007 14.8013 4.09929 14.6104 4.24001 14.4697L15.4901 3.21967ZM5.52007 15.3109V18.4803H8.68951L19.1894 7.98033L16.0201 4.81099L5.52007 15.3109Z" fill="currentColor"/>
+                                                </svg>
+                                            </button>
+                                            <button
+                                                @onclick="() => DeleteTransactionAsync(tx.Id)"
+                                                class="text-gray-400 transition-colors hover:text-error-500 dark:hover:text-error-400"
+                                                title="Delete">
+                                                <svg class="fill-current" width="16" height="16" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M15.75 4.5H2.25M7.5 8.25V12.75M10.5 8.25V12.75M14.25 4.5V14.25C14.25 15.0784 13.5784 15.75 12.75 15.75H5.25C4.42157 15.75 3.75 15.0784 3.75 14.25V4.5M6 4.5V3C6 2.17157 6.67157 1.5 7.5 1.5H10.5C11.3284 1.5 12 2.17157 12 3V4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (_showModal)
+    {
+        <!-- Log/Edit Transaction Modal -->
+        <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5 modal-backdrop-enter">
+            <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @onclick="CloseModal"></div>
+            <div class="relative w-full max-w-[584px] rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-10 modal-panel-enter">
+                <button
+                    @onclick="CloseModal"
+                    type="button"
+                    class="group absolute right-3 top-3 z-999 flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-200 text-gray-500 transition-colors hover:bg-gray-300 hover:text-gray-500 dark:bg-gray-800 dark:hover:bg-gray-700 sm:right-6 sm:top-6 sm:h-11 sm:w-11">
+                <svg class="fill-current transition-colors group-hover:text-gray-600 dark:group-hover:text-gray-200" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M6.04289 16.5413C5.65237 16.9318 5.65237 17.565 6.04289 17.9555C6.43342 18.346 7.06658 18.346 7.45711 17.9555L11.9987 13.4139L16.5408 17.956C16.9313 18.3466 17.5645 18.3466 17.955 17.956C18.3455 17.5655 18.3455 16.9323 17.955 16.5418L13.4129 11.9997L17.955 7.4576C18.3455 7.06707 18.3455 6.43391 17.955 6.04338C17.5645 5.65286 16.9313 5.65286 16.5408 6.04338L11.9987 10.5855L7.45711 6.0439C7.06658 5.65338 6.43342 5.65338 6.04289 6.0439C5.65237 6.43442 5.65237 7.06759 6.04289 7.45811L10.5845 11.9997L6.04289 16.5413Z" fill=""/>
+                </svg>
+            </button>
+
+            <form @onsubmit="SaveTransactionAsync">
+                <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">@(_editingId.HasValue ? "Edit Transaction" : "Log Expense")</h4>
+
+                <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+                    <div class="col-span-1 sm:col-span-2">
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Description</label>
+                        <input
+                            type="text"
+                            placeholder="What did you spend on?"
+                            @bind="_formDescription"
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-white/30 dark:focus:border-brand-400" />
+                    </div>
+
+                    <div class="col-span-1">
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Amount</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            inputmode="decimal"
+                            @bind-value="_formAmount"
+                            @bind-value:event="oninput"
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-white/30 dark:focus:border-brand-400" />
+                    </div>
+
+                    <div class="col-span-1">
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bucket</label>
+                        <select
+                            @bind="_formBucketId"
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                            <option value="">— None —</option>
+                            @foreach (var bucket in _buckets)
+                            {
+                                <option value="@bucket.Id">@bucket.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-span-1">
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Debt (optional)</label>
+                        <select
+                            @bind="_formDebtAccountId"
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                            <option value="">— None —</option>
+                            @foreach (var debt in _debts)
+                            {
+                                <option value="@debt.Id">@debt.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-span-1">
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Type</label>
+                        <select
+                            @bind="_formType"
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                            @foreach (var value in Enum.GetValues<TransactionType>())
+                            {
+                                <option value="@value">@value</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-span-1">
+                        <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-400">
+                            <input type="checkbox" @bind="_formIsImpulse"
+                                class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700" />
+                            Impulse purchase?
+                        </label>
+                    </div>
+
+                    <div class="col-span-1 sm:col-span-2">
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Notes (optional)</label>
+                        <textarea
+                            @bind="_formNotes"
+                            rows="2"
+                            placeholder="Any additional notes..."
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder:text-white/30 dark:focus:border-brand-400">
+                        </textarea>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex w-full items-center justify-end gap-3">
+                    <button
+                        @onclick="CloseModal"
+                        type="button"
+                        class="flex w-full justify-center rounded-full border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:border-gray-600 dark:bg-transparent dark:text-gray-300 dark:hover:bg-white/[0.05] dark:hover:text-white sm:w-auto">
+                        Close
+                    </button>
+                    <button
+                        type="submit"
+                        class="flex w-full justify-center rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 sm:w-auto">
+                        @(_editingId.HasValue ? "Update" : "Log")
+                    </button>
+                </div>
+            </form>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly List<Transaction> _transactions = new();
+    private List<Bucket> _buckets = new();
+    private List<DebtAccount> _debts = new();
+    private bool _isLoading = true;
+    private bool _showModal;
+    private GameTransactionResult? _gameResult;
+
+    private int? _editingId;
+    private string _formDescription = "";
+    private decimal _formAmount;
+    private int? _formBucketId;
+    private int? _formDebtAccountId;
+    private TransactionType _formType = TransactionType.Expense;
+    private bool _formIsImpulse;
+    private string _formNotes = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var items = await TransactionService.GetAllAsync();
+        _buckets = await BucketService.GetAllAsync();
+        _debts = await DebtService.GetAllAsync();
+        _transactions.Clear();
+        _transactions.AddRange(items);
+        _isLoading = false;
+    }
+
+    private void OpenCreateModal()
+    {
+        _editingId = null;
+        _formDescription = "";
+        _formAmount = 0;
+        _formBucketId = null;
+        _formDebtAccountId = null;
+        _formType = TransactionType.Expense;
+        _formIsImpulse = false;
+        _formNotes = "";
+        _showModal = true;
+    }
+
+    private void OpenEditModal(Transaction tx)
+    {
+        _editingId = tx.Id;
+        _formDescription = tx.Description;
+        _formAmount = tx.Amount;
+        _formBucketId = tx.BucketId;
+        _formDebtAccountId = tx.DebtAccountId;
+        _formType = tx.Type;
+        _formIsImpulse = tx.IsImpulse;
+        _formNotes = tx.Notes ?? "";
+        _showModal = true;
+    }
+
+    private async Task SaveTransactionAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_formDescription))
+        {
+            return;
+        }
+
+        if (_editingId.HasValue)
+        {
+            var existing = _transactions.FirstOrDefault(t => t.Id == _editingId.Value);
+            if (existing is not null)
+            {
+                existing.Description = _formDescription.Trim();
+                existing.Amount = _formAmount;
+                existing.Type = _formType;
+                existing.BucketId = _formBucketId;
+                existing.DebtAccountId = _formDebtAccountId;
+                existing.IsImpulse = _formIsImpulse;
+                existing.Notes = string.IsNullOrWhiteSpace(_formNotes) ? null : _formNotes.Trim();
+                await TransactionService.UpdateAsync(existing);
+            }
+        }
+        else
+        {
+            var transaction = new Transaction
+            {
+                Description = _formDescription.Trim(),
+                Amount = _formAmount,
+                Type = _formType,
+                BucketId = _formBucketId,
+                DebtAccountId = _formDebtAccountId,
+                IsImpulse = _formIsImpulse,
+                Notes = string.IsNullOrWhiteSpace(_formNotes) ? null : _formNotes.Trim(),
+                OccurredAtUtc = DateTime.UtcNow,
+            };
+
+            var created = await TransactionService.CreateAsync(transaction);
+            _transactions.Insert(0, created);
+
+            int userOffset = 0;
+            _gameResult = await GameLoop.ProcessTransactionAsync(created, userOffset);
+        }
+
+        _editingId = null;
+        _formDescription = "";
+        _formAmount = 0;
+        _formBucketId = null;
+        _formDebtAccountId = null;
+        _formType = TransactionType.Expense;
+        _formIsImpulse = false;
+        _formNotes = "";
+        _showModal = false;
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+    }
+
+    private async Task DeleteTransactionAsync(int id)
+    {
+        await TransactionService.DeleteAsync(id);
+        _transactions.RemoveAll(t => t.Id == id);
+    }
+
+    private static string GetTypeClasses(TransactionType type) => type switch
+    {
+        TransactionType.Expense => "bg-error-50 text-error-600 dark:bg-error-500/15 dark:text-error-500",
+        TransactionType.Income => "bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500",
+        TransactionType.Transfer => "bg-gray-100 text-gray-700 dark:bg-white/[0.03] dark:text-gray-300",
+        _ => "bg-gray-100 text-gray-700 dark:bg-white/[0.03] dark:text-gray-300",
+    };
+}

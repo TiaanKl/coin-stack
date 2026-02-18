@@ -1,0 +1,53 @@
+## Visual Studio / .NET
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build outputs
+bin/
+obj/
+out/
+publish/
+*.dll
+*.exe
+*.pdb
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# User-specific files
+*.user
+*.userprefs
+*.vspscc
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Ignore development appsettings
+appsettings.*.Development.json
+
+# Ignore publish artifacts and temporary files
+*.Publish.xml
+_ReSharper*/
+*.DotSettings.user

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Aspire.FinanceManager/Aspire.FinanceManager.csproj" />
+  <Project Path="FinanceManager.Data/FinanceManager.Data.csproj" />
+  <Project Path="FinanceManager/FinanceManager.csproj" />
+</Solution>
