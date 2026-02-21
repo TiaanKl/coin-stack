@@ -1,4 +1,4 @@
-using FinanceManager.Data.Entities;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -21,6 +21,14 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.Property(x => x.Type)
             .HasConversion<string>()
             .HasMaxLength(32)
+            .IsRequired();
+
+        builder.Property(x => x.ExpenseKind)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
+        builder.Property(x => x.AutoDeduct)
             .IsRequired();
 
         builder.Property(x => x.Notes)
@@ -47,5 +55,7 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => x.OccurredAtUtc);
+
+        builder.HasIndex(x => x.AutoDeductTemplateId);
     }
 }

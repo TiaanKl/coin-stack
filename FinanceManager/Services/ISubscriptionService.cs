@@ -1,6 +1,6 @@
-using FinanceManager.Data.Entities;
+using CoinStack.Data.Entities;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public interface ISubscriptionService
 {

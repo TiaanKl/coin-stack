@@ -1,14 +1,14 @@
-using FinanceManager.Data;
-using FinanceManager.Data.Entities;
+using CoinStack.Data;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public sealed class BudgetService : IBudgetService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
-    public BudgetService(IDbContextFactory<FinanceManagerDbContext> dbFactory)
+    public BudgetService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
     }
@@ -52,7 +52,9 @@ public sealed class BudgetService : IBudgetService
         existing.Year = budget.Year;
         existing.Month = budget.Month;
         existing.LimitAmount = budget.LimitAmount;
+        existing.BucketId = budget.BucketId;
         existing.CategoryId = budget.CategoryId;
+        existing.BucketId = budget.BucketId;
 
         await db.SaveChangesAsync(cancellationToken);
     }

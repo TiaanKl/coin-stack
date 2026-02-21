@@ -1,14 +1,14 @@
-using FinanceManager.Data;
-using FinanceManager.Data.Entities;
+using CoinStack.Data;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public sealed class DebtService : IDebtService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
-    public DebtService(IDbContextFactory<FinanceManagerDbContext> dbFactory)
+    public DebtService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
     }

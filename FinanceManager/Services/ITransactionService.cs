@@ -1,6 +1,6 @@
-using FinanceManager.Data.Entities;
+using CoinStack.Data.Entities;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public interface ITransactionService
 {
@@ -9,4 +9,8 @@ public interface ITransactionService
     Task<Transaction> CreateAsync(Transaction transaction, CancellationToken cancellationToken = default);
     Task UpdateAsync(Transaction transaction, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    Task<decimal> GetExpenseTotalForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default);
+
+    Task ApplyAutoDeductionsForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default);
 }

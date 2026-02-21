@@ -1,23 +1,39 @@
 @page "/"
 @rendermode InteractiveServer
-@using FinanceManager.Data.Entities
-@using FinanceManager.Services
+@using CoinStack.Data.Entities
+@using CoinStack.Services
 @inject ITransactionService TransactionService
 @inject IGameLoopService GameLoop
 @inject IScoringService ScoringService
 @inject IReflectionService ReflectionService
 @inject IGoalService GoalService
+@inject ISettingsService SettingsService
 
-<PageTitle>Budget Dashboard</PageTitle>
+<PageTitle>CoinStack</PageTitle>
 
 <div class="grid grid-cols-12 gap-4 md:gap-6">
+    <div class="col-span-12">
+        <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
+                <div class="text-center sm:text-left">
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">Monthly Budget Remaining</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        @FormatC(MonthlyBudgetSpent) spent of @FormatC(MonthlyBudgetLimit)
+                    </p>
+                </div>
+
+                <BudgetDonut BudgetLimit="@MonthlyBudgetLimit" Spent="@MonthlyBudgetSpent" Size="260" />
+            </div>
+        </div>
+    </div>
+
     <div class="col-span-12 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div class="h-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
             <div class="flex h-11 w-11 items-center justify-center rounded-full bg-gray-100 text-brand-500 dark:bg-gray-800">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <div class="mt-4">
-                <h4 class="text-2xl font-bold text-gray-800 dark:text-white">@(_summaryData.FirstOrDefault(x => x.Label == "Savings")?.Amount.ToString("C0") ?? "$0")</h4>
+                <h4 class="text-2xl font-bold text-gray-800 dark:text-white">@(_summaryData.FirstOrDefault(x => x.Label == "Savings") is { } s ? FormatC0(s.Amount) : FormatC0(0))</h4>
                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Net Saved</span>
             </div>
         </div>
@@ -27,7 +43,7 @@
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
             </div>
             <div class="mt-4">
-                <h4 class="text-2xl font-bold text-gray-800 dark:text-white">@(_summaryData.FirstOrDefault(x => x.Label == "Spending")?.Amount.ToString("C0") ?? "$0")</h4>
+                <h4 class="text-2xl font-bold text-gray-800 dark:text-white">@(_summaryData.FirstOrDefault(x => x.Label == "Spending") is { } sp ? FormatC0(sp.Amount) : FormatC0(0))</h4>
                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Spent</span>
             </div>
         </div>
@@ -98,7 +114,7 @@
         <div class="h-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
             <div class="mb-4 flex items-center justify-between gap-3">
                 <h3 class="font-bold text-gray-800 dark:text-white/90">Predictive Cash Flow (30 days)</h3>
-                <span class="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Income: @_projectedIncomeIn30Days.ToString("C") · Expense: @_projectedExpenseIn30Days.ToString("C") · Net: @_projectedBalanceIn30Days.ToString("C")</span>
+                <span class="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Income: @FormatC(_projectedIncomeIn30Days) · Expense: @FormatC(_projectedExpenseIn30Days) · Net: @FormatC(_projectedBalanceIn30Days)</span>
             </div>
             @if (_forecastData.Count == 0)
             {
@@ -148,8 +164,8 @@
                                 </span>
                             </div>
                             <div class="mb-2 flex items-end justify-between">
-                                <span class="text-lg font-bold text-gray-800 dark:text-white/90">@bucket.Spent.ToString("C")</span>
-                                <span class="text-xs text-gray-500 dark:text-gray-400">/ @bucket.Allocated.ToString("C")</span>
+                                <span class="text-lg font-bold text-gray-800 dark:text-white/90">@FormatC(bucket.Spent)</span>
+                                                                                <span class="text-xs text-gray-500 dark:text-gray-400">/ @FormatC(bucket.Allocated)</span>
                             </div>
                             <div class="relative h-2 w-full rounded-full bg-gray-200 dark:bg-gray-800">
                                 <div class="absolute left-0 top-0 h-full rounded-full @(bucket.IsOverBudget ? "bg-error-500" : bucket.PercentUsed > 80 ? "bg-warning-500" : "bg-success-500")" style="width: @(Math.Min(bucket.PercentUsed, 100).ToString("F0"))%;"></div>
@@ -184,7 +200,7 @@
                                     <p class="text-xs text-gray-500 dark:text-gray-400">@tx.OccurredAtUtc.ToString("dd MMM")</p>
                                 </div>
                                 <p class="text-sm font-semibold @(tx.Type == TransactionType.Income ? "text-success-600 dark:text-success-500" : "text-gray-800 dark:text-white/90")">
-                                    @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("C")
+                                    @(tx.Type == TransactionType.Income ? "+" : "-")@FormatC(tx.Amount)
                                 </p>
                             </div>
                         }
@@ -281,8 +297,8 @@
                                 </div>
 
                                 <div class="mb-3 flex items-end justify-between">
-                                    <span class="text-xl font-bold text-gray-800 dark:text-white/90">@goal.CurrentAmount.ToString("C")</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">of @goal.TargetAmount.ToString("C")</span>
+                                    <span class="text-xl font-bold text-gray-800 dark:text-white/90">@FormatC(goal.CurrentAmount)</span>
+                                                                                        <span class="text-xs text-gray-500 dark:text-gray-400">of @FormatC(goal.TargetAmount)</span>
                                 </div>
 
                                 <div class="relative mb-4 h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-800">
@@ -322,6 +338,13 @@
 @code {
     private GameState _state = new();
 
+    private AppSettings _settings = new();
+    private decimal _budgetSpent;
+
+    private decimal MonthlyBudgetLimit => _settings.MonthlyIncome;
+
+    private decimal MonthlyBudgetSpent => _budgetSpent;
+
     private readonly List<Transaction> _transactions = [];
     private readonly List<DailyData> _spendingData = [];
     private readonly List<DailyData> _moneyTrendData = [];
@@ -343,6 +366,10 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _settings = await SettingsService.GetAsync();
+        await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
+        _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
+
         await GameLoop.ProcessDailyCheckInAsync();
         _state = await GameLoop.GetCurrentStateAsync();
 
@@ -537,6 +564,20 @@
         yield return new MilestoneData("75%", "Champion Badge", progressPercent >= 75);
         yield return new MilestoneData("100%", "Goal Unlocked", progressPercent >= 100);
     }
+
+    private string FormatC(decimal amount) => $"{GetCurrencySymbol(_settings.Currency)}{amount:N2}";
+    private string FormatC0(decimal amount) => $"{GetCurrencySymbol(_settings.Currency)}{amount:N0}";
+
+    private static string GetCurrencySymbol(string currency) => currency switch
+    {
+        "USD" => "$",
+        "EUR" => "€",
+        "GBP" => "£",
+        "CAD" => "C$",
+        "AUD" => "A$",
+        "ZAR" => "R",
+        _ => "$"
+    };
 
     public sealed record DailyData(DateTime Date, decimal Amount);
     public sealed record SummaryData(string Label, decimal Amount);

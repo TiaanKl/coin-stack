@@ -1,10 +1,16 @@
-namespace FinanceManager.Data.Entities;
+namespace CoinStack.Data.Entities;
 
 public enum TransactionType
 {
     Expense = 0,
     Income = 1,
     Transfer = 2
+}
+
+public enum ExpenseKind
+{
+    Discretionary = 0,
+    Mandatory = 1
 }
 
 public enum SubscriptionCycle
@@ -39,7 +45,8 @@ public enum ScoreChangeReason
     DailyCheckIn = 5,
     ImpulseResisted = 6,
     ManualAdjustment = 7,
-    GoalAchieved = 8
+    GoalAchieved = 8,
+    ImpulseBuy = 9
 }
 
 public enum StreakType
@@ -57,4 +64,33 @@ public enum ReflectionTrigger
     LargeExpense = 2,
     ImpulseBuy = 3,
     ManualEntry = 4
+}
+
+public enum EmotionTag
+{
+    Neutral = 0,
+    Proud = 1,
+    Stressed = 2,
+    Anxious = 3,
+    Impulsive = 4,
+    Tired = 5,
+    Bored = 6,
+    Excited = 7,
+    Guilty = 8,
+    Motivated = 9
+}
+
+public enum WaitlistPriority
+{
+    Low = 0,
+    Medium = 1,
+    High = 2
+}
+
+public enum CoolOffPeriod
+{
+    Hours24 = 0,
+    Days3 = 1,
+    Days7 = 2,
+    Days30 = 3
 }

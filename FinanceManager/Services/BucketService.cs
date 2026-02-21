@@ -1,14 +1,14 @@
-using FinanceManager.Data;
-using FinanceManager.Data.Entities;
+using CoinStack.Data;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public sealed class BucketService : IBucketService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
-    public BucketService(IDbContextFactory<FinanceManagerDbContext> dbFactory)
+    public BucketService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
     }

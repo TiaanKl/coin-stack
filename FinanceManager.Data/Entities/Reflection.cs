@@ -1,4 +1,4 @@
-namespace FinanceManager.Data.Entities;
+namespace CoinStack.Data.Entities;
 
 public sealed class Reflection : EntityBase
 {
@@ -11,6 +11,8 @@ public sealed class Reflection : EntityBase
     public int MoodBefore { get; set; }
 
     public int MoodAfter { get; set; }
+
+    public EmotionTag? EmotionTag { get; set; }
 
     public bool IsCompleted { get; set; }
 

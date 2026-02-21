@@ -1,8 +1,8 @@
 ﻿@inherits LayoutComponentBase
 @implements IDisposable
 @using Microsoft.AspNetCore.Components.Routing
-@using FinanceManager.Services
-@using FinanceManager.Data.Entities
+@using CoinStack.Services
+@using CoinStack.Data.Entities
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 @inject IGameLoopService GameLoop
@@ -27,20 +27,13 @@
                     <button
                         class="@(_sidebarToggle ? "xl:bg-transparent dark:xl:bg-transparent bg-gray-100 dark:bg-gray-800" : "") z-99999 flex h-10 w-10 items-center justify-center rounded-lg border-gray-200 text-gray-500 xl:h-11 xl:w-11 xl:border dark:border-gray-800 dark:text-gray-400"
                         @onclick="() => _sidebarToggle = !_sidebarToggle" @onclick:stopPropagation>
-                        <svg class="hidden fill-current xl:block" width="16" height="12" viewBox="0 0 16 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M0.583252 1C0.583252 0.585788 0.919038 0.25 1.33325 0.25H14.6666C15.0808 0.25 15.4166 0.585786 15.4166 1C15.4166 1.41421 15.0808 1.75 14.6666 1.75L1.33325 1.75C0.919038 1.75 0.583252 1.41422 0.583252 1ZM0.583252 11C0.583252 10.5858 0.919038 10.25 1.33325 10.25L14.6666 10.25C15.0808 10.25 15.4166 10.5858 15.4166 11C15.4166 11.4142 15.0808 11.75 14.6666 11.75L1.33325 11.75C0.919038 11.75 0.583252 11.4142 0.583252 11ZM1.33325 5.25C0.919038 5.25 0.583252 5.58579 0.583252 6C0.583252 6.41421 0.919038 6.75 1.33325 6.75L7.99992 6.75C8.41413 6.75 8.74992 6.41421 8.74992 6C8.74992 5.58579 8.41413 5.25 7.99992 5.25L1.33325 5.25Z" fill="" />
-                        </svg>
                         @if (!_sidebarToggle)
                         {
-                            <svg class="fill-current xl:hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path fill-rule="evenodd" clip-rule="evenodd" d="M3.25 6C3.25 5.58579 3.58579 5.25 4 5.25L20 5.25C20.4142 5.25 20.75 5.58579 20.75 6C20.75 6.41421 20.4142 6.75 20 6.75L4 6.75C3.58579 6.75 3.25 6.41422 3.25 6ZM3.25 18C3.25 17.5858 3.58579 17.25 4 17.25L20 17.25C20.4142 17.25 20.75 17.5858 20.75 18C20.75 18.4142 20.4142 18.75 20 18.75L4 18.75C3.58579 18.75 3.25 18.4142 3.25 18ZM4 11.25C3.58579 11.25 3.25 11.5858 3.25 12C3.25 12.4142 3.58579 12.75 4 12.75L12 12.75C12.4142 12.75 12.75 12.4142 12.75 12C12.75 11.5858 12.4142 11.25 12 11.25L4 11.25Z" fill="" />
-                            </svg>
+                            <i class="fa-solid fa-bars xl:hidden text-xl"></i>
                         }
                         else
                         {
-                            <svg class="fill-current xl:hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path fill-rule="evenodd" clip-rule="evenodd" d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z" fill="" />
-                            </svg>
+                            <i class="fa-solid fa-xmark xl:hidden text-xl"></i>
                         }
                     </button>
                     <a href="/" class="flex items-center gap-2 xl:hidden">
@@ -55,9 +48,7 @@
                         <!-- Score -->
                          <div class="flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1.5 dark:bg-brand-500/15">
                              <span class="text-brand-500 dark:text-brand-400">
-                                <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                                </svg>
+                                <i class="fa-solid fa-star text-base"></i>
                              </span>
                              <span class="text-xs font-bold text-brand-500 dark:text-brand-400">@_totalScore pts</span>
                          </div>
@@ -65,9 +56,7 @@
                         <!-- Daily Streak Widget -->
                          <div class="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-1.5 dark:bg-gray-800">
                              <div class="@_streakColorClass">
-                                 <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                                </svg>
+                                 <i class="fa-solid fa-fire text-base"></i>
                              </div>
                              <div class="flex flex-col">
                                  <span class="text-xs font-bold @_streakColorClass">@_streakCount Day Streak</span>
@@ -82,25 +71,12 @@
                                   <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-warning-400 opacity-75"></span>
                                   <span class="relative inline-flex h-3 w-3 rounded-full bg-warning-500"></span>
                                 </span>
-                                <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M9 21c0 .5.5 1 1 1h4c.5 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.5 1 1 1h6c.5 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z" fill="currentColor"/>
-                                </svg>
+                                <i class="fa-solid fa-lightbulb text-base"></i>
                             </button>
                         }
 
-                        <!-- Dark Mode Toggler (desktop) -->
-                        <button
-                            class="hover:text-dark-900 relative flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
-                            @@click.prevent="darkMode = !darkMode">
-                            <svg class="hidden dark:block" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path fill-rule="evenodd" clip-rule="evenodd" d="M9.99998 1.5415C10.4142 1.5415 10.75 1.87729 10.75 2.2915V3.5415C10.75 3.95572 10.4142 4.2915 9.99998 4.2915C9.58577 4.2915 9.24998 3.95572 9.24998 3.5415V2.2915C9.24998 1.87729 9.58577 1.5415 9.99998 1.5415Z" fill="currentColor" />
-                            </svg>
-                            <svg class="dark:hidden" width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M17.4547 11.97L18.1799 12.1611C18.265 11.8383 18.1265 11.4982 17.8401 11.3266C17.5538 11.1551 17.1885 11.1934 16.944 11.4207L17.4547 11.97Z" fill="currentColor" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
+                            </div>
+                        </div>
             </div>
         </header>
         <!-- ===== Header End ===== -->
@@ -127,6 +103,8 @@
     private string _reflectionResponse = "";
     private int _moodBefore = 5;
     private int _moodAfter = 5;
+    private EmotionTag? _selectedEmotion;
+    private List<EmotionSpendPattern> _emotionPatterns = [];
     private bool _sidebarToggle = false;
 
     private void OnSidebarToggleChanged(bool value)
@@ -153,6 +131,11 @@
             if (_streakCount >= 7) _streakColorClass = "text-warning-500";
             else if (_streakCount >= 3) _streakColorClass = "text-brand-500";
             else _streakColorClass = "text-gray-500";
+
+            if (_pendingReflection is not null)
+            {
+                _emotionPatterns = await ReflectionService.GetEmotionPatternsAsync();
+            }
         }
         catch (Exception ex)
         {
@@ -173,7 +156,8 @@
                 _pendingReflection.Id,
                 _reflectionResponse.Trim(),
                 _moodBefore,
-                _moodAfter);
+                _moodAfter,
+                _selectedEmotion);
 
             await ScoringService.AddScoreEventAsync(
                 3,
@@ -181,7 +165,11 @@
                 "Completed a reflection");
 
             _showReflectionModal = false;
-            await LoadStateAsync(); // Refresh state
+            _reflectionResponse = "";
+            _selectedEmotion = null;
+            _moodBefore = 5;
+            _moodAfter = 5;
+            await LoadStateAsync();
         }
         catch (Exception ex)
         {
@@ -227,55 +215,90 @@
 <!-- Reflection Modal -->
 @if (_showReflectionModal && _pendingReflection != null)
 {
-    <!-- Modal Backdrop -->
     <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5 bg-gray-900/50 backdrop-blur-sm" style="z-index: 99999;">
         <div class="fixed inset-0 h-full w-full" @onclick="() => _showReflectionModal = false"></div>
-        <div class="relative w-full max-w-[500px] rounded-3xl bg-white p-6 shadow-2xl dark:bg-gray-800 lg:p-8">
+        <div class="relative w-full max-w-[380px] rounded-3xl bg-white p-5 shadow-2xl dark:bg-gray-800">
             <button
                 @onclick="() => _showReflectionModal = false"
                 type="button"
-                class="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600">
-                <svg class="fill-current" width="20" height="20" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                class="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600">
+                <i class="fa-solid fa-xmark text-sm"></i>
             </button>
 
-            <div class="text-center mb-6">
-                <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-warning-100 text-warning-600 dark:bg-warning-900/30 dark:text-warning-400">
-                    <svg class="h-6 w-6 fill-current" viewBox="0 0 24 24"><path d="M9 21c0 .5.5 1 1 1h4c.5 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.5 1 1 1h6c.5 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z"/></svg>
+            <div class="text-center mb-4">
+                <div class="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-warning-100 text-warning-600 dark:bg-warning-900/30 dark:text-warning-400">
+                    <svg class="h-5 w-5 fill-current" viewBox="0 0 24 24"><path d="M9 21c0 .5.5 1 1 1h4c.5 0 1-.5 1-1v-1H9v1zm3-19C8.1 2 5 5.1 5 9c0 2.4 1.2 4.5 3 5.7V17c0 .5.5 1 1 1h6c.5 0 1-.5 1-1v-2.3c1.8-1.3 3-3.4 3-5.7 0-3.9-3.1-7-7-7z"/></svg>
                 </div>
-                <h3 class="text-xl font-bold text-gray-800 dark:text-white">Time to Reflect</h3>
-                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">@_pendingReflection.Prompt</p>
+                <h3 class="text-base font-bold text-gray-800 dark:text-white">Time to Reflect</h3>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 leading-relaxed">@_pendingReflection.Prompt</p>
             </div>
 
-            <div class="space-y-5">
+            @if (_emotionPatterns.Count > 0)
+            {
+                var top = _emotionPatterns[0];
+                <div class="mb-3 rounded-xl bg-brand-50 px-3 py-2 text-xs text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                    <span class="font-semibold">Pattern:</span> @top.Insight
+                </div>
+            }
+
+            <div class="space-y-4">
+                <div>
+                    <p class="mb-2 text-xs font-medium text-gray-600 dark:text-gray-400">How are you feeling?</p>
+                    <div class="flex flex-wrap gap-1.5">
+                        @foreach (var tag in Enum.GetValues<EmotionTag>())
+                        {
+                            var isSelected = _selectedEmotion == tag;
+                            var (emoji, colorClass) = tag switch
+                            {
+                                EmotionTag.Proud     => ("🌟", "bg-success-50 text-success-700 border-success-300 dark:bg-success-500/15 dark:text-success-400"),
+                                EmotionTag.Motivated => ("💪", "bg-success-50 text-success-700 border-success-300 dark:bg-success-500/15 dark:text-success-400"),
+                                EmotionTag.Excited   => ("🎉", "bg-brand-50 text-brand-700 border-brand-300 dark:bg-brand-500/15 dark:text-brand-400"),
+                                EmotionTag.Stressed  => ("😰", "bg-error-50 text-error-700 border-error-300 dark:bg-error-500/15 dark:text-error-400"),
+                                EmotionTag.Anxious   => ("😟", "bg-error-50 text-error-700 border-error-300 dark:bg-error-500/15 dark:text-error-400"),
+                                EmotionTag.Impulsive => ("⚡", "bg-warning-50 text-warning-700 border-warning-300 dark:bg-warning-500/15 dark:text-warning-400"),
+                                EmotionTag.Tired     => ("😴", "bg-warning-50 text-warning-700 border-warning-300 dark:bg-warning-500/15 dark:text-warning-400"),
+                                EmotionTag.Bored     => ("😑", "bg-warning-50 text-warning-700 border-warning-300 dark:bg-warning-500/15 dark:text-warning-400"),
+                                EmotionTag.Guilty    => ("😔", "bg-orange-50 text-orange-700 border-orange-300 dark:bg-orange-500/15 dark:text-orange-400"),
+                                _                    => ("😐", "bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-700 dark:text-gray-300")
+                            };
+                            <button type="button"
+                                    @onclick="() => _selectedEmotion = isSelected ? null : tag"
+                                    class="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-all @colorClass @(isSelected ? "ring-2 ring-offset-1 ring-brand-400" : "")">
+                                @emoji @tag
+                            </button>
+                        }
+                    </div>
+                </div>
+
                 <div>
                     <div class="flex justify-between text-xs mb-1 text-gray-500 dark:text-gray-400">
                         <span>Mood Before</span>
-                        <span>@_moodBefore/10</span>
+                        <span>@_moodBefore / 10</span>
                     </div>
-                    <input type="range" min="1" max="10" @bind="_moodBefore" class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 dark:bg-gray-700" />
+                    <input type="range" min="1" max="10" @bind="_moodBefore" class="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 dark:bg-gray-700" />
                 </div>
 
                 <div>
-                    <label class="mb-2 block text-sm font-medium text-gray-800 dark:text-white">Your Thoughts</label>
+                    <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">Your Thoughts</label>
                     <textarea
                         @bind="_reflectionResponse"
-                        rows="4"
+                        rows="3"
                         placeholder="How are you feeling about your finances?"
-                        class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-3 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white">
+                        class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white">
                     </textarea>
                 </div>
 
                 <div>
-                     <div class="flex justify-between text-xs mb-1 text-gray-500 dark:text-gray-400">
+                    <div class="flex justify-between text-xs mb-1 text-gray-500 dark:text-gray-400">
                         <span>Mood After</span>
-                        <span>@_moodAfter/10</span>
+                        <span>@_moodAfter / 10</span>
                     </div>
-                    <input type="range" min="1" max="10" @bind="_moodAfter" class="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 dark:bg-gray-700" />
+                    <input type="range" min="1" max="10" @bind="_moodAfter" class="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-gray-200 dark:bg-gray-700" />
                 </div>
 
                 <button
                     @onclick="SubmitReflectionAsync"
-                    class="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-3 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
+                    class="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
                     Complete Reflection (+3 pts)
                 </button>
             </div>

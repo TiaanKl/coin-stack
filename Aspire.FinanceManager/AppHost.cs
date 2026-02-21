@@ -1,5 +1,5 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-builder.AddProject<Projects.FinanceManager>("FinanceManager");
+builder.AddProject<Projects.CoinStack>("CoinStack");
 
 builder.Build().Run();

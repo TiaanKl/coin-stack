@@ -1,4 +1,4 @@
-namespace FinanceManager.Data.Entities;
+namespace CoinStack.Data.Entities;
 
 public sealed class Transaction : EntityBase
 {
@@ -23,6 +23,19 @@ public sealed class Transaction : EntityBase
 
     public int? DebtAccountId { get; set; }
     public DebtAccount? DebtAccount { get; set; }
+
+    public ExpenseKind ExpenseKind { get; set; } = ExpenseKind.Discretionary;
+
+    /// <summary>
+    /// If true, this transaction acts as a recurring template that should be automatically applied
+    /// at the start of each budget period.
+    /// </summary>
+    public bool AutoDeduct { get; set; }
+
+    /// <summary>
+    /// If set, this transaction was auto-generated from the template identified by this id.
+    /// </summary>
+    public int? AutoDeductTemplateId { get; set; }
 
     public bool IsImpulse { get; set; }
 }

@@ -1,8 +1,8 @@
-using FinanceManager.Data;
-using FinanceManager.Data.Entities;
+using CoinStack.Data;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 /// <summary>
 /// CBT-style reflection prompts designed to increase awareness of emotional spending.
@@ -10,7 +10,7 @@ namespace FinanceManager.Services;
 /// </summary>
 public sealed class ReflectionService : IReflectionService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
     private static readonly Dictionary<ReflectionTrigger, string[]> Prompts = new()
     {
@@ -51,7 +51,7 @@ public sealed class ReflectionService : IReflectionService
         ]
     };
 
-    public ReflectionService(IDbContextFactory<FinanceManagerDbContext> dbFactory)
+    public ReflectionService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
     }
@@ -81,6 +81,7 @@ public sealed class ReflectionService : IReflectionService
         string response,
         int moodBefore,
         int moodAfter,
+        EmotionTag? emotionTag = null,
         CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -93,6 +94,7 @@ public sealed class ReflectionService : IReflectionService
         existing.Response = response;
         existing.MoodBefore = Math.Clamp(moodBefore, 1, 10);
         existing.MoodAfter = Math.Clamp(moodAfter, 1, 10);
+        existing.EmotionTag = emotionTag;
         existing.IsCompleted = true;
 
         await db.SaveChangesAsync(cancellationToken);
@@ -116,5 +118,51 @@ public sealed class ReflectionService : IReflectionService
             .Where(x => !x.IsCompleted)
             .OrderByDescending(x => x.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public async Task<List<EmotionSpendPattern>> GetEmotionPatternsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var completed = await db.Reflections
+            .AsNoTracking()
+            .Include(r => r.Transaction)
+            .Where(r => r.IsCompleted && r.EmotionTag.HasValue)
+            .ToListAsync(cancellationToken);
+
+        if (completed.Count == 0)
+        {
+            return [];
+        }
+
+        var patterns = completed
+            .GroupBy(r => r.EmotionTag!.Value)
+            .Select(g =>
+            {
+                var count = g.Count();
+                var totalSpend = g
+                    .Where(r => r.Transaction is not null && r.Transaction.Type == TransactionType.Expense)
+                    .Sum(r => r.Transaction!.Amount);
+
+                var insight = g.Key switch
+                {
+                    EmotionTag.Stressed => $"You tend to overspend when stressed ({count}x recorded).",
+                    EmotionTag.Tired => $"Tiredness led to {count} spending reflection{(count > 1 ? "s" : "")}.",
+                    EmotionTag.Impulsive => $"Impulse buying linked to {count} transaction{(count > 1 ? "s" : "")}.",
+                    EmotionTag.Bored => $"Boredom spending appeared {count} time{(count > 1 ? "s" : "")}.",
+                    EmotionTag.Anxious => $"Anxiety-driven spending occurred {count} time{(count > 1 ? "s" : "")}.",
+                    EmotionTag.Proud => $"You felt proud during {count} financial moment{(count > 1 ? "s" : "")} — keep it up!",
+                    EmotionTag.Motivated => $"Motivation drove {count} positive financial decision{(count > 1 ? "s" : "")}.",
+                    EmotionTag.Excited => $"Excitement influenced {count} purchase{(count > 1 ? "s" : "")}.",
+                    EmotionTag.Guilty => $"Guilt was tagged {count} time{(count > 1 ? "s" : "")} — reflect on patterns.",
+                    _ => $"Neutral state recorded {count} time{(count > 1 ? "s" : "")}."
+                };
+
+                return new EmotionSpendPattern(g.Key, count, totalSpend, insight);
+            })
+            .OrderByDescending(p => p.Count)
+            .ToList();
+
+        return patterns;
     }
 }

@@ -1,4 +1,4 @@
-namespace FinanceManager.Data.Entities;
+namespace CoinStack.Data.Entities;
 
 public sealed class Streak : EntityBase
 {

@@ -1,14 +1,14 @@
-using FinanceManager.Data;
+using CoinStack.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public static class DatabaseInitializer
 {
     public static async Task InitializeAsync(IServiceProvider services, CancellationToken cancellationToken = default)
     {
         await using var scope = services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<FinanceManagerDbContext>();
+        var db = scope.ServiceProvider.GetRequiredService<CoinStackDbContext>();
         await db.Database.MigrateAsync(cancellationToken);
     }
 }

@@ -1,4 +1,4 @@
-using FinanceManager.Data.Entities;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -21,6 +21,10 @@ internal sealed class ReflectionConfiguration : IEntityTypeConfiguration<Reflect
 
         builder.Property(x => x.Response)
             .HasMaxLength(2000);
+
+        builder.Property(x => x.EmotionTag)
+            .HasConversion<string>()
+            .HasMaxLength(32);
 
         builder.HasOne(x => x.Transaction)
             .WithMany()

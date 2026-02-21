@@ -1,4 +1,4 @@
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public interface IDataResetService
 {

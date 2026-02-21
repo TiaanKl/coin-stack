@@ -1,8 +1,8 @@
-using FinanceManager.Data;
-using FinanceManager.Data.Entities;
+using CoinStack.Data;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 /// <summary>
 /// Scoring algorithm:
@@ -17,9 +17,9 @@ namespace FinanceManager.Services;
 /// </summary>
 public sealed class ScoringService : IScoringService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
-    public ScoringService(IDbContextFactory<FinanceManagerDbContext> dbFactory)
+    public ScoringService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
     }
@@ -104,7 +104,7 @@ public sealed class ScoringService : IScoringService
         {
             await AddScoreEventAsync(
                 -5,
-                ScoreChangeReason.OverBudget,
+                ScoreChangeReason.ImpulseBuy,
                 "Impulse purchase recorded",
                 transaction.Id,
                 transaction.BucketId,

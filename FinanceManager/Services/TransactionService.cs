@@ -1,16 +1,16 @@
-using FinanceManager.Data;
-using FinanceManager.Data.Entities;
+using CoinStack.Data;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public sealed class TransactionService : ITransactionService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
     private readonly IGameLoopService _gameLoop;
 
     public TransactionService(
-        IDbContextFactory<FinanceManagerDbContext> dbFactory,
+        IDbContextFactory<CoinStackDbContext> dbFactory,
         IGameLoopService gameLoop)
     {
         _dbFactory = dbFactory;
@@ -57,7 +57,7 @@ public sealed class TransactionService : ITransactionService
         var existing = await db.Transactions.FirstOrDefaultAsync(x => x.Id == transaction.Id, cancellationToken);
         if (existing is null) return;
 
-        // Check impact before commiting to this change, if there is an impact, we need to revert it before applying the new one
+        // Check impact before committing to this change, if there is an impact, we need to revert it before applying the new one
         await _gameLoop.RevertTransactionImpactAsync(existing, cancellationToken);
 
         var oldDebtId = existing.DebtAccountId;
@@ -110,6 +110,106 @@ public sealed class TransactionService : ITransactionService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<decimal> GetExpenseTotalForBudgetPeriodAsync(
+        int monthStartDay,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, utcNow);
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var sum = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.Type == TransactionType.Expense
+                        && t.OccurredAtUtc >= startUtc
+                        && t.OccurredAtUtc < endUtc)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken);
+
+        return sum ?? 0m;
+    }
+
+    public async Task ApplyAutoDeductionsForBudgetPeriodAsync(
+        int monthStartDay,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, utcNow);
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var templates = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.Type == TransactionType.Expense
+                        && t.AutoDeduct
+                        && t.AutoDeductTemplateId == null)
+            .ToListAsync(cancellationToken);
+
+        if (templates.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var template in templates)
+        {
+            // If the template transaction itself falls within this period, treat it as already applied.
+            if (template.OccurredAtUtc >= startUtc && template.OccurredAtUtc < endUtc)
+            {
+                continue;
+            }
+
+            var alreadyApplied = await db.Transactions
+                .AsNoTracking()
+                .AnyAsync(t => t.AutoDeductTemplateId == template.Id
+                               && t.OccurredAtUtc >= startUtc
+                               && t.OccurredAtUtc < endUtc, cancellationToken);
+
+            if (alreadyApplied)
+            {
+                continue;
+            }
+
+            var autoTx = new Transaction
+            {
+                OccurredAtUtc = startUtc,
+                Amount = template.Amount,
+                Type = TransactionType.Expense,
+                Description = template.Description,
+                Notes = template.Notes,
+                CategoryId = template.CategoryId,
+                SubscriptionId = template.SubscriptionId,
+                BucketId = template.BucketId,
+                DebtAccountId = template.DebtAccountId,
+                IsImpulse = false,
+                ExpenseKind = template.ExpenseKind,
+                AutoDeduct = false,
+                AutoDeductTemplateId = template.Id,
+            };
+
+            db.Transactions.Add(autoTx);
+
+            var createDebtImpact = GetDebtPaymentImpact(autoTx);
+            if (autoTx.DebtAccountId.HasValue && createDebtImpact > 0)
+            {
+                await AdjustDebtBalanceAsync(db, autoTx.DebtAccountId.Value, -createDebtImpact, cancellationToken);
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
+    {
+        if (monthStartDay is < 1 or > 28)
+        {
+            monthStartDay = 1;
+        }
+
+        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
+        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
+        var endUtc = startUtc.AddMonths(1);
+        return (startUtc, endUtc);
+    }
+
     private static decimal GetDebtPaymentImpact(Transaction transaction)
     {
         return transaction.Type == TransactionType.Expense && transaction.DebtAccountId.HasValue
@@ -118,7 +218,7 @@ public sealed class TransactionService : ITransactionService
     }
 
     private static async Task AdjustDebtBalanceAsync(
-        FinanceManagerDbContext db,
+        CoinStackDbContext db,
         int debtId,
         decimal balanceDelta,
         CancellationToken cancellationToken)

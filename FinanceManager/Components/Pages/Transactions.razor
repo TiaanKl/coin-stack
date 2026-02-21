@@ -1,11 +1,12 @@
 ﻿@page "/transactions"
 @rendermode InteractiveServer
-@using FinanceManager.Data.Entities
-@using FinanceManager.Services
-@inject FinanceManager.Services.ITransactionService TransactionService
-@inject FinanceManager.Services.IBucketService BucketService
-@inject FinanceManager.Services.IDebtService DebtService
-@inject FinanceManager.Services.IGameLoopService GameLoop
+@using CoinStack.Data.Entities
+@using CoinStack.Services
+@inject CoinStack.Services.ITransactionService TransactionService
+@inject CoinStack.Services.IBucketService BucketService
+@inject CoinStack.Services.IDebtService DebtService
+@inject CoinStack.Services.IGameLoopService GameLoop
+@inject CoinStack.Services.ISettingsService SettingsService
 
 <PageTitle>Transactions</PageTitle>
 
@@ -76,10 +77,24 @@
                                     <td class="px-4 py-4">
                                         <div>
                                             <p class="text-sm font-medium text-gray-800 dark:text-white/90">@tx.Description</p>
-                                            @if (tx.IsImpulse)
-                                            {
-                                                <span class="text-xs text-warning-600 dark:text-warning-400">Impulse</span>
-                                            }
+                                            <div class="mt-0.5 flex flex-wrap items-center gap-2">
+                                                @if (tx.IsImpulse)
+                                                {
+                                                    <span class="text-xs text-warning-600 dark:text-warning-400">Impulse</span>
+                                                }
+                                                @if (tx.Type == TransactionType.Expense && tx.ExpenseKind == ExpenseKind.Mandatory)
+                                                {
+                                                    <span class="text-xs text-gray-600 dark:text-gray-400">Mandatory</span>
+                                                }
+                                                @if (tx.AutoDeduct)
+                                                {
+                                                    <span class="text-xs text-brand-500 dark:text-brand-400">Auto-deduct</span>
+                                                }
+                                                @if (tx.AutoDeductTemplateId.HasValue)
+                                                {
+                                                    <span class="text-xs text-gray-500 dark:text-gray-400">Auto</span>
+                                                }
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
@@ -231,6 +246,34 @@
                         </select>
                     </div>
 
+                    @if (_formType == TransactionType.Expense)
+                    {
+                        <div class="col-span-1">
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Expense Kind</label>
+                            <select
+                                @bind="_formExpenseKind"
+                                class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                                @foreach (var value in Enum.GetValues<ExpenseKind>())
+                                {
+                                    <option value="@value">@value</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-span-1 sm:col-span-2">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <label for="autoDeduct" class="text-sm font-medium text-gray-800 dark:text-white/90 cursor-pointer">Auto-deduct monthly?</label>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Automatically log this expense at the start of each budget period</p>
+                                </div>
+                                <label class="relative inline-flex cursor-pointer items-center">
+                                    <input type="checkbox" id="autoDeduct" @bind="_formAutoDeduct" class="peer sr-only" />
+                                    <div class="toggle-track"></div>
+                                </label>
+                            </div>
+                        </div>
+                    }
+
                     <div class="col-span-1">
                         <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-400">
                             <input type="checkbox" @bind="_formIsImpulse"
@@ -283,11 +326,17 @@
     private int? _formBucketId;
     private int? _formDebtAccountId;
     private TransactionType _formType = TransactionType.Expense;
+    private ExpenseKind _formExpenseKind = ExpenseKind.Discretionary;
+    private bool _formAutoDeduct;
     private bool _formIsImpulse;
     private string _formNotes = "";
 
     protected override async Task OnInitializedAsync()
     {
+        var now = DateTime.UtcNow;
+        var settings = await SettingsService.GetAsync();
+        await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
+
         var items = await TransactionService.GetAllAsync();
         _buckets = await BucketService.GetAllAsync();
         _debts = await DebtService.GetAllAsync();
@@ -304,6 +353,8 @@
         _formBucketId = null;
         _formDebtAccountId = null;
         _formType = TransactionType.Expense;
+        _formExpenseKind = ExpenseKind.Discretionary;
+        _formAutoDeduct = false;
         _formIsImpulse = false;
         _formNotes = "";
         _showModal = true;
@@ -317,6 +368,8 @@
         _formBucketId = tx.BucketId;
         _formDebtAccountId = tx.DebtAccountId;
         _formType = tx.Type;
+        _formExpenseKind = tx.ExpenseKind;
+        _formAutoDeduct = tx.AutoDeduct;
         _formIsImpulse = tx.IsImpulse;
         _formNotes = tx.Notes ?? "";
         _showModal = true;
@@ -339,6 +392,8 @@
                 existing.Type = _formType;
                 existing.BucketId = _formBucketId;
                 existing.DebtAccountId = _formDebtAccountId;
+                existing.ExpenseKind = _formType == TransactionType.Expense ? _formExpenseKind : ExpenseKind.Discretionary;
+                existing.AutoDeduct = _formType == TransactionType.Expense && _formAutoDeduct;
                 existing.IsImpulse = _formIsImpulse;
                 existing.Notes = string.IsNullOrWhiteSpace(_formNotes) ? null : _formNotes.Trim();
                 await TransactionService.UpdateAsync(existing);
@@ -353,6 +408,8 @@
                 Type = _formType,
                 BucketId = _formBucketId,
                 DebtAccountId = _formDebtAccountId,
+                ExpenseKind = _formType == TransactionType.Expense ? _formExpenseKind : ExpenseKind.Discretionary,
+                AutoDeduct = _formType == TransactionType.Expense && _formAutoDeduct,
                 IsImpulse = _formIsImpulse,
                 Notes = string.IsNullOrWhiteSpace(_formNotes) ? null : _formNotes.Trim(),
                 OccurredAtUtc = DateTime.UtcNow,
@@ -371,6 +428,8 @@
         _formBucketId = null;
         _formDebtAccountId = null;
         _formType = TransactionType.Expense;
+        _formExpenseKind = ExpenseKind.Discretionary;
+        _formAutoDeduct = false;
         _formIsImpulse = false;
         _formNotes = "";
         _showModal = false;

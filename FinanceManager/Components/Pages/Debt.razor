@@ -1,7 +1,7 @@
 @page "/debt"
 @rendermode InteractiveServer
-@using FinanceManager.Data.Entities
-@using FinanceManager.Services
+@using CoinStack.Data.Entities
+@using CoinStack.Services
 @inject IDebtCalculatorEngine Calculator
 @inject IDebtService DebtService
 
@@ -189,6 +189,10 @@
     <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Saved Debt Cards</h3>
+                    <button type="button" @onclick="OpenCreateDebtModal"
+                            class="inline-flex items-center justify-center rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                        + Add Debt
+                    </button>
                 </div>
 
                 @if (_isDebtLoading)

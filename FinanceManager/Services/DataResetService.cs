@@ -1,13 +1,13 @@
-using FinanceManager.Data;
+using CoinStack.Data;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public sealed class DataResetService : IDataResetService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
-    public DataResetService(IDbContextFactory<FinanceManagerDbContext> dbFactory)
+    public DataResetService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
     }

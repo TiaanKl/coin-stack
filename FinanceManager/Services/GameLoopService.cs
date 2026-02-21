@@ -1,8 +1,8 @@
-using FinanceManager.Data;
-using FinanceManager.Data.Entities;
+using CoinStack.Data;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 /// <summary>
 /// The game loop orchestrates the interaction between buckets, scoring, streaks, and reflections.
@@ -23,13 +23,16 @@ namespace FinanceManager.Services;
 /// </summary>
 public sealed class GameLoopService : IGameLoopService
 {
-    private readonly IDbContextFactory<FinanceManagerDbContext> _dbFactory;
+    private const int DailyCheckInPoints = 2;
+    private const string DailyCheckInDescription = "Daily check-in";
+
+    private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
     private readonly IBucketService _bucketService;
     private readonly IScoringService _scoringService;
     private readonly IReflectionService _reflectionService;
 
     public GameLoopService(
-        IDbContextFactory<FinanceManagerDbContext> dbFactory,
+        IDbContextFactory<CoinStackDbContext> dbFactory,
         IBucketService bucketService,
         IScoringService scoringService,
         IReflectionService reflectionService)
@@ -82,6 +85,7 @@ public sealed class GameLoopService : IGameLoopService
             streak = new Streak { Type = StreakType.DailyCheckIn, CurrentCount = 1, BestCount = 1, LastIncrementedAtUtc = now };
             db.Streaks.Add(streak);
             await db.SaveChangesAsync(cancellationToken);
+            await _scoringService.AddScoreEventAsync(2, ScoreChangeReason.DailyCheckIn, "Daily check-in!", cancellationToken: cancellationToken);
             return;
         }
 
@@ -104,6 +108,15 @@ public sealed class GameLoopService : IGameLoopService
 
         streak.LastIncrementedAtUtc = now;
         await db.SaveChangesAsync(cancellationToken);
+        await _scoringService.AddScoreEventAsync(DailyCheckInPoints, ScoreChangeReason.DailyCheckIn, DailyCheckInDescription, cancellationToken: cancellationToken);
+
+        await _scoringService.AddScoreEventAsync(
+            2,
+            ScoreChangeReason.DailyCheckIn,
+            "Daily check-in",
+            cancellationToken: cancellationToken);
+
+        await _scoringService.AddScoreEventAsync(2, ScoreChangeReason.DailyCheckIn, "Daily check-in!", cancellationToken: cancellationToken);
 
         if (streak.CurrentCount > 0 && streak.CurrentCount % 7 == 0)
         {
@@ -166,7 +179,7 @@ public sealed class GameLoopService : IGameLoopService
         if (bucket is null) return result;
 
         var monthlyLimit = await GetMonthlyLimitAsync(
-            bucket.Id,
+            transaction.CategoryId,
             currentYear,
             currentMonth,
             bucket.AllocatedAmount,
@@ -258,24 +271,27 @@ public sealed class GameLoopService : IGameLoopService
     }
 
     /// <summary>
-    /// Resolves the spending limit for a specific bucket in a specific month.
+    /// Resolves the spending limit for a specific category in a specific month.
     /// Priorities:
-    /// 1. Explicit 'Budget' entity for that Month/Year.
+    /// 1. Explicit 'Budget' entity for that Category/Month/Year.
     /// 2. Default 'AllocatedAmount' on the Bucket itself.
     /// </summary>
     private async Task<decimal> GetMonthlyLimitAsync(
-        int bucketId,
+        int? categoryId,
         int year,
         int month,
         decimal defaultLimit,
         CancellationToken cancellationToken)
     {
+        if (categoryId is null)
+            return defaultLimit;
+
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
         var monthlyOverride = await db.Budgets
             .AsNoTracking()
             .FirstOrDefaultAsync(b =>
-                b.CategoryId == bucketId &&
+                b.BucketId == bucketId &&
                 b.Year == year &&
                 b.Month == month,
                 cancellationToken);

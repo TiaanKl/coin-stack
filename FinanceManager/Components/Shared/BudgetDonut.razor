@@ -1,0 +1,91 @@
+@using Microsoft.AspNetCore.Components
+
+<div class="relative flex items-center justify-center" style="width: @SizePx; height: @SizePx;">
+    <svg viewBox="0 0 120 120" width="@Size" height="@Size" role="img" aria-label="Budget remaining">
+        <g transform="rotate(-90 60 60)">
+            <circle
+                class="text-gray-200 dark:text-gray-800"
+                cx="60" cy="60" r="@Radius"
+                fill="transparent"
+                stroke="currentColor"
+                stroke-width="@StrokeWidth" />
+
+            <circle
+                class="@RemainingColorClass"
+                cx="60" cy="60" r="@Radius"
+                fill="transparent"
+                stroke="currentColor"
+                stroke-width="@StrokeWidth"
+                stroke-linecap="butt"
+                stroke-dasharray="@RemainingDashArray"
+                stroke-dashoffset="0" />
+
+            <circle
+                class="text-gray-400"
+                cx="60" cy="60" r="@Radius"
+                fill="transparent"
+                stroke="currentColor"
+                stroke-width="@StrokeWidth"
+                stroke-linecap="butt"
+                stroke-dasharray="@SpentDashArray"
+                stroke-dashoffset="@SpentDashOffset" />
+        </g>
+    </svg>
+
+    <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <div class="@CenterTextClass font-bold @CenterTextColorClass">@RemainingText</div>
+        @if (!string.IsNullOrWhiteSpace(Caption))
+        {
+            <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">@Caption</div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public decimal BudgetLimit { get; set; }
+    [Parameter] public decimal Spent { get; set; }
+
+    [Parameter] public int Size { get; set; } = 220;
+    [Parameter] public int StrokeWidth { get; set; } = 14;
+    [Parameter] public string? Caption { get; set; } = "remaining";
+    [Parameter] public string CenterTextClass { get; set; } = "text-2xl";
+
+    private string SizePx => $"{Size}px";
+
+    private double Radius => 52;
+
+    private decimal Remaining => BudgetLimit - Spent;
+
+    private decimal RemainingNonNegative => Math.Max(0m, Remaining);
+
+    private double RemainingRatio => BudgetLimit > 0m
+        ? (double)(RemainingNonNegative / BudgetLimit)
+        : 0d;
+
+    private double SpentRatio => BudgetLimit > 0m
+        ? Math.Clamp(1d - RemainingRatio, 0d, 1d)
+        : 0d;
+
+    private double Circumference => 2d * Math.PI * Radius;
+
+    private double RemainingLength => Circumference * Math.Clamp(RemainingRatio, 0d, 1d);
+
+    private double SpentLength => Circumference - RemainingLength;
+
+    private string RemainingDashArray => $"{RemainingLength:F3} {(Circumference - RemainingLength):F3}";
+
+    private string SpentDashArray => $"{SpentLength:F3} {(Circumference - SpentLength):F3}";
+
+    private string SpentDashOffset => $"{-RemainingLength:F3}";
+
+    private string RemainingText => BudgetLimit <= 0m ? 0m.ToString("C") : Remaining.ToString("C");
+
+    private string RemainingColorClass => RemainingRatio switch
+    {
+        > 0.5d => "text-success-500",
+        >= 0.2d => "text-warning-500",
+        _ => "text-error-500"
+    };
+
+    private string CenterTextColorClass => Remaining >= 0m ? "text-gray-800 dark:text-white/90" : "text-error-500";
+}

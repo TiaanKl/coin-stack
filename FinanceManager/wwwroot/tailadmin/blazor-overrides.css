@@ -49,3 +49,49 @@ a {
 .modal-panel-enter {
   animation: modalPanelIn 0.3s ease-out both;
 }
+
+/* Toggle switch component */
+.toggle-track {
+  position: relative;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.5rem;
+  border-radius: 9999px;
+  background-color: var(--color-gray-200, #e4e7ec);
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  border: 1px solid var(--color-gray-300, #d0d5dd);
+  background-color: #fff;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.peer:checked ~ .toggle-track {
+  background-color: var(--color-brand-500, #3b82f6);
+}
+
+.peer:checked ~ .toggle-track::after {
+  transform: translateX(100%);
+  border-color: #fff;
+}
+
+.peer:focus ~ .toggle-track {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500, #3b82f6) 20%, transparent);
+}
+
+.dark .toggle-track {
+  background-color: var(--color-gray-700, #344054);
+}
+
+.dark .peer:focus ~ .toggle-track {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-800, #252dae) 30%, transparent);
+}

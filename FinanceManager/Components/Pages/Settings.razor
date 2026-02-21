@@ -1,8 +1,9 @@
 @page "/settings"
 @rendermode InteractiveServer
-@using FinanceManager.Data.Entities
-@inject FinanceManager.Services.IScoringService ScoringService
-@inject FinanceManager.Services.IDataResetService DataResetService
+@using CoinStack.Data.Entities
+@inject CoinStack.Services.IScoringService ScoringService
+@inject CoinStack.Services.IDataResetService DataResetService
+@inject CoinStack.Services.ISettingsService SettingsService
 
 <PageTitle>Settings</PageTitle>
 
@@ -67,6 +68,104 @@
         </div>
     </div>
 
+    <!-- Savings Plan -->
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+            <h3 class="text-base font-medium text-gray-800 dark:text-white/90">Savings Plan</h3>
+        </div>
+        <div class="space-y-5 p-6">
+            <!-- Amount vs % toggle -->
+            <div class="flex items-center gap-3">
+                <button type="button"
+                        @onclick="() => _savingsIsPercent = false"
+                        class="@(!_savingsIsPercent ? "bg-brand-500 text-white" : "border border-gray-300 bg-white text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300") inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition-colors">
+                    Fixed Amount
+                </button>
+                <button type="button"
+                        @onclick="() => _savingsIsPercent = true"
+                        class="@(_savingsIsPercent ? "bg-brand-500 text-white" : "border border-gray-300 bg-white text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300") inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition-colors">
+                    % of Income
+                </button>
+            </div>
+
+            @if (_savingsIsPercent)
+            {
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Monthly Savings (% of Income)</label>
+                    <div class="flex items-center rounded-md border border-gray-300 bg-white overflow-hidden focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700">
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.5"
+                            @bind="_monthlySavingsPercent"
+                            class="block w-full border-0 bg-transparent py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500" />
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center border-l border-gray-300 bg-gray-100 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                            %
+                        </div>
+                    </div>
+                    <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                        Monthly target: @FormatC(_monthlySavingsPercent / 100m * _monthlyIncome)
+                    </p>
+                </div>
+            }
+            else
+            {
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Monthly Savings Amount</label>
+                    <div class="flex items-center rounded-md border border-gray-300 bg-white overflow-hidden focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center border-r border-gray-300 bg-gray-100 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                            @GetCurrencySymbol(_currency)
+                        </div>
+                        <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            @bind="_monthlySavingsAmount"
+                            class="block w-full border-0 bg-transparent py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500"
+                            placeholder="0.00" />
+                    </div>
+                </div>
+            }
+
+            <!-- Interest rate -->
+            <div>
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Savings Interest Rate <span class="font-normal text-gray-400">(optional)</span></label>
+                <div class="flex items-center rounded-md border border-gray-300 bg-white overflow-hidden focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700">
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        @bind="_savingsInterestRate"
+                        class="block w-full border-0 bg-transparent py-3 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500"
+                        placeholder="e.g. 5.5" />
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center border-l border-gray-300 bg-gray-100 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                        %
+                    </div>
+                </div>
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Annual percentage rate earned on your savings (e.g. a high-yield savings account).</p>
+            </div>
+
+            <!-- Compounding frequency -->
+            @if (_savingsInterestRate.HasValue && _savingsInterestRate > 0)
+            {
+                <div class="flex items-center gap-3">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-400">Compounding:</span>
+                    <button type="button"
+                            @onclick="() => _savingsInterestIsYearly = true"
+                            class="@(_savingsInterestIsYearly ? "bg-brand-500 text-white" : "border border-gray-300 bg-white text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300") inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition-colors">
+                        Yearly
+                    </button>
+                    <button type="button"
+                            @onclick="() => _savingsInterestIsYearly = false"
+                            class="@(!_savingsInterestIsYearly ? "bg-brand-500 text-white" : "border border-gray-300 bg-white text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300") inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition-colors">
+                        Monthly
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+
     <!-- Scoring & Gamification -->
     <div class="mb-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
         <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
@@ -80,7 +179,7 @@
                 </div>
                 <label class="relative inline-flex cursor-pointer items-center">
                     <input type="checkbox" id="enableScoring" @bind="_enableScoring" class="peer sr-only" />
-                    <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-['\00a0'] peer-checked:bg-brand-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500/20 dark:bg-gray-700 dark:peer-focus:ring-brand-800"></div>
+                    <div class="toggle-track"></div>
                 </label>
             </div>
 
@@ -91,7 +190,7 @@
                 </div>
                 <label class="relative inline-flex cursor-pointer items-center">
                     <input type="checkbox" id="enableStreaks" @bind="_enableStreaks" class="peer sr-only" />
-                    <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-['\00a0'] peer-checked:bg-brand-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500/20 dark:bg-gray-700 dark:peer-focus:ring-brand-800"></div>
+                    <div class="toggle-track"></div>
                 </label>
             </div>
 
@@ -102,7 +201,7 @@
                 </div>
                 <label class="relative inline-flex cursor-pointer items-center">
                     <input type="checkbox" id="enableToast" @bind="_enableToast" class="peer sr-only" />
-                    <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-['\00a0'] peer-checked:bg-brand-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500/20 dark:bg-gray-700 dark:peer-focus:ring-brand-800"></div>
+                    <div class="toggle-track"></div>
                 </label>
             </div>
         </div>
@@ -121,7 +220,7 @@
                 </div>
                 <label class="relative inline-flex cursor-pointer items-center">
                     <input type="checkbox" id="enableReflections" @bind="_enableReflections" class="peer sr-only" />
-                    <div class="peer h-6 w-11 rounded-full bg-gray-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-['\00a0'] peer-checked:bg-brand-500 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand-500/20 dark:bg-gray-700 dark:peer-focus:ring-brand-800"></div>
+                    <div class="toggle-track"></div>
                 </label>
             </div>
 
@@ -258,6 +357,11 @@
     private bool _enableToast = true;
     private bool _enableReflections = true;
     private int _largeExpenseThreshold = 50;
+    private bool _savingsIsPercent;
+    private decimal _monthlySavingsAmount;
+    private decimal _monthlySavingsPercent;
+    private decimal? _savingsInterestRate;
+    private bool _savingsInterestIsYearly = true;
     private bool _confirmReset;
     private bool _confirmResetData;
     private bool _saved;
@@ -266,10 +370,46 @@
     protected override async Task OnInitializedAsync()
     {
         _currentScore = await ScoringService.GetTotalScoreAsync();
+
+        var settings = await SettingsService.GetAsync();
+        _currency = settings.Currency;
+        _monthStartDay = settings.MonthStartDay;
+        _monthlyIncome = settings.MonthlyIncome;
+        _enableScoring = settings.EnableScoring;
+        _enableStreaks = settings.EnableStreaks;
+        _enableToast = settings.EnableToast;
+        _enableReflections = settings.EnableReflections;
+        _largeExpenseThreshold = settings.LargeExpenseThreshold;
+        _savingsIsPercent = settings.SavingsIsPercent;
+        _monthlySavingsAmount = settings.MonthlySavingsAmount;
+        _monthlySavingsPercent = settings.MonthlySavingsPercent;
+        _savingsInterestRate = settings.SavingsInterestRate.HasValue && settings.SavingsInterestRate > 0
+            ? settings.SavingsInterestRate.Value * 100m
+            : null;
+        _savingsInterestIsYearly = settings.SavingsInterestIsYearly;
     }
 
     private async Task SaveSettings()
     {
+        await SettingsService.SaveAsync(new AppSettings
+        {
+            Currency = _currency,
+            MonthStartDay = _monthStartDay,
+            MonthlyIncome = _monthlyIncome,
+            EnableScoring = _enableScoring,
+            EnableStreaks = _enableStreaks,
+            EnableToast = _enableToast,
+            EnableReflections = _enableReflections,
+            LargeExpenseThreshold = _largeExpenseThreshold,
+            SavingsIsPercent = _savingsIsPercent,
+            MonthlySavingsAmount = _monthlySavingsAmount,
+            MonthlySavingsPercent = _monthlySavingsPercent,
+            SavingsInterestRate = _savingsInterestRate.HasValue && _savingsInterestRate > 0
+                ? _savingsInterestRate.Value / 100m
+                : null,
+            SavingsInterestIsYearly = _savingsInterestIsYearly
+        });
+
         _saved = true;
         StateHasChanged();
         await Task.Delay(3000);
@@ -299,6 +439,11 @@
         _enableToast = true;
         _enableReflections = true;
         _largeExpenseThreshold = 50;
+        _savingsIsPercent = false;
+        _monthlySavingsAmount = 0;
+        _monthlySavingsPercent = 0;
+        _savingsInterestRate = null;
+        _savingsInterestIsYearly = true;
         _currentScore = 0;
         _confirmReset = false;
         _confirmResetData = false;
@@ -309,6 +454,8 @@
         _saved = false;
         await InvokeAsync(StateHasChanged);
     }
+
+    private string FormatC(decimal amount) => $"{GetCurrencySymbol(_currency)}{amount:N2}";
 
     private static string GetCurrencySymbol(string currency) => currency switch
     {

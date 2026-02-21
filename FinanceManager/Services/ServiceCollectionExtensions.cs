@@ -1,4 +1,4 @@
-namespace FinanceManager.Services;
+namespace CoinStack.Services;
 
 public static class ServiceCollectionExtensions
 {
@@ -16,6 +16,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScoringService, ScoringService>();
         services.AddScoped<IReflectionService, ReflectionService>();
         services.AddScoped<IGameLoopService, GameLoopService>();
+        services.AddScoped<ISettingsService, SettingsService>();
+        services.AddScoped<IWaitlistService, WaitlistService>();
 
         return services;
     }

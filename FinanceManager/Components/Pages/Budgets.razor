@@ -1,7 +1,9 @@
 ﻿@page "/budgets"
 @rendermode InteractiveServer
-@using FinanceManager.Data.Entities
-@inject FinanceManager.Services.IBucketService BucketService
+@using CoinStack.Data.Entities
+@inject CoinStack.Services.IBucketService BucketService
+@inject CoinStack.Services.ITransactionService TransactionService
+@inject CoinStack.Services.ISettingsService SettingsService
 
 <PageTitle>Buckets</PageTitle>
 
@@ -21,6 +23,19 @@
             </svg>
         </button>
     </div>
+
+    @if (!_isLoading && _buckets.Count > 0)
+    {
+        <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
+                <div class="text-center sm:text-left">
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">Monthly Budget Remaining</h3>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">@_budgetSpent.ToString("C") spent of @_budgetLimit.ToString("C")</p>
+                </div>
+                <BudgetDonut BudgetLimit="@_budgetLimit" Spent="@_budgetSpent" Size="260" />
+            </div>
+        </div>
+    }
 
     @if (_isLoading)
     {
@@ -79,11 +94,8 @@
                             <span class="text-sm text-gray-500 dark:text-gray-400">/ @bucket.AllocatedAmount.ToString("C")</span>
                         </div>
 
-                        <div class="relative h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-800">
-                            <div
-                                class="absolute left-0 top-0 h-full rounded-full transition-all duration-500 @(isOver ? "bg-error-500" : percentUsed > 80 ? "bg-warning-500" : "bg-success-500")"
-                                style="width: @(Math.Min(percentUsed, 100).ToString("F0"))%;">
-                            </div>
+                        <div class="mt-4 flex justify-center">
+                            <BudgetDonut BudgetLimit="@bucket.AllocatedAmount" Spent="@spent" Size="160" CenterTextClass="text-lg" Caption="" />
                         </div>
                     </div>
 
@@ -113,7 +125,7 @@
                 </svg>
             </button>
 
-            <form @onsubmit="SaveBucketAsync">
+            <form @onsubmit="SaveBucketAsync" @onsubmit:preventDefault="true">
                 <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">@(_editingId.HasValue ? "Edit Bucket" : "New Bucket")</h4>
 
                 <div class="space-y-5">
@@ -171,6 +183,9 @@
     private Dictionary<int, decimal> _spentAmounts = new();
     private bool _isLoading = true;
 
+    private decimal _budgetLimit;
+    private decimal _budgetSpent;
+
     private bool _showModal;
     private int? _editingId;
     private string _formName = "";
@@ -180,6 +195,12 @@
     protected override async Task OnInitializedAsync()
     {
         var now = DateTime.UtcNow;
+
+        var settings = await SettingsService.GetAsync();
+        _budgetLimit = settings.MonthlyIncome;
+        await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
+        _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(settings.MonthStartDay, now);
+
         var items = await BucketService.GetAllAsync();
         _spentAmounts = await BucketService.GetSpentAmountsAsync(now.Year, now.Month);
         _buckets.Clear();

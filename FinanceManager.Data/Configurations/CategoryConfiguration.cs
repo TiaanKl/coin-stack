@@ -1,4 +1,4 @@
-using FinanceManager.Data.Entities;
+using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
