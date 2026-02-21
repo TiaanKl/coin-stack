@@ -1,13 +1,15 @@
 // Set up event handlers
 const reconnectModal = document.getElementById("components-reconnect-modal");
-reconnectModal.addEventListener("components-reconnect-state-changed", handleReconnectStateChanged);
-
 const retryButton = document.getElementById("components-reconnect-button");
-retryButton.addEventListener("click", retry);
-
 const resumeButton = document.getElementById("components-resume-button");
-resumeButton.addEventListener("click", resume);
 
+if (!reconnectModal || !retryButton || !resumeButton) {
+    // Required reconnect UI elements are not present; skip wiring event handlers.
+} else {
+    reconnectModal.addEventListener("components-reconnect-state-changed", handleReconnectStateChanged);
+    retryButton.addEventListener("click", retry);
+    resumeButton.addEventListener("click", resume);
+}
 function handleReconnectStateChanged(event) {
     if (event.detail.state === "show") {
         reconnectModal.showModal();
