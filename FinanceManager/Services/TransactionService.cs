@@ -57,7 +57,7 @@ public sealed class TransactionService : ITransactionService
         var existing = await db.Transactions.FirstOrDefaultAsync(x => x.Id == transaction.Id, cancellationToken);
         if (existing is null) return;
 
-        // Check impact before commiting to this change, if there is an impact, we need to revert it before applying the new one
+        // Check impact before committing to this change, if there is an impact, we need to revert it before applying the new one
         await _gameLoop.RevertTransactionImpactAsync(existing, cancellationToken);
 
         var oldDebtId = existing.DebtAccountId;
