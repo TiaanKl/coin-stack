@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace CoinStack.Data.Migrations
+namespace FinanceManager.Data.Migrations
 {
     [DbContext(typeof(CoinStackDbContext))]
     [Migration("20260220221625_AddTransactionAutoDeductFields")]

@@ -175,11 +175,13 @@ public sealed class WaitlistService : IWaitlistService
             .Select(g => new { BucketId = g.Key, Spent = g.Sum(t => t.Amount) })
             .ToListAsync(cancellationToken);
 
+        var monthlyExpensesDict = monthlyExpenses.ToDictionary(e => e.BucketId, e => e.Spent);
+
         int overCount = 0;
         int totalBuckets = buckets.Count;
         foreach (var bucket in buckets)
         {
-            var spent = monthlyExpenses.FirstOrDefault(e => e.BucketId == bucket.Id)?.Spent ?? 0m;
+            var spent = monthlyExpensesDict.GetValueOrDefault(bucket.Id);
             if (spent > bucket.AllocatedAmount)
             {
                 overCount++;
