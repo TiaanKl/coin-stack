@@ -124,7 +124,7 @@
                 </svg>
             </button>
 
-            <form @onsubmit="SaveSubscriptionAsync">
+            <form @onsubmit="SaveSubscriptionAsync" @onsubmit:preventDefault="true">
                 <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">@(_editingId.HasValue ? "Edit Subscription" : "New Subscription")</h4>
 
                 <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
