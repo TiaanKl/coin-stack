@@ -52,6 +52,7 @@ public sealed class BudgetService : IBudgetService
         existing.Year = budget.Year;
         existing.Month = budget.Month;
         existing.LimitAmount = budget.LimitAmount;
+        existing.BucketId = budget.BucketId;
         existing.CategoryId = budget.CategoryId;
 
         await db.SaveChangesAsync(cancellationToken);

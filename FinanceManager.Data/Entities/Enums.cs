@@ -45,7 +45,8 @@ public enum ScoreChangeReason
     DailyCheckIn = 5,
     ImpulseResisted = 6,
     ManualAdjustment = 7,
-    GoalAchieved = 8
+    GoalAchieved = 8,
+    ImpulseBuy = 9
 }
 
 public enum StreakType

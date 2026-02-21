@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace CoinStack.Data.Migrations
+namespace FinanceManager.Data.Migrations
 {
     /// <inheritdoc />
     public partial class SnapshotSync : Migration

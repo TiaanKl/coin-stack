@@ -104,7 +104,7 @@ public sealed class ScoringService : IScoringService
         {
             await AddScoreEventAsync(
                 -5,
-                ScoreChangeReason.OverBudget,
+                ScoreChangeReason.ImpulseBuy,
                 "Impulse purchase recorded",
                 transaction.Id,
                 transaction.BucketId,
