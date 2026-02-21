@@ -12,4 +12,7 @@ public sealed class Budget : EntityBase
 
     public int? CategoryId { get; set; }
     public Category? Category { get; set; }
+
+    public int? BucketId { get; set; }
+    public Bucket? Bucket { get; set; }
 }

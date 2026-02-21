@@ -25,6 +25,11 @@ internal sealed class BudgetConfiguration : IEntityTypeConfiguration<Budget>
             .HasForeignKey(x => x.CategoryId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(x => x.Bucket)
+            .WithMany(x => x.Budgets)
+            .HasForeignKey(x => x.BucketId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(x => new { x.Year, x.Month, x.CategoryId })
             .IsUnique();
     }

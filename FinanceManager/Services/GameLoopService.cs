@@ -85,7 +85,7 @@ public sealed class GameLoopService : IGameLoopService
             streak = new Streak { Type = StreakType.DailyCheckIn, CurrentCount = 1, BestCount = 1, LastIncrementedAtUtc = now };
             db.Streaks.Add(streak);
             await db.SaveChangesAsync(cancellationToken);
-            await _scoringService.AddScoreEventAsync(DailyCheckInPoints, ScoreChangeReason.DailyCheckIn, DailyCheckInDescription, cancellationToken: cancellationToken);
+            await _scoringService.AddScoreEventAsync(2, ScoreChangeReason.DailyCheckIn, "Daily check-in!", cancellationToken: cancellationToken);
             return;
         }
 
@@ -115,6 +115,8 @@ public sealed class GameLoopService : IGameLoopService
             ScoreChangeReason.DailyCheckIn,
             "Daily check-in",
             cancellationToken: cancellationToken);
+
+        await _scoringService.AddScoreEventAsync(2, ScoreChangeReason.DailyCheckIn, "Daily check-in!", cancellationToken: cancellationToken);
 
         if (streak.CurrentCount > 0 && streak.CurrentCount % 7 == 0)
         {
@@ -289,7 +291,7 @@ public sealed class GameLoopService : IGameLoopService
         var monthlyOverride = await db.Budgets
             .AsNoTracking()
             .FirstOrDefaultAsync(b =>
-                b.CategoryId == categoryId &&
+                b.BucketId == bucketId &&
                 b.Year == year &&
                 b.Month == month,
                 cancellationToken);
