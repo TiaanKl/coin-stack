@@ -32,12 +32,15 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.Lifetime.ApplicationStarted.Register(() =>
+if (app.Environment.IsDevelopment())
 {
-    var url = app.Urls.FirstOrDefault(u => u.StartsWith("https"))
-           ?? app.Urls.FirstOrDefault()
-           ?? "https://localhost:5001";
-    Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-});
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        var url = app.Urls.FirstOrDefault(u => u.StartsWith("https"))
+               ?? app.Urls.FirstOrDefault()
+               ?? "https://localhost:5001";
+        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+    });
+}
 
 app.Run();

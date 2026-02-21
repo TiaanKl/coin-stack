@@ -177,9 +177,10 @@ public sealed class WaitlistService : IWaitlistService
 
         int overCount = 0;
         int totalBuckets = buckets.Count;
+        var monthlyExpenseDict = monthlyExpenses.ToDictionary(e => e.BucketId, e => e.Spent);
         foreach (var bucket in buckets)
         {
-            var spent = monthlyExpenses.FirstOrDefault(e => e.BucketId == bucket.Id)?.Spent ?? 0m;
+            var spent = monthlyExpenseDict.GetValueOrDefault(bucket.Id);
             if (spent > bucket.AllocatedAmount)
             {
                 overCount++;
