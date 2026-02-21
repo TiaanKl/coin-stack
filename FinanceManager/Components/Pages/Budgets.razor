@@ -125,7 +125,7 @@
                 </svg>
             </button>
 
-            <form @onsubmit="SaveBucketAsync">
+            <form @onsubmit="SaveBucketAsync" @onsubmit:preventDefault="true">
                 <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">@(_editingId.HasValue ? "Edit Bucket" : "New Bucket")</h4>
 
                 <div class="space-y-5">
