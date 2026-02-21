@@ -1,0 +1,112 @@
+﻿@page "/income"
+@using CoinStack.Data.Entities
+@using CoinStack.Services
+@inject ITransactionService TransactionService
+
+<PageTitle>Income</PageTitle>
+
+<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <h2 class="text-title-md2 font-bold text-black dark:text-white">Income Streams</h2>
+    <a href="/transactions" class="inline-flex items-center justify-center rounded-md bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 lg:px-8 xl:px-10">
+        Add Income
+    </a>
+</div>
+
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:gap-6">
+    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <h4 class="text-lg font-semibold text-gray-500 dark:text-gray-400">Received This Month</h4>
+        <h2 class="mt-4 text-3xl font-bold text-success-600 dark:text-success-500">
+            @_monthIncome.ToString("C")
+        </h2>
+        <p class="mt-2 text-sm text-gray-500">
+            @(_incomeChange >= 0 ? "+" : "")@_incomeChange.ToString("P0") vs last month
+        </p>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <h4 class="text-lg font-semibold text-gray-500 dark:text-gray-400">Year To Date</h4>
+        <h2 class="mt-4 text-3xl font-bold text-black dark:text-white">
+            @_ytdIncome.ToString("C")
+        </h2>
+        <p class="mt-2 text-sm text-gray-500">
+            Avg. @(_ytdIncome / DateTime.Now.Month).ToString("C0") / month
+        </p>
+    </div>
+</div>
+
+<div class="mt-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+    <h3 class="mb-4 font-bold text-black dark:text-white">Income Sources</h3>
+    @if (_incomeTransactions.Any())
+    {
+        <ApexChart TItem="IncomeData" Title="" Height="300">
+            <ApexPointSeries TItem="IncomeData"
+                             Items="_chartData"
+                             Name="Amount"
+                             XValue="@(e => e.Category)"
+                             YValue="@(e => e.Amount)"
+                             SeriesType="SeriesType.Donut" />
+        </ApexChart>
+    }
+    else
+    {
+        <p class="text-gray-500">No income data yet.</p>
+    }
+</div>
+
+<div class="mt-6 rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
+    <h3 class="mb-4 font-bold text-black dark:text-white">Recent Deposits</h3>
+    <div class="flex flex-col gap-4">
+        @foreach (var t in _incomeTransactions.Take(5))
+        {
+            <div class="flex items-center justify-between border-b border-gray-100 pb-4 last:border-0 last:pb-0 dark:border-gray-800">
+                <div class="flex items-center gap-4">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-success-50 text-success-600 dark:bg-success-900/20">
+                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    </div>
+                    <div>
+                        <p class="font-medium text-black dark:text-white">@(t.Description ?? "Income")</p>
+                        <p class="text-xs text-gray-500">@t.OccurredAtUtc.ToLocalTime().ToString("MMM dd, yyyy")</p>
+                    </div>
+                </div>
+                <span class="font-bold text-success-600">+@t.Amount.ToString("C")</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<Transaction> _incomeTransactions = new();
+    private List<IncomeData> _chartData = new();
+    private decimal _monthIncome;
+    private decimal _ytdIncome;
+    private decimal _incomeChange;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var all = await TransactionService.GetAllAsync();
+
+        _incomeTransactions = all
+            .Where(t => t.Type == TransactionType.Income)
+            .OrderByDescending(t => t.OccurredAtUtc)
+            .ToList();
+
+        var now = DateTime.UtcNow;
+        var thisMonth = _incomeTransactions.Where(t => t.OccurredAtUtc.Month == now.Month && t.OccurredAtUtc.Year == now.Year).Sum(t => t.Amount);
+        var lastMonth = _incomeTransactions.Where(t => t.OccurredAtUtc.Month == now.AddMonths(-1).Month && t.OccurredAtUtc.Year == now.AddMonths(-1).Year).Sum(t => t.Amount);
+
+        _monthIncome = thisMonth;
+        _ytdIncome = _incomeTransactions.Where(t => t.OccurredAtUtc.Year == now.Year).Sum(t => t.Amount);
+
+        if (lastMonth > 0)
+        {
+            _incomeChange = (thisMonth - lastMonth) / lastMonth;
+        }
+
+        _chartData = _incomeTransactions
+            .GroupBy(t => t.Category?.Name ?? "Uncategorized")
+            .Select(g => new IncomeData(g.Key, g.Sum(t => t.Amount)))
+            .ToList();
+    }
+
+    public record IncomeData(string Category, decimal Amount);
+}

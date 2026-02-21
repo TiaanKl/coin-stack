@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Aspire.FinanceManager/Aspire.CoinStack.csproj" />
+  <Project Path="FinanceManager.Data/CoinStack.Data.csproj" />
+  <Project Path="FinanceManager/CoinStack.csproj" />
+</Solution>

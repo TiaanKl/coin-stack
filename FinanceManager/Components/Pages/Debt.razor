@@ -1,0 +1,649 @@
+@page "/debt"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@using CoinStack.Services
+@inject IDebtCalculatorEngine Calculator
+@inject IDebtService DebtService
+
+<PageTitle>Debt Calculator</PageTitle>
+
+<div class="space-y-6">
+    <div class="mb-2">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Debt Calculator</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Calculate and infer debt values across simple, compound, amortizing, and fixed-payment contracts with nullable inputs.</p>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <div class="xl:col-span-5">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Input Parameters</h3>
+
+                <form class="space-y-4" @onsubmit="CalculateAsync">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Interest Type</label>
+                            <select @bind="_model.InterestType"
+                                    class="h-11 w-full rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                                <option value="">Auto detect</option>
+                                <option value="@DebtInterestType.Simple">Simple</option>
+                                <option value="@DebtInterestType.Compound">Compound</option>
+                                <option value="@DebtInterestType.Amortizing">Amortizing</option>
+                                <option value="@DebtInterestType.None">None</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Compounding Frequency</label>
+                            <select @bind="_model.CompoundingFrequency"
+                                    class="h-11 w-full rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                                <option value="">Auto / N/A</option>
+                                <option value="@DebtCompoundingFrequency.Monthly">Monthly</option>
+                                <option value="@DebtCompoundingFrequency.Annual">Annual</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Principal (optional)</label>
+                            <InputNumber TValue="decimal?" @bind-Value="_model.Principal"
+                                         class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Total Owed (optional)</label>
+                            <InputNumber TValue="decimal?" @bind-Value="_model.TotalOwed"
+                                         class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Interest Rate (0.22 or 22)</label>
+                            <InputNumber TValue="decimal?" @bind-Value="_model.InterestRate"
+                                         class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Monthly Payment (optional)</label>
+                            <InputNumber TValue="decimal?" @bind-Value="_model.MonthlyPayment"
+                                         class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Term Months (optional)</label>
+                            <InputNumber TValue="int?" @bind-Value="_model.TermMonths"
+                                         class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Payments Made (optional)</label>
+                            <InputNumber TValue="int?" @bind-Value="_model.PaymentsMade"
+                                         class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Start Date (optional)</label>
+                            <InputDate TValue="DateTime?" @bind-Value="_model.StartDate"
+                                       class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">End Date (optional)</label>
+                            <InputDate TValue="DateTime?" @bind-Value="_model.EndDate"
+                                       class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                        </div>
+                    </div>
+
+                    @if (_result is not null && _result.Errors.Count > 0)
+                    {
+                        <div class="rounded-xl border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+                            @foreach (var error in _result.Errors)
+                            {
+                                <p>@error</p>
+                            }
+                        </div>
+                    }
+
+                    <div class="flex gap-3">
+                        <button type="submit" class="inline-flex flex-1 items-center justify-center rounded-full bg-brand-500 px-4 py-3 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                            Calculate
+                        </button>
+                        <button type="button" @onclick="ResetForm" class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                            Reset
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="xl:col-span-7">
+            <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Calculation Output</h3>
+
+                @if (_result is null)
+                {
+                    <div class="flex min-h-[220px] items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800">
+                        <p class="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+                    </div>
+                }
+                else if (!_result.IsValid)
+                {
+                    <div class="flex min-h-[220px] items-center justify-center rounded-xl bg-error-50 px-6 text-center dark:bg-error-500/10">
+                        <p class="text-sm text-error-700 dark:text-error-400">Please correct the validation errors and calculate again.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Resolved Debt Type</p>
+                                <p class="font-semibold text-gray-800 dark:text-white/90">@_result.ResolvedInterestType</p>
+                            </div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Formula Applied</p>
+                                <p class="font-semibold text-gray-800 dark:text-white/90">@_result.FormulaUsed</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">Principal</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatCurrency(_result.Principal)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">Total Owed</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatCurrency(_result.TotalOwed)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">Interest Amount</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatCurrency(_result.InterestAmount)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">Monthly Payment</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatCurrency(_result.MonthlyPayment)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">Term</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatTerm(_result.TermMonths, _result.Years)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">Remaining Balance</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatCurrency(_result.RemainingBalanceAfterPayments)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">Start Date</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatDate(_result.StartDate)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70"><p class="text-xs text-gray-500 dark:text-gray-400">End Date</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatDate(_result.EndDate)</p></div>
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70 sm:col-span-2"><p class="text-xs text-gray-500 dark:text-gray-400">Rate (normalized)</p><p class="font-semibold text-gray-800 dark:text-white/90">@FormatRate(_result.InterestRate)</p></div>
+                        </div>
+
+                        @if (_result.Inferences.Count > 0)
+                        {
+                            <div class="rounded-xl border border-success-200 bg-success-50 p-3 text-sm text-success-700 dark:border-success-500/40 dark:bg-success-500/10 dark:text-success-400">
+                                <p class="mb-1 font-medium">Inferences made</p>
+                                @foreach (var inference in _result.Inferences)
+                                {
+                                    <p>• @inference</p>
+                                }
+                            </div>
+                        }
+
+                        @if (_result.Warnings.Count > 0)
+                        {
+                            <div class="rounded-xl border border-warning-200 bg-warning-50 p-3 text-sm text-warning-700 dark:border-warning-500/40 dark:bg-warning-500/10 dark:text-warning-400">
+                                <p class="mb-1 font-medium">Warnings</p>
+                                @foreach (var warning in _result.Warnings)
+                                {
+                                    <p>• @warning</p>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Saved Debt Cards</h3>
+                    <button type="button" @onclick="OpenCreateDebtModal"
+                            class="inline-flex items-center justify-center rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                        + Add Debt
+                    </button>
+                </div>
+
+                @if (_isDebtLoading)
+        {
+            <div class="flex min-h-[180px] items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Loading debt cards...</p>
+            </div>
+        }
+        else if (_savedDebts.Count == 0)
+        {
+            <div class="flex min-h-[180px] items-center justify-center rounded-xl bg-gray-50 dark:bg-gray-800">
+                <p class="text-sm text-gray-500 dark:text-gray-400">No debt cards yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                @foreach (var debt in _savedDebts)
+                {
+                    var progressPercent = GetProgressPercent(debt);
+                    <div class="rounded-xl border border-gray-100 p-4 dark:border-gray-800">
+                        <div class="mb-3 flex items-start justify-between gap-2">
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">@debt.Name</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">@(string.IsNullOrWhiteSpace(debt.Provider) ? "No provider" : debt.Provider)</p>
+                            </div>
+                            <span class="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">@debt.InterestRatePercent.ToString("0.##")% APR</span>
+                        </div>
+
+                        <div class="mb-2 flex items-end justify-between">
+                            <p class="text-lg font-bold text-gray-800 dark:text-white/90">@debt.CurrentBalance.ToString("C")</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">of @debt.TotalAmount.ToString("C")</p>
+                        </div>
+
+                        <div class="mb-2 h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-800">
+                            <div class="h-2.5 rounded-full bg-brand-500 transition-all" style="width: @progressPercent.ToString("F0")%;"></div>
+                        </div>
+                        <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">@progressPercent.ToString("F0")% paid off</p>
+
+                        <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <p>Monthly: <span class="font-medium text-gray-700 dark:text-gray-300">@debt.MonthlyPaymentAmount.ToString("C")</span></p>
+                            <p>Start: <span class="font-medium text-gray-700 dark:text-gray-300">@debt.PaymentStartDateUtc.ToString("dd MMM yyyy")</span></p>
+                        </div>
+
+                        <div class="mt-3 flex justify-end">
+                            <button @onclick="() => OpenEditDebtModal(debt)"
+                                    class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Debt Type Examples</h3>
+
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            @foreach (var sample in _examples)
+            {
+                <div class="rounded-xl border border-gray-100 p-4 dark:border-gray-800">
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                        <h4 class="font-semibold text-gray-800 dark:text-white/90">@sample.Title</h4>
+                        <span class="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">@sample.Type</span>
+                    </div>
+                    <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">@sample.InputSummary</p>
+                    @if (sample.Result.IsValid)
+                    {
+                        <div class="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                            <p><span class="font-medium">Total Owed:</span> @FormatCurrency(sample.Result.TotalOwed)</p>
+                            <p><span class="font-medium">Monthly Payment:</span> @FormatCurrency(sample.Result.MonthlyPayment)</p>
+                            <p><span class="font-medium">Term:</span> @FormatTerm(sample.Result.TermMonths, sample.Result.Years)</p>
+                            @if (sample.RemainingExampleText is not null)
+                            {
+                                <p class="pt-1 font-medium text-brand-600 dark:text-brand-400">@sample.RemainingExampleText</p>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-sm text-error-600 dark:text-error-400">Example could not be computed.</p>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (_showDebtModal)
+{
+    <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5">
+        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[4px]" @onclick="CloseDebtModal"></div>
+        <div class="relative w-full max-w-[560px] rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8">
+            <button @onclick="CloseDebtModal"
+                    type="button"
+                    class="group absolute right-3 top-3 z-999 flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-200 text-gray-500 transition-colors hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 sm:right-6 sm:top-6 sm:h-11 sm:w-11">
+                ✕
+            </button>
+
+            <form class="space-y-4" @onsubmit="SaveDebtAsync">
+                <h4 class="text-lg font-medium text-gray-800 dark:text-white/90">@(_isCreateDebtMode ? "Add Debt Card" : "Edit Debt Card")</h4>
+
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Name</label>
+                    <input @bind="_debtFormName" type="text"
+                           class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                </div>
+
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Provider (optional)</label>
+                    <input @bind="_debtFormProvider" type="text"
+                           class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Total Amount</label>
+                        <InputNumber TValue="decimal?" @bind-Value="_debtFormTotalAmount"
+                                     class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Current Balance</label>
+                        <InputNumber TValue="decimal?" @bind-Value="_debtFormCurrentBalance"
+                                     class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Monthly Payment</label>
+                        <InputNumber TValue="decimal?" @bind-Value="_debtFormMonthlyPayment"
+                                     class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Interest Rate (%)</label>
+                        <InputNumber TValue="decimal?" @bind-Value="_debtFormInterestRatePercent"
+                                     class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Start Date</label>
+                        <InputDate TValue="DateTime?" @bind-Value="_debtFormStartDate"
+                                   class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Planned Term (months, optional)</label>
+                        <InputNumber TValue="int?" @bind-Value="_debtFormPlannedTermMonths"
+                                     class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(_debtFormError))
+                {
+                    <div class="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+                        @_debtFormError
+                    </div>
+                }
+
+                <div class="mt-4 flex justify-end gap-3">
+                    <button type="button" @onclick="CloseDebtModal"
+                            class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                            class="inline-flex items-center justify-center rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    private DebtCalculationInput _model = new();
+    private DebtCalculationResult? _result;
+    private List<DebtExampleViewModel> _examples = [];
+
+    private readonly List<DebtAccount> _savedDebts = [];
+    private bool _isDebtLoading = true;
+
+    private bool _showDebtModal;
+    private bool _isCreateDebtMode;
+    private int? _editingDebtId;
+    private string _debtFormName = "";
+    private string _debtFormProvider = "";
+    private decimal? _debtFormTotalAmount;
+    private decimal? _debtFormCurrentBalance;
+    private decimal? _debtFormMonthlyPayment;
+    private decimal? _debtFormInterestRatePercent;
+    private DateTime? _debtFormStartDate;
+    private int? _debtFormPlannedTermMonths;
+    private string _debtFormError = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        BuildExamples();
+        await LoadSavedDebtsAsync();
+    }
+
+    private Task CalculateAsync()
+    {
+        _result = Calculator.Calculate(_model);
+        return Task.CompletedTask;
+    }
+
+    private void ResetForm()
+    {
+        _model = new DebtCalculationInput();
+        _result = null;
+    }
+
+    private async Task LoadSavedDebtsAsync()
+    {
+        _isDebtLoading = true;
+
+        var debts = await DebtService.GetAllAsync();
+        _savedDebts.Clear();
+        _savedDebts.AddRange(debts.OrderByDescending(x => x.CreatedAtUtc));
+
+        _isDebtLoading = false;
+    }
+
+    private void OpenCreateDebtModal()
+    {
+        _isCreateDebtMode = true;
+        _editingDebtId = null;
+        _debtFormName = "";
+        _debtFormProvider = "";
+        _debtFormTotalAmount = null;
+        _debtFormCurrentBalance = null;
+        _debtFormMonthlyPayment = null;
+        _debtFormInterestRatePercent = null;
+        _debtFormStartDate = DateTime.UtcNow.Date;
+        _debtFormPlannedTermMonths = null;
+        _debtFormError = "";
+        _showDebtModal = true;
+    }
+
+    private void OpenEditDebtModal(DebtAccount debt)
+    {
+        _isCreateDebtMode = false;
+        _editingDebtId = debt.Id;
+        _debtFormName = debt.Name;
+        _debtFormProvider = debt.Provider ?? "";
+        _debtFormTotalAmount = debt.TotalAmount;
+        _debtFormCurrentBalance = debt.CurrentBalance;
+        _debtFormMonthlyPayment = debt.MonthlyPaymentAmount;
+        _debtFormInterestRatePercent = debt.InterestRatePercent;
+        _debtFormStartDate = debt.PaymentStartDateUtc;
+        _debtFormPlannedTermMonths = debt.PlannedTermMonths;
+        _debtFormError = "";
+        _showDebtModal = true;
+    }
+
+    private void CloseDebtModal()
+    {
+        _showDebtModal = false;
+    }
+
+    private async Task SaveDebtAsync()
+    {
+        _debtFormError = "";
+
+        if (string.IsNullOrWhiteSpace(_debtFormName))
+        {
+            _debtFormError = "Name is required.";
+            return;
+        }
+
+        if (!_debtFormTotalAmount.HasValue || _debtFormTotalAmount.Value <= 0)
+        {
+            _debtFormError = "Total amount must be greater than zero.";
+            return;
+        }
+
+        if (!_debtFormCurrentBalance.HasValue || _debtFormCurrentBalance.Value < 0)
+        {
+            _debtFormError = "Current balance cannot be negative.";
+            return;
+        }
+
+        if (_debtFormCurrentBalance.Value > _debtFormTotalAmount.Value)
+        {
+            _debtFormError = "Current balance cannot exceed total amount.";
+            return;
+        }
+
+        if (!_debtFormMonthlyPayment.HasValue || _debtFormMonthlyPayment.Value <= 0)
+        {
+            _debtFormError = "Monthly payment must be greater than zero.";
+            return;
+        }
+
+        if (!_debtFormInterestRatePercent.HasValue || _debtFormInterestRatePercent.Value < 0)
+        {
+            _debtFormError = "Interest rate cannot be negative.";
+            return;
+        }
+
+        if (!_debtFormStartDate.HasValue)
+        {
+            _debtFormError = "Start date is required.";
+            return;
+        }
+
+        if (_isCreateDebtMode)
+        {
+            await DebtService.CreateAsync(new DebtAccount
+            {
+                Name = _debtFormName.Trim(),
+                Provider = string.IsNullOrWhiteSpace(_debtFormProvider) ? null : _debtFormProvider.Trim(),
+                TotalAmount = _debtFormTotalAmount.Value,
+                CurrentBalance = _debtFormCurrentBalance.Value,
+                MonthlyPaymentAmount = _debtFormMonthlyPayment.Value,
+                InterestRatePercent = _debtFormInterestRatePercent.Value,
+                PaymentStartDateUtc = _debtFormStartDate.Value.Date,
+                PlannedTermMonths = _debtFormPlannedTermMonths
+            });
+        }
+        else if (_editingDebtId.HasValue)
+        {
+            await DebtService.UpdateAsync(new DebtAccount
+            {
+                Id = _editingDebtId.Value,
+                Name = _debtFormName.Trim(),
+                Provider = string.IsNullOrWhiteSpace(_debtFormProvider) ? null : _debtFormProvider.Trim(),
+                TotalAmount = _debtFormTotalAmount.Value,
+                CurrentBalance = _debtFormCurrentBalance.Value,
+                MonthlyPaymentAmount = _debtFormMonthlyPayment.Value,
+                InterestRatePercent = _debtFormInterestRatePercent.Value,
+                PaymentStartDateUtc = _debtFormStartDate.Value.Date,
+                PlannedTermMonths = _debtFormPlannedTermMonths
+            });
+        }
+
+        _showDebtModal = false;
+        await LoadSavedDebtsAsync();
+    }
+
+    private static decimal GetProgressPercent(DebtAccount debt)
+    {
+        if (debt.TotalAmount <= 0)
+        {
+            return 0m;
+        }
+
+        return Math.Clamp((debt.TotalAmount - debt.CurrentBalance) / debt.TotalAmount * 100m, 0m, 100m);
+    }
+
+    private void BuildExamples()
+    {
+        var simpleInput = new DebtCalculationInput
+        {
+            Principal = 74000m,
+            InterestRate = 0.22m,
+            InterestType = DebtInterestType.Simple,
+            TermMonths = 84,
+            MonthlyPayment = 2000m,
+            PaymentsMade = 47
+        };
+
+        var simpleResult = Calculator.Calculate(simpleInput);
+        var simplePayments = 47 * 2000m;
+        var simpleRemaining = simpleResult.TotalOwed.HasValue
+            ? decimal.Round(Math.Max(0m, simpleResult.TotalOwed.Value - simplePayments), 2)
+            : 0m;
+
+        _examples =
+        [
+            new DebtExampleViewModel(
+                "Simple-interest family loan",
+                "simple",
+                "principal=74 000, interestRate=0.22, years=7, payments=47×2 000",
+                simpleResult,
+                $"Remaining balance after 47 payments: {simpleRemaining:C} (total {simpleResult.TotalOwed:C} - paid {simplePayments:C})"),
+
+            new DebtExampleViewModel(
+                "Compound-interest debt (monthly)",
+                "compound",
+                "principal=120 000, interestRate=22%, termMonths=84, monthly compounding",
+                Calculator.Calculate(new DebtCalculationInput
+                {
+                    Principal = 120000m,
+                    InterestRate = 22m,
+                    InterestType = DebtInterestType.Compound,
+                    CompoundingFrequency = DebtCompoundingFrequency.Monthly,
+                    TermMonths = 84
+                }),
+                null),
+
+            new DebtExampleViewModel(
+                "Amortizing bank loan",
+                "amortizing",
+                "principal=120 000, interestRate=22%, termMonths=84",
+                Calculator.Calculate(new DebtCalculationInput
+                {
+                    Principal = 120000m,
+                    InterestRate = 22m,
+                    InterestType = DebtInterestType.Amortizing,
+                    TermMonths = 84
+                }),
+                null),
+
+            new DebtExampleViewModel(
+                "No-interest phone contract",
+                "none",
+                "monthlyPayment=600, termMonths=36",
+                Calculator.Calculate(new DebtCalculationInput
+                {
+                    MonthlyPayment = 600m,
+                    TermMonths = 36,
+                    InterestType = DebtInterestType.None
+                }),
+                null)
+        ];
+    }
+
+    private static string FormatCurrency(decimal? value)
+    {
+        return value.HasValue ? value.Value.ToString("C") : "—";
+    }
+
+    private static string FormatDate(DateTime? value)
+    {
+        return value.HasValue ? value.Value.ToString("dd MMM yyyy") : "—";
+    }
+
+    private static string FormatRate(decimal? value)
+    {
+        return value.HasValue ? $"{value:P2}" : "—";
+    }
+
+    private static string FormatTerm(int? months, decimal? years)
+    {
+        if (!months.HasValue && !years.HasValue)
+        {
+            return "—";
+        }
+
+        return $"{(months?.ToString() ?? "?")} month(s) / {(years?.ToString("0.##") ?? "?")} years";
+    }
+
+    private sealed record DebtExampleViewModel(
+        string Title,
+        string Type,
+        string InputSummary,
+        DebtCalculationResult Result,
+        string? RemainingExampleText);
+}
