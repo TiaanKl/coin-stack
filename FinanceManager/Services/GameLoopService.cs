@@ -23,6 +23,9 @@ namespace CoinStack.Services;
 /// </summary>
 public sealed class GameLoopService : IGameLoopService
 {
+    private const int DailyCheckInPoints = 2;
+    private const string DailyCheckInDescription = "Daily check-in";
+
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
     private readonly IBucketService _bucketService;
     private readonly IScoringService _scoringService;
@@ -82,11 +85,7 @@ public sealed class GameLoopService : IGameLoopService
             streak = new Streak { Type = StreakType.DailyCheckIn, CurrentCount = 1, BestCount = 1, LastIncrementedAtUtc = now };
             db.Streaks.Add(streak);
             await db.SaveChangesAsync(cancellationToken);
-            await _scoringService.AddScoreEventAsync(
-                2,
-                ScoreChangeReason.DailyCheckIn,
-                "Daily check-in",
-                cancellationToken: cancellationToken);
+            await _scoringService.AddScoreEventAsync(DailyCheckInPoints, ScoreChangeReason.DailyCheckIn, DailyCheckInDescription, cancellationToken: cancellationToken);
             return;
         }
 
@@ -109,6 +108,7 @@ public sealed class GameLoopService : IGameLoopService
 
         streak.LastIncrementedAtUtc = now;
         await db.SaveChangesAsync(cancellationToken);
+        await _scoringService.AddScoreEventAsync(DailyCheckInPoints, ScoreChangeReason.DailyCheckIn, DailyCheckInDescription, cancellationToken: cancellationToken);
 
         await _scoringService.AddScoreEventAsync(
             2,
