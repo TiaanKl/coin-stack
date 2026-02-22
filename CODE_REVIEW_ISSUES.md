@@ -185,7 +185,7 @@ The following issue tickets are ready to be created manually in GitHub.
 - User preference has no effect on trigger behavior.
 
 **Evidence**
-- `FinanceManager/Components/Pages/Settings.razor:382` and `:403`
+- `FinanceManager/Components/Pages/Settings.razor:382-403`
 - `FinanceManager/Services/GameLoopService.cs:251-253`
 
 **Expected fix direction**
