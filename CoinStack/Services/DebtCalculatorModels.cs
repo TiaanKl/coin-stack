@@ -24,6 +24,7 @@ public sealed class DebtCalculationInput
     public decimal? TotalOwed { get; set; }
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
+    public DateTime? FirstPaymentDate { get; set; }
     public int? TermMonths { get; set; }
     public int? PaymentsMade { get; set; }
 }
@@ -51,4 +52,30 @@ public sealed class DebtCalculationResult
     public DateTime? EndDate { get; init; }
 
     public string FormulaUsed { get; init; } = "";
+    public AmortisationScheduleResult? AmortisationSchedule { get; init; }
+}
+
+public sealed class AmortisationRow
+{
+    public int PaymentNumber { get; init; }
+    public DateTime PaymentDate { get; init; }
+    public decimal StartingBalance { get; init; }
+    public decimal Payment { get; init; }
+    public decimal InterestPortion { get; init; }
+    public decimal PrincipalPortion { get; init; }
+    public decimal EndingBalance { get; init; }
+    public bool IsPaid { get; init; }
+}
+
+public sealed class AmortisationScheduleResult
+{
+    public List<AmortisationRow> Rows { get; init; } = [];
+    public decimal TotalInterestPaidToDate { get; init; }
+    public decimal TotalPrincipalRepaidToDate { get; init; }
+    public decimal TotalAmountPaidToDate { get; init; }
+    public decimal CurrentRemainingBalance { get; init; }
+    public int PaymentsMadeCount { get; init; }
+    public int PaymentsRemainingCount { get; init; }
+    public DateTime? PayoffDate { get; init; }
+    public decimal PercentageCompleted { get; init; }
 }

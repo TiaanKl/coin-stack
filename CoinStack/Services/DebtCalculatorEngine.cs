@@ -91,6 +91,20 @@ public sealed class DebtCalculatorEngine : IDebtCalculatorEngine
             }
         }
 
+        AmortisationScheduleResult? amortisationSchedule = null;
+        if (errors.Count == 0
+            && input.FirstPaymentDate.HasValue
+            && principal.HasValue
+            && monthlyPayment.HasValue
+            && resolvedType is DebtInterestType.Simple or DebtInterestType.Amortizing or DebtInterestType.None)
+        {
+            amortisationSchedule = BuildAmortisationSchedule(
+                principal.Value,
+                interestRate,
+                monthlyPayment.Value,
+                input.FirstPaymentDate.Value.Date);
+        }
+
         return new DebtCalculationResult
         {
             IsValid = errors.Count == 0,
@@ -109,7 +123,8 @@ public sealed class DebtCalculatorEngine : IDebtCalculatorEngine
             Years = years.HasValue ? decimal.Round(years.Value, 2) : null,
             StartDate = startDate,
             EndDate = endDate,
-            FormulaUsed = GetFormulaLabel(resolvedType)
+            FormulaUsed = GetFormulaLabel(resolvedType),
+            AmortisationSchedule = amortisationSchedule
         };
     }
 
@@ -449,6 +464,69 @@ public sealed class DebtCalculatorEngine : IDebtCalculatorEngine
         }
 
         totalOwed = monthlyPayment.Value * termMonths.Value;
+    }
+
+    private static AmortisationScheduleResult BuildAmortisationSchedule(
+        decimal principal,
+        decimal? annualRate,
+        decimal monthlyPayment,
+        DateTime firstPaymentDate)
+    {
+        var monthlyRate = annualRate.HasValue ? annualRate.Value / 12m : 0m;
+        var today = DateTime.Today;
+        var rows = new List<AmortisationRow>();
+        var balance = principal;
+
+        for (var n = 1; balance > 0.005m && rows.Count < 1200; n++)
+        {
+            var paymentDate = firstPaymentDate.AddMonths(n - 1);
+            var startingBalance = balance;
+            var interest = decimal.Round(balance * monthlyRate, 2);
+            var totalDue = balance + interest;
+            var payment = decimal.Round(Math.Min(monthlyPayment, totalDue), 2);
+            var principalPaid = decimal.Round(Math.Max(0m, payment - interest), 2);
+            var endingBalance = decimal.Round(Math.Max(0m, startingBalance - principalPaid), 2);
+            var isPaid = paymentDate.Date < today;
+
+            rows.Add(new AmortisationRow
+            {
+                PaymentNumber = n,
+                PaymentDate = paymentDate,
+                StartingBalance = startingBalance,
+                Payment = payment,
+                InterestPortion = interest,
+                PrincipalPortion = principalPaid,
+                EndingBalance = endingBalance,
+                IsPaid = isPaid
+            });
+
+            balance = endingBalance;
+        }
+
+        var paidRows = rows.Where(r => r.IsPaid).ToList();
+        var paymentsMade = paidRows.Count;
+        var totalInterestPaid = decimal.Round(paidRows.Sum(r => r.InterestPortion), 2);
+        var totalPrincipalRepaid = decimal.Round(paidRows.Sum(r => r.PrincipalPortion), 2);
+        var totalAmountPaid = decimal.Round(paidRows.Sum(r => r.Payment), 2);
+        var currentRemainingBalance = paymentsMade > 0 ? paidRows[^1].EndingBalance : principal;
+        var paymentsRemaining = rows.Count - paymentsMade;
+        var payoffDate = rows.LastOrDefault()?.PaymentDate;
+        var percentageCompleted = principal > 0
+            ? decimal.Round(totalPrincipalRepaid / principal * 100m, 2)
+            : 0m;
+
+        return new AmortisationScheduleResult
+        {
+            Rows = rows,
+            TotalInterestPaidToDate = totalInterestPaid,
+            TotalPrincipalRepaidToDate = totalPrincipalRepaid,
+            TotalAmountPaidToDate = totalAmountPaid,
+            CurrentRemainingBalance = currentRemainingBalance,
+            PaymentsMadeCount = paymentsMade,
+            PaymentsRemainingCount = paymentsRemaining,
+            PayoffDate = payoffDate,
+            PercentageCompleted = percentageCompleted
+        };
     }
 
     private static decimal? CalculateRemainingBalance(

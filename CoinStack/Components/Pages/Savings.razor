@@ -1,0 +1,311 @@
+@page "/savings"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@using CoinStack.Services
+@inject ISavingsService SavingsService
+@inject ISettingsService SettingsService
+
+<PageTitle>Savings</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Savings</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Active savings tracked with interest and fallback coverage</p>
+        </div>
+        <button @onclick="RecalculateAsync"
+                disabled="@_calculating"
+                class="inline-flex items-center justify-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 disabled:opacity-50">
+            <svg class="h-4 w-4 @(_calculating ? "animate-spin" : "")" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            @(_calculating ? "Calculating..." : "Apply This Month")
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_toast))
+    {
+        <div class="rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-sm font-medium text-success-700 dark:border-success-500/30 dark:bg-success-500/10 dark:text-success-400">
+            @_toast
+        </div>
+    }
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Total Saved</p>
+            <p class="mt-2 text-2xl font-bold text-gray-800 dark:text-white">@FormatC(_state.Total)</p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Available</p>
+            <p class="mt-2 text-2xl font-bold text-success-600 dark:text-success-500">@FormatC(_state.Available)</p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">This Month</p>
+            <p class="mt-2 text-2xl font-bold text-brand-600 dark:text-brand-400">@FormatC(_thisMonthBase)</p>
+        </div>
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Interest Earned</p>
+            <p class="mt-2 text-2xl font-bold text-purple-600 dark:text-purple-400">@FormatC(_thisMonthInterest)</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+
+        <!-- Savings Rule -->
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="mb-4 flex items-center justify-between">
+                <h3 class="font-semibold text-gray-800 dark:text-white/90">Savings Rule</h3>
+                <a href="/settings" class="text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400">Edit Rule</a>
+            </div>
+            <div class="space-y-3 text-sm text-gray-700 dark:text-gray-300">
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+                    <span class="text-gray-500 dark:text-gray-400">Rule type</span>
+                    <span class="font-medium">@(_settings.SavingsIsPercent ? $"{_settings.MonthlySavingsPercent:G4}% of income" : $"Fixed {FormatC(_settings.MonthlySavingsAmount)} / month")</span>
+                </div>
+                @if (_settings.SavingsInterestRate.HasValue && _settings.SavingsInterestRate > 0)
+                {
+                    <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+                        <span class="text-gray-500 dark:text-gray-400">Interest rate</span>
+                        <span class="font-medium">@((_settings.SavingsInterestRate.Value * 100).ToString("G4"))% APR (@(_settings.SavingsInterestIsYearly ? "yearly" : "monthly") compounding)</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+                        <span class="text-gray-500 dark:text-gray-400">Interest rate</span>
+                        <span class="text-gray-400 dark:text-gray-500">None configured</span>
+                    </div>
+                }
+                <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+                    <span class="text-gray-500 dark:text-gray-400">Monthly income (base)</span>
+                    <span class="font-medium">@FormatC(_settings.MonthlyIncome)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fallback -->
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+            <h3 class="mb-4 font-semibold text-gray-800 dark:text-white/90">Fallback Coverage</h3>
+            <div class="mb-5 flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-800 dark:text-white/90">Allow savings to cover overspending</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Savings will automatically dip in when buckets run short</p>
+                </div>
+                <label class="relative inline-flex cursor-pointer items-center">
+                    <input type="checkbox" @bind="_fallbackEnabled" @bind:after="OnFallbackToggleAsync" class="peer sr-only" />
+                    <div class="toggle-track"></div>
+                </label>
+            </div>
+
+            @if (_fallbackEnabled)
+            {
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between rounded-xl bg-warning-50 px-4 py-3 dark:bg-warning-500/10">
+                        <span class="text-sm text-warning-700 dark:text-warning-400">Used this month</span>
+                        <span class="font-semibold text-warning-700 dark:text-warning-400">@FormatC(_fallbackThisMonth)</span>
+                    </div>
+                    @if (_topFallbackSources.Count > 0)
+                    {
+                        <div class="rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+                            <p class="mb-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Top categories</p>
+                            @foreach (var (source, amount) in _topFallbackSources)
+                            {
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-700 dark:text-gray-300">@source</span>
+                                    <span class="text-sm font-medium text-gray-800 dark:text-white">@FormatC(amount)</span>
+                                </div>
+                            }
+                        </div>
+                    }
+                    <a href="/savings/fallback-history"
+                       class="inline-flex items-center gap-1 text-sm font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400">
+                        View fallback history
+                        <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Projection -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h3 class="font-semibold text-gray-800 dark:text-white/90">Savings Projection</h3>
+            <div class="flex items-center gap-3">
+                <label class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                    <input type="checkbox" @bind="_projectionIncludeInterest" @bind:after="LoadProjectionsAsync"
+                           class="h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700" />
+                    Show interest
+                </label>
+                <select @bind="_projectionMonths" @bind:after="LoadProjectionsAsync"
+                        class="rounded-lg border border-gray-300 bg-transparent px-3 py-1.5 text-sm text-gray-800 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    <option value="6">6 months</option>
+                    <option value="12" selected>12 months</option>
+                    <option value="24">24 months</option>
+                    <option value="36">36 months</option>
+                </select>
+            </div>
+        </div>
+        @if (_projections.Count == 0)
+        {
+            <div class="flex min-h-[260px] items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Configure a savings rule to see projections</p>
+            </div>
+        }
+        else
+        {
+            <ApexChart TItem="SavingsProjectionPoint" Height="260">
+                <ApexPointSeries TItem="SavingsProjectionPoint"
+                                 Items="_projections"
+                                 Name="Projected Savings"
+                                 XValue="@(x => x.Month)"
+                                 YValue="@(x => x.Projected)"
+                                 SeriesType="SeriesType.Area"
+                                 Color="#3C50E0" />
+            </ApexChart>
+        }
+    </div>
+
+    <!-- Monthly History -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <h3 class="mb-4 font-semibold text-gray-800 dark:text-white/90">Monthly History</h3>
+        @if (_history.Count == 0)
+        {
+            <div class="flex min-h-[160px] items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+                <p class="text-sm text-gray-500 dark:text-gray-400">No history yet. Press "Apply This Month" to record your first month.</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100 text-xs uppercase text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                            <th class="pb-3 pr-4 font-medium">Month</th>
+                            <th class="pb-3 pr-4 text-right font-medium">Base</th>
+                            <th class="pb-3 pr-4 text-right font-medium">Interest</th>
+                            <th class="pb-3 pr-4 text-right font-medium">Added</th>
+                            <th class="pb-3 text-right font-medium">Running Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in _history)
+                        {
+                            <tr class="border-b border-gray-50 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50">
+                                <td class="py-3 pr-4 font-medium text-gray-800 dark:text-white/90">@FormatMonth(row.Month)</td>
+                                <td class="py-3 pr-4 text-right text-gray-600 dark:text-gray-300">@FormatC(row.Base)</td>
+                                <td class="py-3 pr-4 text-right text-purple-600 dark:text-purple-400">@FormatC(row.Interest)</td>
+                                <td class="py-3 pr-4 text-right font-medium text-success-600 dark:text-success-500">@FormatC(row.Total)</td>
+                                <td class="py-3 text-right font-bold text-gray-800 dark:text-white/90">@FormatC(row.RunningTotal)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private SavingsState _state = new();
+    private AppSettings _settings = new();
+    private List<SavingsMonthlySummary> _history = [];
+    private List<SavingsFallbackEvent> _fallbackEvents = [];
+    private List<SavingsProjectionPoint> _projections = [];
+    private List<(string Source, decimal Amount)> _topFallbackSources = [];
+
+    private decimal _thisMonthBase;
+    private decimal _thisMonthInterest;
+    private decimal _fallbackThisMonth;
+    private bool _fallbackEnabled;
+    private bool _calculating;
+    private string _toast = "";
+
+    private int _projectionMonths = 12;
+    private bool _projectionIncludeInterest = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAllAsync();
+    }
+
+    private async Task LoadAllAsync()
+    {
+        _settings = await SettingsService.GetAsync();
+        _state = await SavingsService.GetStateAsync();
+        _fallbackEnabled = _state.FallbackEnabled;
+        _history = await SavingsService.GetMonthlySummariesAsync();
+        _fallbackEvents = await SavingsService.GetFallbackEventsAsync();
+        _fallbackThisMonth = await SavingsService.GetFallbackUsedThisMonthAsync();
+
+        var currentMonth = DateTime.UtcNow.ToString("yyyy-MM");
+        var thisMonth = _history.FirstOrDefault(x => x.Month == currentMonth);
+        _thisMonthBase = thisMonth?.Base ?? 0m;
+        _thisMonthInterest = thisMonth?.Interest ?? 0m;
+
+        // Top fallback sources this calendar month
+        var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        _topFallbackSources = _fallbackEvents
+            .Where(x => x.OccurredAtUtc >= monthStart)
+            .GroupBy(x => x.SourceName)
+            .Select(g => (g.Key, g.Sum(e => e.AmountUsed)))
+            .OrderByDescending(x => x.Item2)
+            .Take(3)
+            .ToList();
+
+        await LoadProjectionsAsync();
+    }
+
+    private async Task LoadProjectionsAsync()
+    {
+        _projections = await SavingsService.GetProjectionsAsync(_projectionMonths, _projectionIncludeInterest);
+    }
+
+    private async Task RecalculateAsync()
+    {
+        _calculating = true;
+        _toast = "";
+        StateHasChanged();
+
+        var result = await SavingsService.CalculateMonthAsync();
+        await LoadAllAsync();
+
+        _toast = result is not null
+            ? $"Month {result.Month} recorded — +{FormatC(result.Total)} added."
+            : "This month has already been calculated.";
+
+        _calculating = false;
+    }
+
+    private async Task OnFallbackToggleAsync()
+    {
+        await SavingsService.SetFallbackEnabledAsync(_fallbackEnabled);
+    }
+
+    private string FormatMonth(string yyyyMM)
+    {
+        if (DateTime.TryParseExact(yyyyMM + "-01", "yyyy-MM-dd", null,
+                System.Globalization.DateTimeStyles.None, out var dt))
+        {
+            return dt.ToString("MMMM yyyy");
+        }
+
+        return yyyyMM;
+    }
+
+    private string FormatC(decimal amount) => $"{GetCurrencySymbol(_settings.Currency)}{amount:N2}";
+
+    private static string GetCurrencySymbol(string currency) => currency switch
+    {
+        "USD" => "$",
+        "EUR" => "€",
+        "GBP" => "£",
+        "CAD" => "C$",
+        "AUD" => "A$",
+        "ZAR" => "R",
+        _ => "$"
+    };
+}

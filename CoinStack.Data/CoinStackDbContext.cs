@@ -21,6 +21,9 @@ public sealed class CoinStackDbContext : DbContext
     public DbSet<Reflection> Reflections => Set<Reflection>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
     public DbSet<WaitlistItem> WaitlistItems => Set<WaitlistItem>();
+    public DbSet<SavingsState> SavingsState => Set<SavingsState>();
+    public DbSet<SavingsMonthlySummary> SavingsMonthlySummaries => Set<SavingsMonthlySummary>();
+    public DbSet<SavingsFallbackEvent> SavingsFallbackEvents => Set<SavingsFallbackEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

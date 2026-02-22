@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IGameLoopService, GameLoopService>();
         services.AddScoped<ISettingsService, SettingsService>();
         services.AddScoped<IWaitlistService, WaitlistService>();
+        services.AddScoped<ISavingsService, SavingsService>();
 
         return services;
     }
