@@ -10,7 +10,8 @@ public enum TransactionType
 public enum ExpenseKind
 {
     Discretionary = 0,
-    Mandatory = 1
+    Mandatory = 1,
+    ForceMajeure = 2
 }
 
 public enum SubscriptionCycle
@@ -46,7 +47,8 @@ public enum ScoreChangeReason
     ImpulseResisted = 6,
     ManualAdjustment = 7,
     GoalAchieved = 8,
-    ImpulseBuy = 9
+    ImpulseBuy = 9,
+    ForceMajeure = 10
 }
 
 public enum StreakType

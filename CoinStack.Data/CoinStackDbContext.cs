@@ -1,9 +1,10 @@
 using CoinStack.Data.Entities;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Data;
 
-public sealed class CoinStackDbContext : DbContext
+public sealed class CoinStackDbContext : IdentityDbContext<ApplicationUser>
 {
     public CoinStackDbContext(DbContextOptions<CoinStackDbContext> options) : base(options)
     {

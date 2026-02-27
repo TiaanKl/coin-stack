@@ -19,10 +19,14 @@ namespace CoinStack.Services;
 public sealed class WaitlistService : IWaitlistService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
+    private readonly ISettingsService _settingsService;
 
-    public WaitlistService(IDbContextFactory<CoinStackDbContext> dbFactory)
+    public WaitlistService(
+        IDbContextFactory<CoinStackDbContext> dbFactory,
+        ISettingsService settingsService)
     {
         _dbFactory = dbFactory;
+        _settingsService = settingsService;
     }
 
     // ──────────────────────────────────────────────────────────────────────────
@@ -155,8 +159,8 @@ public sealed class WaitlistService : IWaitlistService
         }
 
         var now = DateTime.UtcNow;
-        var thisYear = now.Year;
-        var thisMonth = now.Month;
+    var settings = await _settingsService.GetAsync(cancellationToken);
+    var (periodStartUtc, periodEndUtc) = GetBudgetPeriodBoundsUtc(settings.MonthStartDay, now);
 
         // ── 1. Budget Health (0–20) ──────────────────────────────────────────
         // Compare actual spending against bucket allocations this month.
@@ -168,8 +172,8 @@ public sealed class WaitlistService : IWaitlistService
         var monthlyExpenses = await db.Transactions
             .AsNoTracking()
             .Where(x => x.Type == TransactionType.Expense
-                     && x.OccurredAtUtc.Year == thisYear
-                     && x.OccurredAtUtc.Month == thisMonth
+                     && x.OccurredAtUtc >= periodStartUtc
+                     && x.OccurredAtUtc < periodEndUtc
                      && x.BucketId != null)
             .GroupBy(x => x.BucketId!.Value)
             .Select(g => new { BucketId = g.Key, Spent = g.Sum(t => t.Amount) })
@@ -179,7 +183,6 @@ public sealed class WaitlistService : IWaitlistService
 
         int overCount = 0;
         int totalBuckets = buckets.Count;
-        var monthlyExpenseDict = monthlyExpenses.ToDictionary(e => e.BucketId, e => e.Spent);
         foreach (var bucket in buckets)
         {
             var spent = expenseByBucket.GetValueOrDefault(bucket.Id, 0m);
@@ -203,14 +206,22 @@ public sealed class WaitlistService : IWaitlistService
 
         if (savingsBucket is not null && savingsBucket.AllocatedAmount > 0)
         {
-            var savedThisMonth = await db.Transactions
+            var monthlySavingsTransactions = await db.Transactions
                 .AsNoTracking()
                 .Where(x => x.BucketId == savingsBucket.Id
-                         && x.OccurredAtUtc.Year == thisYear
-                         && x.OccurredAtUtc.Month == thisMonth)
-                .SumAsync(x => x.Amount, cancellationToken);
+                         && x.OccurredAtUtc >= periodStartUtc
+                         && x.OccurredAtUtc < periodEndUtc)
+                .ToListAsync(cancellationToken);
 
-            var savingsRate = (double)(savedThisMonth / savingsBucket.AllocatedAmount);
+            var netSavedThisMonth = monthlySavingsTransactions.Sum(x =>
+                x.Type == TransactionType.Expense ? -x.Amount : x.Amount);
+
+            if (netSavedThisMonth < 0)
+            {
+                netSavedThisMonth = 0;
+            }
+
+            var savingsRate = (double)(netSavedThisMonth / savingsBucket.AllocatedAmount);
 
             savingsScore = savingsRate >= 1.0 ? 20
                          : savingsRate >= 0.75 ? 17
@@ -228,9 +239,14 @@ public sealed class WaitlistService : IWaitlistService
         var monthlyIncome = await db.Transactions
             .AsNoTracking()
             .Where(x => x.Type == TransactionType.Income
-                     && x.OccurredAtUtc.Year == thisYear
-                     && x.OccurredAtUtc.Month == thisMonth)
+                     && x.OccurredAtUtc >= periodStartUtc
+                     && x.OccurredAtUtc < periodEndUtc)
             .SumAsync(x => x.Amount, cancellationToken);
+
+        if (monthlyIncome <= 0 && settings.MonthlyIncome > 0)
+        {
+            monthlyIncome = settings.MonthlyIncome;
+        }
 
         var totalMonthlyDebt = debts.Sum(d => d.MonthlyPaymentAmount);
 
@@ -317,6 +333,19 @@ public sealed class WaitlistService : IWaitlistService
         CoolOffPeriod.Days30 => TimeSpan.FromDays(30),
         _ => TimeSpan.FromDays(7)
     };
+
+    private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
+    {
+        if (monthStartDay is < 1 or > 28)
+        {
+            monthStartDay = 1;
+        }
+
+        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
+        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
+        var endUtc = startUtc.AddMonths(1);
+        return (startUtc, endUtc);
+    }
 
     public static string CoolOffLabel(CoolOffPeriod period) => period switch
     {

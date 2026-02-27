@@ -3,6 +3,8 @@
 @using CoinStack.Data.Entities
 
 @inject IWaitlistService WaitlistService
+@inject ISettingsService SettingsService
+@inject IMoneyFormatter MoneyFormatter
 
 <PageTitle>The Waitlist</PageTitle>
 
@@ -93,7 +95,7 @@
                     <div class="flex items-center justify-between gap-3">
                         <div>
                             <p class="text-xs text-gray-500 dark:text-gray-400">Estimated cost</p>
-                            <p class="text-xl font-bold text-gray-800 dark:text-white/90">@item.EstimatedCost.ToString("C")</p>
+                            <p class="text-xl font-bold text-gray-800 dark:text-white/90">@FormatC(item.EstimatedCost)</p>
                         </div>
                         <div class="flex flex-col items-center rounded-xl @scoreBg px-4 py-2">
                             <p class="text-2xl font-extrabold @scoreColor">@item.Score</p>
@@ -294,6 +296,7 @@
 }
 
 @code {
+    private AppSettings _settings = new();
     private readonly List<WaitlistItem> _items = [];
     private bool _isLoading = true;
 
@@ -312,6 +315,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _settings = await SettingsService.GetAsync();
         await WaitlistService.EvaluateCoolOffsAsync();
         await LoadAsync();
     }
@@ -457,4 +461,6 @@
         CoolOffPeriod.Days30  => "30 days",
         _                     => "7 days"
     };
+
+    private string FormatC(decimal amount, int decimals = 2) => MoneyFormatter.Format(_settings.Currency, amount, decimals);
 }

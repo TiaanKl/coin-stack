@@ -5,8 +5,8 @@
 @inject CoinStack.Services.ITransactionService TransactionService
 @inject CoinStack.Services.IBucketService BucketService
 @inject CoinStack.Services.IDebtService DebtService
-@inject CoinStack.Services.IGameLoopService GameLoop
 @inject CoinStack.Services.ISettingsService SettingsService
+@inject CoinStack.Services.ISavingsService SavingsService
 
 <PageTitle>Transactions</PageTitle>
 
@@ -85,6 +85,10 @@
                                                 @if (tx.Type == TransactionType.Expense && tx.ExpenseKind == ExpenseKind.Mandatory)
                                                 {
                                                     <span class="text-xs text-gray-600 dark:text-gray-400">Mandatory</span>
+                                                }
+                                                @if (tx.Type == TransactionType.Expense && tx.ExpenseKind == ExpenseKind.ForceMajeure)
+                                                {
+                                                    <span class="text-xs font-medium text-orange-600 dark:text-orange-400">Force Majeure</span>
                                                 }
                                                 @if (tx.AutoDeduct)
                                                 {
@@ -255,7 +259,7 @@
                                 class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
                                 @foreach (var value in Enum.GetValues<ExpenseKind>())
                                 {
-                                    <option value="@value">@value</option>
+                                    <option value="@value">@GetExpenseKindLabel(value)</option>
                                 }
                             </select>
                         </div>
@@ -272,6 +276,36 @@
                                 </label>
                             </div>
                         </div>
+
+                        @if (_formExpenseKind == ExpenseKind.ForceMajeure)
+                        {
+                            <div class="col-span-1 sm:col-span-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3 dark:border-orange-500/30 dark:bg-orange-500/10">
+                                <p class="text-sm font-medium text-orange-700 dark:text-orange-400">Force Majeure — no score impact</p>
+                                <p class="mt-0.5 text-xs text-orange-600/80 dark:text-orange-400/70">Use this for genuine emergencies beyond your control. This expense will be recorded but will not deduct points from your financial score.</p>
+                            </div>
+
+                            <div class="col-span-1 sm:col-span-2">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-800 dark:text-white/90 cursor-pointer">Draw from savings first?</label>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            @if (_savingsAvailable > 0)
+                                            {
+                                                <span>@_savingsAvailable.ToString("N0") available — savings used first, remainder from bucket</span>
+                                            }
+                                            else
+                                            {
+                                                <span>No savings available — will come entirely from selected bucket</span>
+                                            }
+                                        </p>
+                                    </div>
+                                    <label class="relative inline-flex cursor-pointer items-center">
+                                        <input type="checkbox" @bind="_formDrawFromSavings" class="peer sr-only" />
+                                        <div class="toggle-track"></div>
+                                    </label>
+                                </div>
+                            </div>
+                        }
                     }
 
                     <div class="col-span-1">
@@ -329,7 +363,10 @@
     private ExpenseKind _formExpenseKind = ExpenseKind.Discretionary;
     private bool _formAutoDeduct;
     private bool _formIsImpulse;
+    private bool _formDrawFromSavings;
     private string _formNotes = "";
+
+    private decimal _savingsAvailable;
 
     protected override async Task OnInitializedAsync()
     {
@@ -340,6 +377,8 @@
         var items = await TransactionService.GetAllAsync();
         _buckets = await BucketService.GetAllAsync();
         _debts = await DebtService.GetAllAsync();
+        var savingsState = await SavingsService.GetStateAsync();
+        _savingsAvailable = savingsState.Available;
         _transactions.Clear();
         _transactions.AddRange(items);
         _isLoading = false;
@@ -356,6 +395,7 @@
         _formExpenseKind = ExpenseKind.Discretionary;
         _formAutoDeduct = false;
         _formIsImpulse = false;
+        _formDrawFromSavings = true;
         _formNotes = "";
         _showModal = true;
     }
@@ -371,6 +411,7 @@
         _formExpenseKind = tx.ExpenseKind;
         _formAutoDeduct = tx.AutoDeduct;
         _formIsImpulse = tx.IsImpulse;
+        _formDrawFromSavings = false;
         _formNotes = tx.Notes ?? "";
         _showModal = true;
     }
@@ -415,11 +456,29 @@
                 OccurredAtUtc = DateTime.UtcNow,
             };
 
-            var created = await TransactionService.CreateAsync(transaction);
+            var (created, gameResult) = await TransactionService.CreateWithGameLoopAsync(transaction, 0);
             _transactions.Insert(0, created);
+            _gameResult = gameResult;
 
-            int userOffset = 0;
-            _gameResult = await GameLoop.ProcessTransactionAsync(created, userOffset);
+            if (created.ExpenseKind == ExpenseKind.ForceMajeure && _formDrawFromSavings)
+            {
+                var withdrawn = await SavingsService.WithdrawForEmergencyAsync(
+                    created.Amount,
+                    $"Force majeure: {created.Description}");
+
+                var fromBucket = created.Amount - withdrawn;
+                _savingsAvailable -= withdrawn;
+
+                _gameResult = new GameTransactionResult
+                {
+                    PointsChanged = 0,
+                    Message = withdrawn > 0 && fromBucket > 0
+                        ? $"{withdrawn:N0} drawn from savings, {fromBucket:N0} from bucket — no score impact."
+                        : withdrawn > 0
+                            ? $"{withdrawn:N0} fully covered from savings — no score impact."
+                            : "Force majeure recorded — no savings available, no score impact."
+                };
+            }
         }
 
         _editingId = null;
@@ -431,6 +490,7 @@
         _formExpenseKind = ExpenseKind.Discretionary;
         _formAutoDeduct = false;
         _formIsImpulse = false;
+        _formDrawFromSavings = true;
         _formNotes = "";
         _showModal = false;
     }
@@ -445,6 +505,14 @@
         await TransactionService.DeleteAsync(id);
         _transactions.RemoveAll(t => t.Id == id);
     }
+
+    private static string GetExpenseKindLabel(ExpenseKind kind) => kind switch
+    {
+        ExpenseKind.Discretionary => "Discretionary",
+        ExpenseKind.Mandatory => "Mandatory",
+        ExpenseKind.ForceMajeure => "Force Majeure",
+        _ => kind.ToString()
+    };
 
     private static string GetTypeClasses(TransactionType type) => type switch
     {

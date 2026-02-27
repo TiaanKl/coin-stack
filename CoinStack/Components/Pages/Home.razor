@@ -9,6 +9,9 @@
 @inject IGoalService GoalService
 @inject ISettingsService SettingsService
 @inject ISavingsService SavingsService
+@inject ISubscriptionService SubscriptionService
+@inject IBucketService BucketService
+@inject IMoneyFormatter MoneyFormatter
 
 <PageTitle>CoinStack</PageTitle>
 
@@ -25,6 +28,40 @@
 
                 <BudgetDonut BudgetLimit="@MonthlyBudgetLimit" Spent="@MonthlyBudgetSpent" Size="260" />
             </div>
+        </div>
+    </div>
+
+    <div class="col-span-12 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="h-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Amount</h4>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-3xl font-bold text-gray-800 dark:text-white">@FormatC(_monthlyTotal)</span>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Income available this month</p>
+        </div>
+
+        <div class="h-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Pre-allocated</h4>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-3xl font-bold text-gray-800 dark:text-white">@FormatC(_preAllocated)</span>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Reserved for buckets &amp; subscriptions</p>
+        </div>
+
+        <div class="h-full rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400">Other Spending</h4>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-3xl font-bold text-gray-800 dark:text-white">@FormatC(_nonBucketSpent)</span>
+            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Expenses outside buckets</p>
+        </div>
+
+        <div class="h-full rounded-2xl border @(_remaining >= 0 ? "border-brand-200 bg-brand-50 dark:border-brand-900/30 dark:bg-brand-900/10" : "border-error-200 bg-error-50 dark:border-error-900/30 dark:bg-error-900/10") p-6 shadow-sm">
+            <h4 class="text-sm font-medium @(_remaining >= 0 ? "text-brand-600 dark:text-brand-400" : "text-error-600 dark:text-error-400")">Remaining</h4>
+            <div class="mt-2 flex items-baseline gap-2">
+                <span class="text-3xl font-bold @(_remaining >= 0 ? "text-brand-700 dark:text-brand-300" : "text-error-700 dark:text-error-300")">@FormatC(_remaining)</span>
+            </div>
+            <p class="mt-1 text-xs @(_remaining >= 0 ? "text-brand-600/80 dark:text-brand-400/80" : "text-error-600/80 dark:text-error-400/80")">Available after allocations &amp; spending</p>
         </div>
     </div>
 
@@ -78,75 +115,6 @@
         </div>
     </div>
 
-    <div class="col-span-12 xl:col-span-6">
-        <div class="h-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 class="mb-4 font-bold text-gray-800 dark:text-white/90">Daily Spending</h3>
-            @if (_spendingData.Count == 0)
-            {
-                <div class="flex min-h-[300px] w-full items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">No data available</p>
-                </div>
-            }
-            else
-            {
-                <ApexChart TItem="DailyData" Height="300" Title="">
-                    <ApexPointSeries TItem="DailyData" Items="_spendingData" Name="Spending"
-                                     XValue="@(x => x.Date.ToShortDateString())" YValue="@(x => x.Amount)"
-                                     SeriesType="SeriesType.Bar" Color="#3C50E0" />
-                </ApexChart>
-            }
-        </div>
-    </div>
-
-    <div class="col-span-12 xl:col-span-6">
-        <div class="h-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 class="mb-4 font-bold text-gray-800 dark:text-white/90">Money Trend</h3>
-            @if (_moneyTrendData.Count == 0)
-            {
-                <div class="flex min-h-[300px] w-full items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">No data available</p>
-                </div>
-            }
-            else
-            {
-                <ApexChart TItem="DailyData" Height="300" Title="">
-                    <ApexPointSeries TItem="DailyData" Items="_moneyTrendData" Name="Money Trend"
-                                     XValue="@(x => x.Date.ToShortDateString())" YValue="@(x => x.Amount)"
-                                     SeriesType="SeriesType.Line" Color="#10B981" />
-                </ApexChart>
-            }
-        </div>
-    </div>
-
-    <div class="col-span-12">
-        <div class="h-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <h3 class="font-bold text-gray-800 dark:text-white/90">Predictive Cash Flow (30 days)</h3>
-                <span class="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Income: @FormatC(_projectedIncomeIn30Days) · Expense: @FormatC(_projectedExpenseIn30Days) · Net: @FormatC(_projectedBalanceIn30Days)</span>
-            </div>
-            @if (_forecastData.Count == 0)
-            {
-                <div class="flex min-h-[260px] w-full items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">No data available</p>
-                </div>
-            }
-            else
-            {
-                <ApexChart TItem="ForecastData" Height="260" Title="">
-                    <ApexPointSeries TItem="ForecastData" Items="_forecastData" Name="Projected Net"
-                                     XValue="@(x => x.Date.ToShortDateString())" YValue="@(x => x.ProjectedNetBalance)"
-                                     SeriesType="SeriesType.Line" Color="#3C50E0" />
-                    <ApexPointSeries TItem="ForecastData" Items="_forecastData" Name="Projected Income"
-                                     XValue="@(x => x.Date.ToShortDateString())" YValue="@(x => x.ProjectedIncomeCumulative)"
-                                     SeriesType="SeriesType.Line" Color="#10B981" />
-                    <ApexPointSeries TItem="ForecastData" Items="_forecastData" Name="Projected Expense"
-                                     XValue="@(x => x.Date.ToShortDateString())" YValue="@(x => x.ProjectedExpenseCumulative)"
-                                     SeriesType="SeriesType.Line" Color="#F59E0B" />
-                </ApexChart>
-            }
-        </div>
-    </div>
-
     <div class="col-span-12 xl:col-span-8">
         <div class="h-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
             <h3 class="mb-4 font-bold text-gray-800 dark:text-white/90">Spending Buckets</h3>
@@ -191,7 +159,7 @@
                 <h3 class="mb-1 font-bold text-gray-800 dark:text-white/90">Recent Transactions</h3>
             </div>
             <div class="min-h-[320px] p-5">
-                @if (_transactions.Count == 0)
+                @if (_recentTransactions.Count == 0)
                 {
                     <div class="flex h-full min-h-[280px] items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
                         <p class="text-sm text-gray-500 dark:text-gray-400">No data available</p>
@@ -200,7 +168,7 @@
                 else
                 {
                     <div class="space-y-3">
-                        @foreach (var tx in _transactions.OrderByDescending(x => x.OccurredAtUtc).Take(8))
+                        @foreach (var tx in _recentTransactions)
                         {
                             <div class="flex items-center justify-between rounded-lg border border-gray-100 p-3 dark:border-gray-800">
                                 <div>
@@ -354,6 +322,7 @@
     private decimal MonthlyBudgetSpent => _budgetSpent;
 
     private readonly List<Transaction> _transactions = [];
+    private readonly List<Transaction> _recentTransactions = [];
     private readonly List<DailyData> _spendingData = [];
     private readonly List<DailyData> _moneyTrendData = [];
     private readonly List<SummaryData> _summaryData = [];
@@ -367,6 +336,14 @@
     private decimal _projectedBalanceIn30Days;
     private decimal _projectedIncomeIn30Days;
     private decimal _projectedExpenseIn30Days;
+    private decimal _lifetimeIncome;
+    private decimal _lifetimeExpense;
+    private decimal _balanceBeforeTrendStart;
+
+    private decimal _monthlyTotal;
+    private decimal _preAllocated;
+    private decimal _nonBucketSpent;
+    private decimal _remaining;
 
     private readonly Dictionary<int, decimal> _goalContributionInputs = new();
 
@@ -385,9 +362,18 @@
         await GameLoop.ProcessDailyCheckInAsync();
         _state = await GameLoop.GetCurrentStateAsync();
 
-        var transactions = await TransactionService.GetAllAsync();
+        var now = DateTime.UtcNow;
+        var transactions = await TransactionService.GetFromDateAsync(now.AddDays(-120));
+        var recentTransactions = await TransactionService.GetRecentAsync(8);
+        var totals = await TransactionService.GetLifetimeTotalsAsync();
+        _lifetimeIncome = totals.TotalIncome;
+        _lifetimeExpense = totals.TotalExpense;
+        _balanceBeforeTrendStart = await TransactionService.GetNetBalanceBeforeAsync(now.AddDays(-30).Date);
+
         _transactions.Clear();
         _transactions.AddRange(transactions);
+        _recentTransactions.Clear();
+        _recentTransactions.AddRange(recentTransactions);
 
         var goals = await GoalService.GetAllAsync();
         _goals.Clear();
@@ -399,6 +385,27 @@
         var monthlySummaries = await SavingsService.GetMonthlySummariesAsync();
         _savingsThisMonth = monthlySummaries.FirstOrDefault(x => x.Month == currentMonth)?.Total ?? 0m;
 
+        var buckets = await BucketService.GetAllAsync();
+        var bucketSpentAmounts = await BucketService.GetSpentAmountsForPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
+
+        decimal bucketCommitted = 0;
+        foreach (var bucket in buckets)
+        {
+            var spent = bucketSpentAmounts.TryGetValue(bucket.Id, out var s) ? s : 0m;
+            bucketCommitted += Math.Max(bucket.AllocatedAmount, spent);
+        }
+
+        var bucketSpentTotal = bucketSpentAmounts.Values.Sum();
+        _nonBucketSpent = Math.Max(0, _budgetSpent - bucketSpentTotal);
+
+        var subscriptions = await SubscriptionService.GetAllAsync();
+        var today = DateTime.UtcNow.Day;
+        var subscriptionAllocated = subscriptions
+            .Where(s => s.Status == SubscriptionStatus.Active && (!s.DebitOrderDay.HasValue || s.DebitOrderDay.Value >= today))
+            .Sum(s => s.Cost);
+
+        _preAllocated = bucketCommitted + subscriptionAllocated;
+
         PrepareChartData();
     }
 
@@ -409,6 +416,14 @@
         _summaryData.Clear();
         _forecastData.Clear();
 
+        var now = DateTime.UtcNow;
+
+        var actualIncomeThisMonth = _transactions
+            .Where(t => t.Type == TransactionType.Income && t.OccurredAtUtc.ToString("yyyy-MM") == now.ToString("yyyy-MM"))
+            .Sum(t => t.Amount);
+        _monthlyTotal = Math.Max(_settings.MonthlyIncome, actualIncomeThisMonth);
+        _remaining = _monthlyTotal - _preAllocated - _nonBucketSpent;
+
         if (_transactions.Count == 0)
         {
             _projectedIncomeIn30Days = 0;
@@ -417,7 +432,6 @@
             return;
         }
 
-        var now = DateTime.UtcNow;
         var thirtyDaysAgo = now.AddDays(-30);
 
         _spendingData.AddRange(_transactions
@@ -426,9 +440,7 @@
             .Select(g => new DailyData(g.Key, g.Sum(t => t.Amount)))
             .OrderBy(x => x.Date));
 
-        decimal runningBalance = _transactions
-            .Where(t => t.OccurredAtUtc < thirtyDaysAgo)
-            .Sum(t => t.Type == TransactionType.Income ? t.Amount : -t.Amount);
+        decimal runningBalance = _balanceBeforeTrendStart;
 
         for (var i = 30; i >= 0; i--)
         {
@@ -441,8 +453,8 @@
             _moneyTrendData.Add(new DailyData(date, runningBalance));
         }
 
-        var totalIncome = _transactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
-        var totalExpense = _transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+        var totalIncome = _lifetimeIncome;
+        var totalExpense = _lifetimeExpense;
         var totalSavings = totalIncome - totalExpense;
 
         _summaryData.Add(new SummaryData("Income", totalIncome));
@@ -583,19 +595,8 @@
         yield return new MilestoneData("100%", "Goal Unlocked", progressPercent >= 100);
     }
 
-    private string FormatC(decimal amount) => $"{GetCurrencySymbol(_settings.Currency)}{amount:N2}";
-    private string FormatC0(decimal amount) => $"{GetCurrencySymbol(_settings.Currency)}{amount:N0}";
-
-    private static string GetCurrencySymbol(string currency) => currency switch
-    {
-        "USD" => "$",
-        "EUR" => "€",
-        "GBP" => "£",
-        "CAD" => "C$",
-        "AUD" => "A$",
-        "ZAR" => "R",
-        _ => "$"
-    };
+    private string FormatC(decimal amount) => MoneyFormatter.Format(_settings.Currency, amount);
+    private string FormatC0(decimal amount) => MoneyFormatter.Format(_settings.Currency, amount, 0);
 
     public sealed record DailyData(DateTime Date, decimal Amount);
     public sealed record SummaryData(string Label, decimal Amount);

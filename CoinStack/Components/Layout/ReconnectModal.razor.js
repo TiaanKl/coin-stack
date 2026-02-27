@@ -3,63 +3,89 @@ const reconnectModal = document.getElementById("components-reconnect-modal");
 const retryButton = document.getElementById("components-reconnect-button");
 const resumeButton = document.getElementById("components-resume-button");
 
-if (!reconnectModal || !retryButton || !resumeButton) {
-    // Required reconnect UI elements are not present; skip wiring event handlers.
-} else {
+const reconnectStateClasses = [
+    "components-reconnect-show",
+    "components-reconnect-failed",
+    "components-reconnect-rejected"
+];
+
+if (reconnectModal) {
     reconnectModal.addEventListener("components-reconnect-state-changed", handleReconnectStateChanged);
-    retryButton.addEventListener("click", retry);
-    resumeButton.addEventListener("click", resume);
+    if (retryButton) {
+        retryButton.addEventListener("click", retry);
+    }
+    if (resumeButton) {
+        resumeButton.addEventListener("click", resume);
+    }
 }
+
 function handleReconnectStateChanged(event) {
-    if (event.detail.state === "show") {
-        reconnectModal.showModal();
-    } else if (event.detail.state === "hide") {
-        reconnectModal.close();
-    } else if (event.detail.state === "failed") {
+    const state = event?.detail?.state;
+
+    if (state === "show") {
+        setModalState("components-reconnect-show");
+        reconnectModal.showModal?.();
+    } else if (state === "hide") {
+        clearModalState();
+        reconnectModal.close?.();
+        document.removeEventListener("visibilitychange", retryWhenDocumentBecomesVisible);
+    } else if (state === "failed") {
+        setModalState("components-reconnect-failed");
+        reconnectModal.showModal?.();
         document.addEventListener("visibilitychange", retryWhenDocumentBecomesVisible);
-    } else if (event.detail.state === "rejected") {
-        location.reload();
+    } else if (state === "rejected") {
+        setModalState("components-reconnect-rejected");
+        reconnectModal.showModal?.();
     }
 }
 
 async function retry() {
     document.removeEventListener("visibilitychange", retryWhenDocumentBecomesVisible);
+    setModalState("components-reconnect-show");
 
     try {
-        // Reconnect will asynchronously return:
-        // - true to mean success
-        // - false to mean we reached the server, but it rejected the connection (e.g., unknown circuit ID)
-        // - exception to mean we didn't reach the server (this can be sync or async)
         const successful = await Blazor.reconnect();
         if (!successful) {
-            // We have been able to reach the server, but the circuit is no longer available.
-            // We'll reload the page so the user can continue using the app as quickly as possible.
-            const resumeSuccessful = await Blazor.resumeCircuit();
-            if (!resumeSuccessful) {
-                location.reload();
-            } else {
-                reconnectModal.close();
-            }
+            setModalState("components-reconnect-failed");
+            return;
         }
+
+        clearModalState();
+        reconnectModal?.close?.();
     } catch (err) {
-        // We got an exception, server is currently unavailable
+        setModalState("components-reconnect-failed");
         document.addEventListener("visibilitychange", retryWhenDocumentBecomesVisible);
     }
 }
 
 async function resume() {
-    try {
-        const successful = await Blazor.resumeCircuit();
-        if (!successful) {
-            location.reload();
-        }
-    } catch {
-        reconnectModal.classList.replace("components-reconnect-paused", "components-reconnect-resume-failed");
-    }
+    await retry();
 }
 
 async function retryWhenDocumentBecomesVisible() {
     if (document.visibilityState === "visible") {
         await retry();
+    }
+}
+
+function setModalState(activeClass) {
+    if (!reconnectModal) {
+        return;
+    }
+
+    for (const stateClass of reconnectStateClasses) {
+        reconnectModal.classList.remove(stateClass);
+    }
+
+    reconnectModal.classList.add(activeClass);
+}
+
+function clearModalState() {
+    if (!reconnectModal) {
+        return;
+    }
+
+    for (const stateClass of reconnectStateClasses) {
+        reconnectModal.classList.remove(stateClass);
     }
 }

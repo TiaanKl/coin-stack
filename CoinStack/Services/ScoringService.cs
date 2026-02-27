@@ -75,6 +75,18 @@ public sealed class ScoringService : IScoringService
             return;
         }
 
+        if (transaction.ExpenseKind == ExpenseKind.ForceMajeure)
+        {
+            await AddScoreEventAsync(
+                0,
+                ScoreChangeReason.ForceMajeure,
+                $"Force majeure expense — no score impact",
+                transaction.Id,
+                transaction.BucketId,
+                cancellationToken);
+            return;
+        }
+
         var spentAfter = bucketSpentBefore + transaction.Amount;
         var wasUnder = bucketSpentBefore <= bucketAllocated;
         var isNowOver = spentAfter > bucketAllocated;

@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISettingsService, SettingsService>();
         services.AddScoped<IWaitlistService, WaitlistService>();
         services.AddScoped<ISavingsService, SavingsService>();
+        services.AddScoped<IMoneyFormatter, MoneyFormatter>();
 
         return services;
     }

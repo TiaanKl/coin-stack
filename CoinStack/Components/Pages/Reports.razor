@@ -1,3 +1,250 @@
 @page "/reports"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@inject CoinStack.Services.ITransactionService TransactionService
+@inject CoinStack.Services.ISettingsService SettingsService
+@inject CoinStack.Services.ISavingsService SavingsService
+@inject CoinStack.Services.IDebtService DebtService
+@inject CoinStack.Services.IBucketService BucketService
+@inject CoinStack.Services.IMoneyFormatter MoneyFormatter
 
 <PageTitle>Reports</PageTitle>
+
+<div class="space-y-6">
+	<div>
+		<h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Reports</h2>
+		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Monthly snapshot of cashflow, savings, debt, and bucket performance</p>
+	</div>
+
+	@if (_isLoading)
+	{
+		<div class="flex min-h-[220px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+			<p class="text-sm text-gray-500 dark:text-gray-400">Loading report...</p>
+		</div>
+	}
+	else
+	{
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			<div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+				<p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Income (Period)</p>
+				<p class="mt-2 text-2xl font-bold text-success-600 dark:text-success-500">@FormatC(_periodIncome)</p>
+			</div>
+
+			<div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+				<p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Expenses (Period)</p>
+				<p class="mt-2 text-2xl font-bold text-gray-800 dark:text-white">@FormatC(_periodExpense)</p>
+			</div>
+
+			<div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+				<p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Net Cashflow</p>
+				<p class="mt-2 text-2xl font-bold @(_periodNet >= 0 ? "text-brand-600 dark:text-brand-400" : "text-error-600 dark:text-error-500")">@FormatC(_periodNet)</p>
+			</div>
+
+			<div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+				<p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Savings Available</p>
+				<p class="mt-2 text-2xl font-bold text-brand-600 dark:text-brand-400">@FormatC(_savingsAvailable)</p>
+				@if (_fallbackUsedThisMonth > 0)
+				{
+					<p class="mt-1 text-xs text-warning-600 dark:text-warning-400">@FormatC(_fallbackUsedThisMonth) used this month</p>
+				}
+			</div>
+		</div>
+
+		<div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+			<div class="xl:col-span-7 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+				<div class="mb-4 flex items-center justify-between">
+					<h3 class="font-semibold text-gray-800 dark:text-white/90">Bucket Spend (Current Budget Period)</h3>
+					<span class="text-xs text-gray-500 dark:text-gray-400">Top 6 buckets</span>
+				</div>
+
+				@if (_topBucketSpending.Count == 0)
+				{
+					<div class="flex min-h-[180px] items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+						<p class="text-sm text-gray-500 dark:text-gray-400">No expense data for this period.</p>
+					</div>
+				}
+				else
+				{
+					<div class="space-y-3">
+						@foreach (var row in _topBucketSpending)
+						{
+							var used = row.Allocated > 0 ? (double)(row.Spent / row.Allocated) * 100d : 0d;
+							var clamped = Math.Min(100, Math.Max(0, used));
+							var over = row.Spent > row.Allocated;
+
+							<div class="rounded-xl border border-gray-100 p-3 dark:border-gray-800">
+								<div class="mb-2 flex items-center justify-between gap-3">
+									<p class="text-sm font-medium text-gray-800 dark:text-white/90">@row.Name</p>
+									<p class="text-xs @(over ? "text-error-600 dark:text-error-400" : "text-gray-500 dark:text-gray-400")">
+										@FormatC(row.Spent) / @FormatC(row.Allocated)
+									</p>
+								</div>
+								<div class="h-2 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+									<div class="h-2 rounded-full @(over ? "bg-error-500" : clamped >= 80 ? "bg-warning-500" : "bg-success-500")" style="width: @clamped.ToString("F0")%;"></div>
+								</div>
+							</div>
+						}
+					</div>
+				}
+			</div>
+
+			<div class="xl:col-span-5 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+				<h3 class="mb-4 font-semibold text-gray-800 dark:text-white/90">Debt Snapshot</h3>
+
+				<div class="space-y-3 text-sm">
+					<div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+						<span class="text-gray-500 dark:text-gray-400">Open debt accounts</span>
+						<span class="font-semibold text-gray-800 dark:text-white/90">@_openDebtCount</span>
+					</div>
+
+					<div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+						<span class="text-gray-500 dark:text-gray-400">Total outstanding</span>
+						<span class="font-semibold text-gray-800 dark:text-white/90">@FormatC(_totalDebtOutstanding)</span>
+					</div>
+
+					<div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
+						<span class="text-gray-500 dark:text-gray-400">Planned monthly payments</span>
+						<span class="font-semibold text-gray-800 dark:text-white/90">@FormatC(_totalDebtMonthlyPayment)</span>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+			<h3 class="mb-4 font-semibold text-gray-800 dark:text-white/90">Last 14 Days Net Trend</h3>
+
+			@if (_dailyNet.Count == 0)
+			{
+				<div class="flex min-h-[160px] items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+					<p class="text-sm text-gray-500 dark:text-gray-400">No transactions recorded.</p>
+				</div>
+			}
+			else
+			{
+				<div class="overflow-x-auto">
+					<table class="w-full text-left text-sm">
+						<thead>
+							<tr class="border-b border-gray-100 text-xs uppercase text-gray-500 dark:border-gray-800 dark:text-gray-400">
+								<th class="pb-3 pr-4 font-medium">Date</th>
+								<th class="pb-3 pr-4 text-right font-medium">Income</th>
+								<th class="pb-3 pr-4 text-right font-medium">Expense</th>
+								<th class="pb-3 text-right font-medium">Net</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var row in _dailyNet)
+							{
+								<tr class="border-b border-gray-50 last:border-0 dark:border-gray-800">
+									<td class="py-3 pr-4 text-gray-700 dark:text-gray-300">@row.Date.ToString("dd MMM")</td>
+									<td class="py-3 pr-4 text-right text-success-600 dark:text-success-500">@FormatC(row.Income)</td>
+									<td class="py-3 pr-4 text-right text-gray-700 dark:text-gray-300">@FormatC(row.Expense)</td>
+									<td class="py-3 text-right font-semibold @(row.Net >= 0 ? "text-brand-600 dark:text-brand-400" : "text-error-600 dark:text-error-500")">@FormatC(row.Net)</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+		</div>
+	}
+</div>
+
+@code {
+	private bool _isLoading = true;
+	private AppSettings _settings = new();
+
+	private decimal _periodIncome;
+	private decimal _periodExpense;
+	private decimal _periodNet;
+	private decimal _savingsAvailable;
+	private decimal _fallbackUsedThisMonth;
+
+	private int _openDebtCount;
+	private decimal _totalDebtOutstanding;
+	private decimal _totalDebtMonthlyPayment;
+
+	private readonly List<BucketSpendRow> _topBucketSpending = [];
+	private readonly List<DailyNetRow> _dailyNet = [];
+
+	protected override async Task OnInitializedAsync()
+	{
+		_settings = await SettingsService.GetAsync();
+
+		var nowUtc = DateTime.UtcNow;
+		var (periodStartUtc, periodEndUtc) = GetBudgetPeriodBoundsUtc(_settings.MonthStartDay, nowUtc);
+
+		var periodTotals = await TransactionService.GetIncomeExpenseForPeriodAsync(periodStartUtc, periodEndUtc);
+		_periodIncome = periodTotals.Income;
+		_periodExpense = periodTotals.Expense;
+
+		_periodNet = _periodIncome - _periodExpense;
+
+		var savings = await SavingsService.GetStateAsync();
+		_savingsAvailable = savings.Available;
+		_fallbackUsedThisMonth = await SavingsService.GetFallbackUsedThisMonthAsync();
+
+		var debts = await DebtService.GetAllAsync();
+		var openDebts = debts.Where(d => d.CurrentBalance > 0).ToList();
+		_openDebtCount = openDebts.Count;
+		_totalDebtOutstanding = openDebts.Sum(d => d.CurrentBalance);
+		_totalDebtMonthlyPayment = openDebts.Sum(d => d.MonthlyPaymentAmount);
+
+		var buckets = await BucketService.GetAllAsync();
+		var bucketSpendRows = await TransactionService.GetBucketSpendingForPeriodAsync(periodStartUtc, periodEndUtc);
+		var bucketSpent = bucketSpendRows.ToDictionary(x => x.BucketId, x => x.Spent);
+
+		_topBucketSpending.Clear();
+		_topBucketSpending.AddRange(
+			buckets
+				.Select(b => new BucketSpendRow(
+					b.Name,
+					b.AllocatedAmount,
+					bucketSpent.TryGetValue(b.Id, out var spent) ? spent : 0m))
+				.Where(x => x.Spent > 0)
+				.OrderByDescending(x => x.Spent)
+				.Take(6));
+
+		_dailyNet.Clear();
+		var start = nowUtc.Date.AddDays(-13);
+		var dailyRows = await TransactionService.GetDailyNetForRangeAsync(start, nowUtc.Date.AddDays(1));
+		var dailyByDate = dailyRows.ToDictionary(x => x.Date.Date, x => x);
+
+		for (var i = 0; i < 14; i++)
+		{
+			var day = start.AddDays(i);
+			if (dailyByDate.TryGetValue(day.Date, out var row))
+			{
+				_dailyNet.Add(new DailyNetRow(day, row.Income, row.Expense));
+			}
+			else
+			{
+				_dailyNet.Add(new DailyNetRow(day, 0m, 0m));
+			}
+		}
+
+		_dailyNet.Reverse();
+		_isLoading = false;
+	}
+
+	private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
+	{
+		if (monthStartDay is < 1 or > 28)
+		{
+			monthStartDay = 1;
+		}
+
+		var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
+		var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
+		var endUtc = startUtc.AddMonths(1);
+		return (startUtc, endUtc);
+	}
+
+	private string FormatC(decimal amount) => MoneyFormatter.Format(_settings.Currency, amount);
+
+	private sealed record BucketSpendRow(string Name, decimal Allocated, decimal Spent);
+
+	private sealed record DailyNetRow(DateTime Date, decimal Income, decimal Expense)
+	{
+		public decimal Net => Income - Expense;
+	}
+}

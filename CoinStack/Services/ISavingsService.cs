@@ -13,6 +13,13 @@ public interface ISavingsService
     /// </summary>
     Task<SavingsMonthlySummary?> CalculateMonthAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Explicitly withdraws up to <paramref name="amount"/> from available savings for a force-majeure
+    /// expense. Does <b>not</b> require <see cref="SavingsState.FallbackEnabled"/>.
+    /// Returns the amount actually deducted (may be less than requested if savings are insufficient).
+    /// </summary>
+    Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, CancellationToken cancellationToken = default);
+
     /// <summary>Enables or disables savings fallback globally.</summary>
     Task SetFallbackEnabledAsync(bool enabled, CancellationToken cancellationToken = default);
 

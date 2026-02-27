@@ -26,6 +26,31 @@ public sealed class TransactionService : ITransactionService
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<List<Transaction>> GetRecentAsync(int count, CancellationToken cancellationToken = default)
+    {
+        if (count <= 0)
+        {
+            return [];
+        }
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Transactions
+            .AsNoTracking()
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<Transaction>> GetFromDateAsync(DateTime fromUtc, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Transactions
+            .AsNoTracking()
+            .Where(x => x.OccurredAtUtc >= fromUtc)
+            .OrderByDescending(x => x.OccurredAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Transaction?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -48,6 +73,16 @@ public sealed class TransactionService : ITransactionService
         }
 
         return transaction;
+    }
+
+    public async Task<(Transaction Transaction, GameTransactionResult Result)> CreateWithGameLoopAsync(
+        Transaction transaction,
+        int userTimezoneOffsetHours,
+        CancellationToken cancellationToken = default)
+    {
+        var created = await CreateAsync(transaction, cancellationToken);
+        var gameResult = await _gameLoop.ProcessTransactionAsync(created, userTimezoneOffsetHours, cancellationToken);
+        return (created, gameResult);
     }
 
     public async Task UpdateAsync(Transaction transaction, CancellationToken cancellationToken = default)
@@ -126,6 +161,110 @@ public sealed class TransactionService : ITransactionService
             .SumAsync(t => (decimal?)t.Amount, cancellationToken);
 
         return sum ?? 0m;
+    }
+
+    public async Task<(decimal TotalIncome, decimal TotalExpense)> GetLifetimeTotalsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var income = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.Type == TransactionType.Income)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
+
+        var expense = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.Type == TransactionType.Expense)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
+
+        return (income, expense);
+    }
+
+    public async Task<decimal> GetNetBalanceBeforeAsync(DateTime beforeUtc, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var income = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.OccurredAtUtc < beforeUtc && t.Type == TransactionType.Income)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
+
+        var expense = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.OccurredAtUtc < beforeUtc && t.Type == TransactionType.Expense)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
+
+        return income - expense;
+    }
+
+    public async Task<(decimal Income, decimal Expense)> GetIncomeExpenseForPeriodAsync(
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var income = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.OccurredAtUtc >= startUtc
+                        && t.OccurredAtUtc < endUtc
+                        && t.Type == TransactionType.Income)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
+
+        var expense = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.OccurredAtUtc >= startUtc
+                        && t.OccurredAtUtc < endUtc
+                        && t.Type == TransactionType.Expense)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
+
+        return (income, expense);
+    }
+
+    public async Task<List<BucketSpendSummary>> GetBucketSpendingForPeriodAsync(
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var rows = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.OccurredAtUtc >= startUtc
+                        && t.OccurredAtUtc < endUtc
+                        && t.Type == TransactionType.Expense
+                        && t.BucketId.HasValue)
+            .GroupBy(t => t.BucketId!.Value)
+            .Select(g => new
+            {
+                BucketId = g.Key,
+                Spent = g.Sum(t => t.Amount)
+            })
+            .OrderByDescending(x => x.Spent)
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .Select(x => new BucketSpendSummary(x.BucketId, x.Spent))
+            .ToList();
+    }
+
+    public async Task<List<DailyNetSummary>> GetDailyNetForRangeAsync(
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        return await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.OccurredAtUtc >= startUtc && t.OccurredAtUtc < endUtc)
+            .GroupBy(t => t.OccurredAtUtc.Date)
+            .Select(g => new DailyNetSummary(
+                g.Key,
+                g.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount),
+                g.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount)))
+            .OrderByDescending(x => x.Date)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task ApplyAutoDeductionsForBudgetPeriodAsync(

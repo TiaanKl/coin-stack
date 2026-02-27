@@ -11,6 +11,8 @@ public sealed class Subscription : EntityBase
 
     public SubscriptionStatus Status { get; set; } = SubscriptionStatus.Active;
 
+    public int? DebitOrderDay { get; set; }
+
     /// <summary>
     /// Primary UI color for the subscription (e.g. #RRGGBB).
     /// </summary>

@@ -4,6 +4,7 @@
 @using CoinStack.Services
 @inject IDebtService DebtService
 @inject ISettingsService SettingsService
+@inject IMoneyFormatter MoneyFormatter
 
 <PageTitle>Debt Payoff Simulator</PageTitle>
 
@@ -60,7 +61,7 @@
                         <div class="mt-4 grid grid-cols-2 gap-3">
                             <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Current Balance</p>
-                                <p class="font-semibold text-gray-800 dark:text-white/90">@_selectedDebt.CurrentBalance.ToString("C")</p>
+                                <p class="font-semibold text-gray-800 dark:text-white/90">@FormatC(_selectedDebt.CurrentBalance)</p>
                             </div>
                             <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Interest Rate</p>
@@ -68,11 +69,11 @@
                             </div>
                             <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Current Payment</p>
-                                <p class="font-semibold text-gray-800 dark:text-white/90">@_selectedDebt.MonthlyPaymentAmount.ToString("C") / mo</p>
+                                <p class="font-semibold text-gray-800 dark:text-white/90">@FormatC(_selectedDebt.MonthlyPaymentAmount) / mo</p>
                             </div>
                             <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Monthly Interest</p>
-                                <p class="font-semibold text-error-600 dark:text-error-400">@GetMonthlyInterest(_selectedDebt).ToString("C")</p>
+                                <p class="font-semibold text-error-600 dark:text-error-400">@FormatC(GetMonthlyInterest(_selectedDebt))</p>
                             </div>
                         </div>
                     }
@@ -86,7 +87,7 @@
                         <p class="mb-5 text-xs text-gray-500 dark:text-gray-400">Drag the slider or type an amount to instantly recalculate.</p>
 
                         <div class="mb-5 flex items-baseline gap-2">
-                            <span class="text-3xl font-bold text-brand-600 dark:text-brand-400">@_simPayment.ToString("C0")</span>
+                            <span class="text-3xl font-bold text-brand-600 dark:text-brand-400">@FormatC(_simPayment, 0)</span>
                             <span class="text-sm text-gray-500 dark:text-gray-400">/ month</span>
                         </div>
 
@@ -101,8 +102,8 @@
                                style="accent-color: var(--color-brand-500)" />
 
                         <div class="mt-1 mb-5 flex justify-between text-xs text-gray-400">
-                            <span>@_sliderMin.ToString("C0")</span>
-                            <span>@_sliderMax.ToString("C0")</span>
+                            <span>@FormatC(_sliderMin, 0)</span>
+                            <span>@FormatC(_sliderMax, 0)</span>
                         </div>
 
                         <!-- Exact amount input -->
@@ -144,8 +145,8 @@
                         <div class="rounded-2xl border border-error-200 bg-error-50 p-5 dark:border-error-500/40 dark:bg-error-500/10">
                             <p class="font-semibold text-error-700 dark:text-error-400">Payment too low</p>
                             <p class="mt-1 text-sm text-error-600 dark:text-error-300">
-                                @_simPayment.ToString("C") doesn't cover the @GetMonthlyInterest(_selectedDebt).ToString("C") monthly interest — the balance would keep growing.
-                                Increase to at least @_sliderMin.ToString("C") to make progress.
+                                @FormatC(_simPayment) doesn't cover the @FormatC(GetMonthlyInterest(_selectedDebt)) monthly interest — the balance would keep growing.
+                                Increase to at least @FormatC(_sliderMin) to make progress.
                             </p>
                         </div>
                     }
@@ -157,7 +158,7 @@
                         <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
                             <p class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Current Plan</p>
                             <p class="mb-4 text-xl font-bold text-gray-800 dark:text-white/90">
-                                @_selectedDebt.MonthlyPaymentAmount.ToString("C")
+                                @FormatC(_selectedDebt.MonthlyPaymentAmount)
                                 <span class="text-sm font-normal text-gray-400">/ mo</span>
                             </p>
                             <div class="space-y-2.5">
@@ -171,11 +172,11 @@
                                 </div>
                                 <div class="flex justify-between text-sm">
                                     <span class="text-gray-500 dark:text-gray-400">Total paid</span>
-                                    <span class="font-medium text-gray-800 dark:text-white/90">@_currentResult.TotalPaid.ToString("C")</span>
+                                        <span class="font-medium text-gray-800 dark:text-white/90">@FormatC(_currentResult.TotalPaid)</span>
                                 </div>
                                 <div class="flex justify-between text-sm">
                                     <span class="text-gray-500 dark:text-gray-400">Total interest</span>
-                                    <span class="font-medium text-error-600 dark:text-error-400">@_currentResult.TotalInterest.ToString("C")</span>
+                                        <span class="font-medium text-error-600 dark:text-error-400">@FormatC(_currentResult.TotalInterest)</span>
                                 </div>
                             </div>
                         </div>
@@ -196,7 +197,7 @@
                                 Your Simulation
                             </p>
                             <p class="mb-4 text-xl font-bold text-gray-800 dark:text-white/90">
-                                @_simPayment.ToString("C")
+                                @FormatC(_simPayment)
                                 <span class="text-sm font-normal text-gray-400">/ mo</span>
                             </p>
                             @if (!_simResult.IsUnpayable)
@@ -212,11 +213,11 @@
                                     </div>
                                     <div class="flex justify-between text-sm">
                                         <span class="text-gray-500 dark:text-gray-400">Total paid</span>
-                                        <span class="font-medium text-gray-800 dark:text-white/90">@_simResult.TotalPaid.ToString("C")</span>
+                                        <span class="font-medium text-gray-800 dark:text-white/90">@FormatC(_simResult.TotalPaid)</span>
                                     </div>
                                     <div class="flex justify-between text-sm">
                                         <span class="text-gray-500 dark:text-gray-400">Total interest</span>
-                                        <span class="font-medium text-error-600 dark:text-error-400">@_simResult.TotalInterest.ToString("C")</span>
+                                        <span class="font-medium text-error-600 dark:text-error-400">@FormatC(_simResult.TotalInterest)</span>
                                     </div>
                                 </div>
                             }
@@ -236,7 +237,7 @@
 
                         <div class="rounded-2xl border border-success-200 bg-success-50 p-5 dark:border-success-500/30 dark:bg-success-500/10">
                             <p class="mb-4 text-sm font-semibold text-success-700 dark:text-success-400">
-                                By paying @_simPayment.ToString("C") / month instead of @_selectedDebt.MonthlyPaymentAmount.ToString("C"), you save:
+                                By paying @FormatC(_simPayment) / month instead of @FormatC(_selectedDebt.MonthlyPaymentAmount), you save:
                             </p>
                             <div class="grid grid-cols-3 divide-x divide-success-200 dark:divide-success-500/30 text-center">
                                 <div class="px-3">
@@ -244,11 +245,11 @@
                                     <p class="mt-0.5 text-xs text-success-600 dark:text-success-500">sooner</p>
                                 </div>
                                 <div class="px-3">
-                                    <p class="text-xl font-bold text-success-700 dark:text-success-400">@interestSaved.ToString("C0")</p>
+                                    <p class="text-xl font-bold text-success-700 dark:text-success-400">@FormatC(interestSaved, 0)</p>
                                     <p class="mt-0.5 text-xs text-success-600 dark:text-success-500">less interest</p>
                                 </div>
                                 <div class="px-3">
-                                    <p class="text-xl font-bold text-success-700 dark:text-success-400">@totalSaved.ToString("C0")</p>
+                                    <p class="text-xl font-bold text-success-700 dark:text-success-400">@FormatC(totalSaved, 0)</p>
                                     <p class="mt-0.5 text-xs text-success-600 dark:text-success-500">total saved</p>
                                 </div>
                             </div>
@@ -264,9 +265,9 @@
                         <div class="rounded-2xl border border-warning-200 bg-warning-50 p-5 dark:border-warning-500/30 dark:bg-warning-500/10">
                             <p class="font-semibold text-warning-700 dark:text-warning-400">Lower payment impact</p>
                             <p class="mt-1 text-sm text-warning-600 dark:text-warning-300">
-                                Dropping to @_simPayment.ToString("C") / month adds
+                                Dropping to @FormatC(_simPayment) / month adds
                                 <strong>@FormatMonthDelta(monthsExtra)</strong> to the timeline and costs
-                                <strong>@interestExtra.ToString("C")</strong> more in interest.
+                                <strong>@FormatC(interestExtra)</strong> more in interest.
                             </p>
                         </div>
                     }
@@ -282,7 +283,7 @@
                     <div>
                         <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Amortization Schedule</h3>
                         <p class="text-xs text-gray-500 dark:text-gray-400">
-                            @_simResult.Schedule.Count payment@(_simResult.Schedule.Count != 1 ? "s" : "") at @_simPayment.ToString("C") / month
+                            @_simResult.Schedule.Count payment@(_simResult.Schedule.Count != 1 ? "s" : "") at @FormatC(_simPayment) / month
                         </p>
                     </div>
                     @if (_simResult.Schedule.Count > 12)
@@ -313,10 +314,10 @@
                                 <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                     <td class="px-5 py-3 text-xs text-gray-400 dark:text-gray-500">@row.Month</td>
                                     <td class="px-5 py-3 text-gray-700 dark:text-gray-300">@row.Date.ToString("MMM yyyy")</td>
-                                    <td class="px-5 py-3 text-right font-medium text-gray-800 dark:text-white/90">@row.Payment.ToString("C")</td>
-                                    <td class="px-5 py-3 text-right font-medium text-success-600 dark:text-success-400">@row.Principal.ToString("C")</td>
-                                    <td class="px-5 py-3 text-right text-error-500 dark:text-error-400">@row.Interest.ToString("C")</td>
-                                    <td class="px-5 py-3 text-right text-gray-600 dark:text-gray-300">@row.Balance.ToString("C")</td>
+                                    <td class="px-5 py-3 text-right font-medium text-gray-800 dark:text-white/90">@FormatC(row.Payment)</td>
+                                    <td class="px-5 py-3 text-right font-medium text-success-600 dark:text-success-400">@FormatC(row.Principal)</td>
+                                    <td class="px-5 py-3 text-right text-error-500 dark:text-error-400">@FormatC(row.Interest)</td>
+                                    <td class="px-5 py-3 text-right text-gray-600 dark:text-gray-300">@FormatC(row.Balance)</td>
                                 </tr>
                             }
                         </tbody>
@@ -325,9 +326,9 @@
                             <tfoot>
                                 <tr class="border-t border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
                                     <td colspan="2" class="px-5 py-3 text-xs font-semibold text-gray-600 dark:text-gray-300">Total</td>
-                                    <td class="px-5 py-3 text-right text-xs font-semibold text-gray-800 dark:text-white/90">@_simResult.TotalPaid.ToString("C")</td>
-                                    <td class="px-5 py-3 text-right text-xs font-semibold text-success-600 dark:text-success-400">@(_simResult.TotalPaid - _simResult.TotalInterest).ToString("C")</td>
-                                    <td class="px-5 py-3 text-right text-xs font-semibold text-error-500 dark:text-error-400">@_simResult.TotalInterest.ToString("C")</td>
+                                    <td class="px-5 py-3 text-right text-xs font-semibold text-gray-800 dark:text-white/90">@FormatC(_simResult.TotalPaid)</td>
+                                    <td class="px-5 py-3 text-right text-xs font-semibold text-success-600 dark:text-success-400">@FormatC(_simResult.TotalPaid - _simResult.TotalInterest)</td>
+                                    <td class="px-5 py-3 text-right text-xs font-semibold text-error-500 dark:text-error-400">@FormatC(_simResult.TotalInterest)</td>
                                     <td class="px-5 py-3 text-right text-xs font-semibold text-gray-800 dark:text-white/90">—</td>
                                 </tr>
                             </tfoot>
@@ -360,6 +361,7 @@
     private decimal _sliderMin;
     private decimal _sliderMax;
     private decimal _sliderStep = 10m;
+    private AppSettings _settings = new();
     private string _currencySymbol = "$";
     private bool _showFullSchedule;
     private SimResult? _currentResult;
@@ -368,8 +370,8 @@
     // ── Lifecycle ────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
-        var settings = await SettingsService.GetAsync();
-        _currencySymbol = CurrencySymbol(settings.Currency);
+        _settings = await SettingsService.GetAsync();
+        _currencySymbol = MoneyFormatter.Symbol(_settings.Currency);
 
         _debts = (await DebtService.GetAllAsync())
             .Where(d => d.CurrentBalance > 0)
@@ -493,8 +495,8 @@
         var extra25 = Math.Round(cur * 0.25m, 0);
         var extra50 = Math.Round(cur * 0.50m, 0);
 
-        yield return ($"+{extra25:C0}/mo", Math.Round(cur + extra25, 0));
-        yield return ($"+{extra50:C0}/mo", Math.Round(cur + extra50, 0));
+        yield return ($"+{FormatC(extra25, 0)}/mo", Math.Round(cur + extra25, 0));
+        yield return ($"+{FormatC(extra50, 0)}/mo", Math.Round(cur + extra50, 0));
         yield return ("2× payment", Math.Round(cur * 2m, 0));
     }
 
@@ -532,12 +534,7 @@
         };
     }
 
-    private static string CurrencySymbol(string code) => code switch
-    {
-        "USD" => "$", "EUR" => "€", "GBP" => "£",
-        "CAD" => "C$", "AUD" => "A$", "ZAR" => "R",
-        _ => "$"
-    };
+    private string FormatC(decimal amount, int decimals = 2) => MoneyFormatter.Format(_settings.Currency, amount, decimals);
 
     // ── Models ───────────────────────────────────────────────────────────
     private sealed record SimResult(

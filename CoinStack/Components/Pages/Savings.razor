@@ -4,6 +4,7 @@
 @using CoinStack.Services
 @inject ISavingsService SavingsService
 @inject ISettingsService SettingsService
+@inject IMoneyFormatter MoneyFormatter
 
 <PageTitle>Savings</PageTitle>
 
@@ -296,16 +297,5 @@
         return yyyyMM;
     }
 
-    private string FormatC(decimal amount) => $"{GetCurrencySymbol(_settings.Currency)}{amount:N2}";
-
-    private static string GetCurrencySymbol(string currency) => currency switch
-    {
-        "USD" => "$",
-        "EUR" => "€",
-        "GBP" => "£",
-        "CAD" => "C$",
-        "AUD" => "A$",
-        "ZAR" => "R",
-        _ => "$"
-    };
+    private string FormatC(decimal amount) => MoneyFormatter.Format(_settings.Currency, amount);
 }

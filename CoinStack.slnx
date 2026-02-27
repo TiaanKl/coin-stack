@@ -2,4 +2,5 @@
   <Project Path="Aspire.CoinStack/Aspire.CoinStack.csproj" />
   <Project Path="CoinStack.Data/CoinStack.Data.csproj" />
   <Project Path="CoinStack/CoinStack.csproj" />
+  <Project Path="CoinStack.Tests/CoinStack.Tests.csproj" />
 </Solution>

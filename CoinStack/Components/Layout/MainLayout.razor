@@ -102,9 +102,19 @@
     private bool _showReflectionModal;
 
     private string _reflectionResponse = "";
+    private string _reframeResponse = "";
     private int _moodBefore = 5;
     private int _moodAfter = 5;
     private EmotionTag? _selectedEmotion;
+    private readonly List<string> _selectedDistortions = [];
+    private static readonly string[] DistortionOptions =
+    [
+        "All-or-nothing thinking",
+        "Catastrophizing",
+        "Emotional reasoning",
+        "Scarcity/fear-based thinking",
+        "Social comparison/FOMO"
+    ];
     private List<EmotionSpendPattern> _emotionPatterns = [];
     private bool _sidebarToggle = false;
 
@@ -155,7 +165,7 @@
         {
             await ReflectionService.CompleteReflectionAsync(
                 _pendingReflection.Id,
-                _reflectionResponse.Trim(),
+                BuildFinalReflectionResponse(),
                 _moodBefore,
                 _moodAfter,
                 _selectedEmotion);
@@ -171,6 +181,8 @@
 
             _showReflectionModal = false;
             _reflectionResponse = "";
+            _reframeResponse = "";
+            _selectedDistortions.Clear();
             _selectedEmotion = null;
             _moodBefore = 5;
             _moodAfter = 5;
@@ -209,6 +221,39 @@
         }
 
         await LoadStateAsync();
+    }
+
+    private void ToggleDistortion(string distortion)
+    {
+        if (_selectedDistortions.Contains(distortion))
+        {
+            _selectedDistortions.Remove(distortion);
+            return;
+        }
+
+        _selectedDistortions.Add(distortion);
+    }
+
+    private string BuildFinalReflectionResponse()
+    {
+        var response = _reflectionResponse.Trim();
+        var hasDistortions = _selectedDistortions.Count > 0;
+        var hasReframe = !string.IsNullOrWhiteSpace(_reframeResponse);
+
+        if (!hasDistortions && !hasReframe)
+        {
+            return response;
+        }
+
+        var distortionsLine = hasDistortions
+            ? string.Join(", ", _selectedDistortions)
+            : "None selected";
+
+        var reframeLine = hasReframe
+            ? _reframeResponse.Trim()
+            : "No reframe entered";
+
+        return $"{response}\n\nCBT Reframe\n- Distortions: {distortionsLine}\n- Reframe: {reframeLine}";
     }
 
     public void Dispose()
@@ -290,6 +335,30 @@
                         rows="3"
                         placeholder="How are you feeling about your finances?"
                         class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:text-white">
+                    </textarea>
+                </div>
+
+                <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/40">
+                    <p class="mb-2 text-xs font-semibold text-gray-700 dark:text-gray-300">Thought Reframe (CBT)</p>
+                    <p class="mb-2 text-[11px] text-gray-500 dark:text-gray-400">Select any thinking patterns you notice, then write a more balanced replacement thought.</p>
+
+                    <div class="mb-3 flex flex-wrap gap-1.5">
+                        @foreach (var distortion in DistortionOptions)
+                        {
+                            var selected = _selectedDistortions.Contains(distortion);
+                            <button type="button"
+                                    @onclick="() => ToggleDistortion(distortion)"
+                                    class="rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all @(selected ? "border-brand-300 bg-brand-50 text-brand-700 dark:border-brand-500/40 dark:bg-brand-500/15 dark:text-brand-400" : "border-gray-300 bg-white text-gray-600 hover:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300")">
+                                @distortion
+                            </button>
+                        }
+                    </div>
+
+                    <textarea
+                        @bind="_reframeResponse"
+                        rows="2"
+                        placeholder="Balanced thought example: 'I can wait 48 hours and reassess this against my budget goals.'"
+                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                     </textarea>
                 </div>
 

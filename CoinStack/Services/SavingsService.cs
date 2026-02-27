@@ -118,6 +118,31 @@ public sealed class SavingsService : ISavingsService
     // Fallback
     // ──────────────────────────────────────────────────────────────────────────
 
+    public async Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
+        if (state is null || state.Available <= 0)
+        {
+            return 0m;
+        }
+
+        var withdrawn = Math.Min(amount, state.Available);
+        state.Available -= withdrawn;
+
+        db.SavingsFallbackEvents.Add(new SavingsFallbackEvent
+        {
+            OccurredAtUtc = DateTime.UtcNow,
+            AmountUsed = withdrawn,
+            Reason = reason,
+            SourceName = "Emergency Withdrawal"
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+        return withdrawn;
+    }
+
     public async Task SetFallbackEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
