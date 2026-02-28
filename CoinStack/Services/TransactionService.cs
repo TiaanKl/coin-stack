@@ -255,16 +255,60 @@ public sealed class TransactionService : ITransactionService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        return await db.Transactions
+        var incomeRows = await db.Transactions
             .AsNoTracking()
-            .Where(t => t.OccurredAtUtc >= startUtc && t.OccurredAtUtc < endUtc)
-            .GroupBy(t => t.OccurredAtUtc.Date)
-            .Select(g => new DailyNetSummary(
-                g.Key,
-                g.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount),
-                g.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount)))
-            .OrderByDescending(x => x.Date)
+            .Where(t => t.OccurredAtUtc >= startUtc
+                        && t.OccurredAtUtc < endUtc
+                        && t.Type == TransactionType.Income)
+            .GroupBy(t => new { t.OccurredAtUtc.Year, t.OccurredAtUtc.Month, t.OccurredAtUtc.Day })
+            .Select(g => new
+            {
+                g.Key.Year,
+                g.Key.Month,
+                g.Key.Day,
+                Total = g.Sum(t => t.Amount)
+            })
             .ToListAsync(cancellationToken);
+
+        var expenseRows = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.OccurredAtUtc >= startUtc
+                        && t.OccurredAtUtc < endUtc
+                        && t.Type == TransactionType.Expense)
+            .GroupBy(t => new { t.OccurredAtUtc.Year, t.OccurredAtUtc.Month, t.OccurredAtUtc.Day })
+            .Select(g => new
+            {
+                g.Key.Year,
+                g.Key.Month,
+                g.Key.Day,
+                Total = g.Sum(t => t.Amount)
+            })
+            .ToListAsync(cancellationToken);
+
+        var byDate = new Dictionary<DateTime, DailyNetSummary>();
+
+        foreach (var row in incomeRows)
+        {
+            var date = new DateTime(row.Year, row.Month, row.Day, 0, 0, 0, DateTimeKind.Utc);
+            byDate[date] = new DailyNetSummary(date, row.Total, 0m);
+        }
+
+        foreach (var row in expenseRows)
+        {
+            var date = new DateTime(row.Year, row.Month, row.Day, 0, 0, 0, DateTimeKind.Utc);
+            if (byDate.TryGetValue(date, out var existing))
+            {
+                byDate[date] = existing with { Expense = row.Total };
+            }
+            else
+            {
+                byDate[date] = new DailyNetSummary(date, 0m, row.Total);
+            }
+        }
+
+        return byDate.Values
+            .OrderByDescending(x => x.Date)
+            .ToList();
     }
 
     public async Task ApplyAutoDeductionsForBudgetPeriodAsync(

@@ -1,6 +1,6 @@
 # CoinStack Open Implementation Issues (Current)
 
-Last updated: 2026-02-27 (Auth foundation + PostgreSQL provider switch scaffolding added)
+Last updated: 2026-02-27 (Auth foundation added; reverted to SQLite-first setup)
 
 ## Session handoff note (for short prompts)
 
@@ -56,4 +56,4 @@ This file tracks only the issues that are still open and should be prioritized i
 - Identity auth foundation and API endpoints are now implemented.
 - Full per-user data partitioning for domain entities is not implemented yet.
 - Trigger/setup guidance for psychology features is documented in `PSYCHOLOGY_FEATURE_TRIGGERS.md`.
-- Auth/PostgreSQL setup guidance is documented in `AUTH_POSTGRES_SETUP.md`.
+- Auth/SQLite setup guidance is documented in `AUTH_POSTGRES_SETUP.md`.

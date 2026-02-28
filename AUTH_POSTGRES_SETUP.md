@@ -1,4 +1,4 @@
-# Auth + PostgreSQL Setup Guide
+# Auth + SQLite Setup Guide
 
 Last updated: 2026-02-27
 
@@ -7,7 +7,6 @@ Last updated: 2026-02-27
 - ASP.NET Core Identity foundation using `ApplicationUser`.
 - Identity API endpoints are mapped under `/auth/*`.
 - EF Core context now supports Identity tables.
-- Database provider is now configurable: `Sqlite` or `PostgreSql`.
 - Identity schema migration added: `AddIdentityFoundation`.
 
 ## Auth endpoint trigger flow
@@ -24,27 +23,22 @@ Examples:
 
 These are provided by `MapIdentityApi<ApplicationUser>()` in startup.
 
-## Current default behavior
+## Current behavior (SQLite)
 
-By default, appsettings keeps provider as `Sqlite` so your app continues working without PostgreSQL installed.
+The app is configured for SQLite right now.
 
-- `Database:Provider = Sqlite`
-- SQLite connection string key: `ConnectionStrings:FinanceManagerSqlite`
+- Connection string key: `ConnectionStrings:FinanceManager`
+- Default development DB file: `financemanager.dev.db`
 
-## Switch to PostgreSQL
+## Apply migrations (SQLite)
 
-1. Install PostgreSQL locally.
-2. Create a database (for example `coinstack_dev`).
-3. Update `CoinStack/appsettings.Development.json`:
-   - `Database:Provider` -> `PostgreSql`
-   - `ConnectionStrings:FinanceManagerPostgres` -> your real connection string
-4. Apply migrations to PostgreSQL:
+Run this once in your environment:
 
 ```bash
 dotnet ef database update --project CoinStack.Data/CoinStack.Data.csproj --startup-project CoinStack/CoinStack.csproj
 ```
 
-5. Run app normally.
+Then run the app normally.
 
 ## Notes on user partitioning
 

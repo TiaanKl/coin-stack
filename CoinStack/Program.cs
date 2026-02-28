@@ -4,7 +4,6 @@ using CoinStack.Data.Entities;
 using CoinStack.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
-using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -51,16 +50,5 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapGroup("/auth").MapIdentityApi<ApplicationUser>();
-
-if (app.Environment.IsDevelopment())
-{
-    app.Lifetime.ApplicationStarted.Register(() =>
-    {
-        var url = app.Urls.FirstOrDefault(u => u.StartsWith("https"))
-               ?? app.Urls.FirstOrDefault()
-               ?? "https://localhost:5001";
-        Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
-    });
-}
 
 app.Run();
