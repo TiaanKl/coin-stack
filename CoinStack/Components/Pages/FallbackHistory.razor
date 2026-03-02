@@ -1,0 +1,81 @@
+@page "/savings/fallback-history"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@using CoinStack.Services
+@inject ISavingsService SavingsService
+@inject ISettingsService SettingsService
+@inject IMoneyFormatter MoneyFormatter
+
+<PageTitle>Fallback History</PageTitle>
+
+<div class="space-y-6">
+    <div class="flex items-center gap-3">
+        <a href="/savings"
+           class="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+        </a>
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Fallback History</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">All instances where savings covered an expense shortfall</p>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        @if (_events.Count == 0)
+        {
+            <div class="flex min-h-[200px] items-center justify-center rounded-lg bg-gray-50 dark:bg-gray-800">
+                <p class="text-sm text-gray-500 dark:text-gray-400">No fallback events recorded yet.</p>
+            </div>
+        }
+        else
+        {
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100 text-xs uppercase text-gray-500 dark:border-gray-800 dark:text-gray-400">
+                            <th class="pb-3 pr-4 font-medium">Date</th>
+                            <th class="pb-3 pr-4 font-medium">Source</th>
+                            <th class="pb-3 pr-4 font-medium">Reason</th>
+                            <th class="pb-3 text-right font-medium">Amount Used</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var evt in _events)
+                        {
+                            <tr class="border-b border-gray-50 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50">
+                                <td class="py-3 pr-4 text-gray-600 dark:text-gray-300">
+                                    @evt.OccurredAtUtc.ToString("dd MMM yyyy")
+                                    <span class="ml-1 text-xs text-gray-400 dark:text-gray-500">@evt.OccurredAtUtc.ToString("HH:mm")</span>
+                                </td>
+                                <td class="py-3 pr-4 font-medium text-gray-800 dark:text-white/90">@evt.SourceName</td>
+                                <td class="py-3 pr-4 text-gray-600 dark:text-gray-300">@evt.Reason</td>
+                                <td class="py-3 text-right font-semibold text-warning-600 dark:text-warning-400">@FormatC(evt.AmountUsed)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr class="border-t border-gray-200 dark:border-gray-700">
+                            <td colspan="3" class="pt-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Total</td>
+                            <td class="pt-3 text-right font-bold text-gray-800 dark:text-white">@FormatC(_events.Sum(x => x.AmountUsed))</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<SavingsFallbackEvent> _events = [];
+    private AppSettings _settings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _settings = await SettingsService.GetAsync();
+        _events = await SavingsService.GetFallbackEventsAsync();
+    }
+
+    private string FormatC(decimal amount) => MoneyFormatter.Format(_settings.Currency, amount);
+}

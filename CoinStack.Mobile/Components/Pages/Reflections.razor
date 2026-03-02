@@ -1,0 +1,351 @@
+@page "/reflections"
+@using CoinStack.Data
+@using CoinStack.Data.Entities
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<CoinStackDbContext> DbFactory
+
+<h1>Reflections</h1>
+
+<p class="cs-subtitle">Capture behavior triggers and close the loop with mood-aware reflection.</p>
+
+@if (!string.IsNullOrWhiteSpace(_statusMessage))
+{
+	<p class="cs-status @StatusClass(_statusMessage)">@_statusMessage</p>
+}
+
+<div class="cs-page">
+<div class="cs-card">
+<h3 class="cs-card-title">Create Manual Reflection</h3>
+
+	<div class="cs-form-grid two">
+	<div class="cs-field">
+	<label>Trigger</label>
+	<select @bind="_manualTrigger">
+		@foreach (var trigger in Enum.GetValues<ReflectionTrigger>())
+		{
+			<option value="@trigger">@trigger</option>
+		}
+	</select>
+</div>
+
+	<div class="cs-field">
+	<label>Prompt</label>
+	<input @bind="_manualPrompt" maxlength="240" />
+</div>
+	</div>
+
+<div class="cs-actions">
+	<button @onclick="CreateManualReflectionAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Add Reflection")</button>
+</div>
+</div>
+
+<div class="cs-card">
+<h3 class="cs-card-title">Pending Reflections</h3>
+
+@if (_isLoading)
+{
+	<p>Loading reflections...</p>
+}
+else if (_pending.Count == 0)
+{
+	<p>No pending reflections.</p>
+}
+else
+{
+	@foreach (var reflection in _pending)
+	{
+		<div class="cs-card" style="margin-bottom:0.75rem; padding:0.9rem;">
+			<p>
+				<span class="cs-pill @TriggerClass(reflection.Trigger)">@reflection.Trigger</span>
+				<span style="margin-left:0.45rem; color:var(--cs-muted);">@reflection.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</span>
+			</p>
+			<p style="margin-top:0.35rem;">@reflection.Prompt</p>
+
+			@if (_editingReflectionId == reflection.Id)
+			{
+				<div class="cs-field">
+					<label>Response</label>
+					<textarea @bind="_responseText" rows="3"></textarea>
+				</div>
+				<div class="cs-form-grid two">
+				<div class="cs-field">
+					<label>Mood Before (1-10)</label>
+					<input type="number" min="1" max="10" @bind="_moodBefore" />
+				</div>
+				<div class="cs-field">
+					<label>Mood After (1-10)</label>
+					<input type="number" min="1" max="10" @bind="_moodAfter" />
+				</div>
+				</div>
+				<div class="cs-field">
+					<label>Emotion (optional)</label>
+					<select @bind="_selectedEmotionText">
+						<option value="">None</option>
+						@foreach (var emotion in Enum.GetValues<EmotionTag>())
+						{
+							<option value="@emotion.ToString()">@emotion</option>
+						}
+					</select>
+				</div>
+				<div class="cs-actions">
+					<button @onclick="() => CompleteAsync(reflection.Id)" disabled="@_isSaving">Complete</button>
+					<button class="cs-btn-secondary" @onclick="CancelEdit" disabled="@_isSaving">Cancel</button>
+				</div>
+			}
+			else
+			{
+				<div class="cs-actions">
+					<button @onclick="() => StartEdit(reflection.Id)">Complete Reflection</button>
+				</div>
+			}
+		</div>
+	}
+}
+
+</div>
+
+<div class="cs-card">
+<h3 class="cs-card-title">Recent Completed Reflections</h3>
+
+@if (_completed.Count == 0)
+{
+	<p>No completed reflections yet.</p>
+}
+else
+{
+	<div class="cs-table-wrap">
+	<table>
+		<thead>
+			<tr>
+				<th>Date</th>
+				<th>Trigger</th>
+				<th>Emotion</th>
+				<th>Mood</th>
+				<th>Response</th>
+			</tr>
+		</thead>
+		<tbody>
+			@foreach (var reflection in _completed)
+			{
+				<tr>
+					<td>@reflection.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd")</td>
+					<td>@reflection.Trigger</td>
+					<td>@(reflection.EmotionTag?.ToString() ?? "-")</td>
+					<td>@reflection.MoodBefore → @reflection.MoodAfter</td>
+					<td>@TrimResponse(reflection.Response)</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+	</div>
+}
+
+</div>
+</div>
+
+@code {
+	private readonly List<Reflection> _pending = [];
+	private readonly List<Reflection> _completed = [];
+
+	private bool _isLoading = true;
+	private bool _isSaving;
+	private string? _statusMessage;
+
+	private ReflectionTrigger _manualTrigger = ReflectionTrigger.ManualEntry;
+	private string _manualPrompt = "What spending pattern do I want to improve today?";
+
+	private int? _editingReflectionId;
+	private string _responseText = string.Empty;
+	private int _moodBefore = 5;
+	private int _moodAfter = 5;
+	private string _selectedEmotionText = string.Empty;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshAsync();
+	}
+
+	private async Task RefreshAsync()
+	{
+		_isLoading = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+
+			var pending = await db.Reflections
+				.AsNoTracking()
+				.Where(x => !x.IsCompleted)
+				.OrderByDescending(x => x.CreatedAtUtc)
+				.Take(10)
+				.ToListAsync();
+
+			var completed = await db.Reflections
+				.AsNoTracking()
+				.Where(x => x.IsCompleted)
+				.OrderByDescending(x => x.CreatedAtUtc)
+				.Take(20)
+				.ToListAsync();
+
+			_pending.Clear();
+			_pending.AddRange(pending);
+
+			_completed.Clear();
+			_completed.AddRange(completed);
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to load reflections: {exception.Message}";
+		}
+		finally
+		{
+			_isLoading = false;
+		}
+	}
+
+	private async Task CreateManualReflectionAsync()
+	{
+		if (_isSaving)
+		{
+			return;
+		}
+
+		if (string.IsNullOrWhiteSpace(_manualPrompt))
+		{
+			_statusMessage = "Prompt is required.";
+			return;
+		}
+
+		_isSaving = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+
+			db.Reflections.Add(new Reflection
+			{
+				Trigger = _manualTrigger,
+				Prompt = _manualPrompt.Trim(),
+				IsCompleted = false,
+			});
+
+			await db.SaveChangesAsync();
+			_statusMessage = "Reflection added.";
+			await RefreshAsync();
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to create reflection: {exception.Message}";
+		}
+		finally
+		{
+			_isSaving = false;
+		}
+	}
+
+	private void StartEdit(int reflectionId)
+	{
+		_editingReflectionId = reflectionId;
+		_responseText = string.Empty;
+		_moodBefore = 5;
+		_moodAfter = 5;
+		_selectedEmotionText = string.Empty;
+	}
+
+	private void CancelEdit()
+	{
+		_editingReflectionId = null;
+	}
+
+	private async Task CompleteAsync(int reflectionId)
+	{
+		if (_isSaving)
+		{
+			return;
+		}
+
+		if (string.IsNullOrWhiteSpace(_responseText))
+		{
+			_statusMessage = "Response is required to complete a reflection.";
+			return;
+		}
+
+		_isSaving = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+
+			var reflection = await db.Reflections.FirstOrDefaultAsync(x => x.Id == reflectionId);
+			if (reflection is null)
+			{
+				_statusMessage = "Reflection not found.";
+				return;
+			}
+
+			reflection.Response = _responseText.Trim();
+			reflection.MoodBefore = Math.Clamp(_moodBefore, 1, 10);
+			reflection.MoodAfter = Math.Clamp(_moodAfter, 1, 10);
+			reflection.IsCompleted = true;
+
+			if (Enum.TryParse<EmotionTag>(_selectedEmotionText, out var parsedEmotion))
+			{
+				reflection.EmotionTag = parsedEmotion;
+			}
+			else
+			{
+				reflection.EmotionTag = null;
+			}
+
+			await db.SaveChangesAsync();
+
+			_editingReflectionId = null;
+			_statusMessage = "Reflection completed.";
+			await RefreshAsync();
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to complete reflection: {exception.Message}";
+		}
+		finally
+		{
+			_isSaving = false;
+		}
+	}
+
+	private static string TrimResponse(string? response)
+	{
+		if (string.IsNullOrWhiteSpace(response))
+		{
+			return "-";
+		}
+
+		var trimmed = response.Trim();
+		return trimmed.Length <= 80 ? trimmed : $"{trimmed[..80]}...";
+	}
+
+	private static string StatusClass(string? message)
+	{
+		if (string.IsNullOrWhiteSpace(message))
+		{
+			return string.Empty;
+		}
+
+		return message.Contains("failed", StringComparison.OrdinalIgnoreCase)
+			? "error"
+			: "ok";
+	}
+
+	private static string TriggerClass(ReflectionTrigger trigger) => trigger switch
+	{
+		ReflectionTrigger.ImpulseBuy => "expense",
+		ReflectionTrigger.OverBudgetSpend => "expense",
+		ReflectionTrigger.LargeExpense => "expense",
+		ReflectionTrigger.SavingsDip => "neutral",
+		ReflectionTrigger.ManualEntry => "neutral",
+		_ => "neutral",
+	};
+}

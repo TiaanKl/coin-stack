@@ -1,0 +1,191 @@
+﻿@page "/"
+@using CoinStack.Data
+@using CoinStack.Data.Entities
+@using CoinStack.Mobile.Core
+@using Microsoft.EntityFrameworkCore
+@inject CoinStack.Mobile.Core.IDeviceContextService DeviceContext
+@inject IDbContextFactory<CoinStackDbContext> DbFactory
+
+<h1>Dashboard</h1>
+
+<p class="cs-subtitle">Mobile overview for the current budget period.</p>
+
+@if (!string.IsNullOrWhiteSpace(_statusMessage))
+{
+	<p class="cs-status @StatusClass(_statusMessage)">@_statusMessage</p>
+}
+
+<div class="cs-page">
+    <div class="cs-card">
+        <div class="cs-spread">
+            <h3 class="cs-card-title">Current Period</h3>
+            <span class="cs-pill">@DeviceContext.PlatformName</span>
+        </div>
+
+        <div class="cs-kpi-grid">
+            <div class="cs-kpi">
+                <p class="cs-kpi-label">Income</p>
+                <p class="cs-kpi-value success">@FormatMoney(_periodIncome)</p>
+            </div>
+            <div class="cs-kpi">
+                <p class="cs-kpi-label">Expense</p>
+                <p class="cs-kpi-value danger">@FormatMoney(_periodExpense)</p>
+            </div>
+            <div class="cs-kpi">
+                <p class="cs-kpi-label">Net</p>
+                <p class="cs-kpi-value @(_periodNet >= 0 ? "success" : "danger")">@FormatMoney(_periodNet)</p>
+            </div>
+        </div>
+
+        <div class="cs-kpi-grid" style="margin-top:0.6rem">
+            <div class="cs-kpi">
+                <p class="cs-kpi-label">Transactions</p>
+                <p class="cs-kpi-value">@_transactionCount</p>
+            </div>
+            <div class="cs-kpi">
+                <p class="cs-kpi-label">Buckets</p>
+                <p class="cs-kpi-value">@_bucketCount</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="cs-actions">
+        <button @onclick="RefreshAsync" disabled="@_isLoading">@(_isLoading ? "Refreshing..." : "Refresh Dashboard")</button>
+    </div>
+
+    <div class="cs-card">
+        <h3 class="cs-card-title">Recent Activity</h3>
+
+        @if (_isLoading)
+        {
+        	<p>Loading dashboard...</p>
+        }
+        else if (_recentTransactions.Count == 0)
+        {
+        	<p>No transactions yet.</p>
+        }
+        else
+        {
+            <div class="cs-table-wrap">
+        		<table>
+        			<thead>
+        				<tr>
+        					<th>Date</th>
+        					<th>Description</th>
+        					<th>Type</th>
+        					<th>Amount</th>
+        				</tr>
+        			</thead>
+        			<tbody>
+        				@foreach (var transaction in _recentTransactions)
+        				{
+        					<tr>
+        						<td>@transaction.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+        						<td>@(string.IsNullOrWhiteSpace(transaction.Description) ? "(No description)" : transaction.Description)</td>
+        						<td><span class="cs-pill @(transaction.Type == TransactionType.Income ? "income" : "expense")">@transaction.Type</span></td>
+        						<td>@(transaction.Type == TransactionType.Income ? "+" : "-")@FormatMoney(transaction.Amount)</td>
+        					</tr>
+        				}
+        			</tbody>
+        		</table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+	private bool _isLoading = true;
+	private string? _statusMessage;
+
+	private int _bucketCount;
+	private int _transactionCount;
+	private string _currency = "USD";
+	private decimal _periodIncome;
+	private decimal _periodExpense;
+	private decimal _periodNet;
+	private readonly List<Transaction> _recentTransactions = [];
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshAsync();
+	}
+
+	private async Task RefreshAsync()
+	{
+		_isLoading = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+			var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync() ?? new AppSettings();
+			_currency = settings.Currency;
+
+			var nowUtc = DateTime.UtcNow;
+			var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(settings.MonthStartDay, nowUtc);
+
+			_periodIncome = await db.Transactions
+				.AsNoTracking()
+				.Where(x => x.OccurredAtUtc >= startUtc
+					&& x.OccurredAtUtc < endUtc
+					&& x.Type == TransactionType.Income)
+				.SumAsync(x => (decimal?)x.Amount) ?? 0m;
+
+			_periodExpense = await db.Transactions
+				.AsNoTracking()
+				.Where(x => x.OccurredAtUtc >= startUtc
+					&& x.OccurredAtUtc < endUtc
+					&& x.Type == TransactionType.Expense)
+				.SumAsync(x => (decimal?)x.Amount) ?? 0m;
+
+			_periodNet = _periodIncome - _periodExpense;
+
+			_bucketCount = await db.Buckets.CountAsync();
+			_transactionCount = await db.Transactions.CountAsync();
+
+			var transactions = await db.Transactions
+				.AsNoTracking()
+				.OrderByDescending(x => x.OccurredAtUtc)
+				.Take(10)
+				.ToListAsync();
+
+			_recentTransactions.Clear();
+			_recentTransactions.AddRange(transactions);
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to load dashboard: {exception.Message}";
+		}
+		finally
+		{
+			_isLoading = false;
+		}
+	}
+
+	private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
+	{
+		if (monthStartDay is < 1 or > 28)
+		{
+			monthStartDay = 1;
+		}
+
+		var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
+		var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
+		var endUtc = startUtc.AddMonths(1);
+		return (startUtc, endUtc);
+	}
+
+	private string FormatMoney(decimal amount) => MoneyDisplay.Format(_currency, amount);
+
+	private static string StatusClass(string? message)
+	{
+		if (string.IsNullOrWhiteSpace(message))
+		{
+			return string.Empty;
+		}
+
+		return message.Contains("failed", StringComparison.OrdinalIgnoreCase)
+			? "error"
+			: "ok";
+	}
+}

@@ -1,0 +1,258 @@
+@page "/savings"
+@using CoinStack.Data
+@using CoinStack.Data.Entities
+@using CoinStack.Mobile.Core
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<CoinStackDbContext> DbFactory
+
+<h1>Savings</h1>
+
+<p class="cs-subtitle">Monitor reserve health, monthly growth, and fallback usage.</p>
+
+@if (!string.IsNullOrWhiteSpace(_statusMessage))
+{
+	<p class="cs-status @StatusClass(_statusMessage)">@_statusMessage</p>
+}
+
+<div class="cs-page">
+@if (_isLoading)
+{
+	<div class="cs-card">
+		<p>Loading savings...</p>
+	</div>
+}
+else if (_state is null)
+{
+	<div class="cs-card">
+		<p>Savings state not initialized.</p>
+	</div>
+}
+else
+{
+	<div class="cs-kpi-grid">
+		<div class="cs-kpi-card">
+			<div class="cs-kpi-label">Total</div>
+			<div class="cs-kpi-value">@FormatMoney(_state.Total)</div>
+		</div>
+		<div class="cs-kpi-card">
+			<div class="cs-kpi-label">Available</div>
+			<div class="cs-kpi-value">@FormatMoney(_state.Available)</div>
+		</div>
+		<div class="cs-kpi-card">
+			<div class="cs-kpi-label">Reserved</div>
+			<div class="cs-kpi-value">@FormatMoney(_state.Reserved)</div>
+		</div>
+		<div class="cs-kpi-card">
+			<div class="cs-kpi-label">Last Calculated</div>
+			<div class="cs-kpi-value">@(_state.LastCalculatedMonth ?? "-")</div>
+		</div>
+	</div>
+
+	<div class="cs-card">
+		<h3 class="cs-card-title">Fallback Control</h3>
+		<p>
+			Status:
+			<span class="cs-pill @(_state.FallbackEnabled ? "income" : "neutral")">
+				@(_state.FallbackEnabled ? "Enabled" : "Disabled")
+			</span>
+		</p>
+		<div class="cs-actions">
+			<button @onclick="ToggleFallbackAsync" disabled="@_isSaving">
+				@(_isSaving ? "Saving..." : (_state.FallbackEnabled ? "Disable Fallback" : "Enable Fallback"))
+			</button>
+		</div>
+	</div>
+}
+
+<div class="cs-card">
+	<h3 class="cs-card-title">Recent Monthly Savings</h3>
+	@if (_monthlySummaries.Count == 0)
+	{
+		<p>No monthly savings summaries yet.</p>
+	}
+	else
+	{
+		<div class="cs-table-wrap">
+		<table>
+			<thead>
+				<tr>
+					<th>Month</th>
+					<th>Base</th>
+					<th>Interest</th>
+					<th>Total</th>
+					<th>Running Total</th>
+				</tr>
+			</thead>
+			<tbody>
+				@foreach (var row in _monthlySummaries)
+				{
+					<tr>
+						<td>@row.Month</td>
+						<td>@FormatMoney(row.Base)</td>
+						<td>@FormatMoney(row.Interest)</td>
+						<td>@FormatMoney(row.Total)</td>
+						<td>@FormatMoney(row.RunningTotal)</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		</div>
+	}
+</div>
+
+<div class="cs-card">
+	<h3 class="cs-card-title">Recent Fallback Events</h3>
+	@if (_fallbackEvents.Count == 0)
+	{
+		<p>No fallback events recorded.</p>
+	}
+	else
+	{
+		<div class="cs-table-wrap">
+		<table>
+			<thead>
+				<tr>
+					<th>Date</th>
+					<th>Amount</th>
+					<th>Reason</th>
+					<th>Source</th>
+				</tr>
+			</thead>
+			<tbody>
+				@foreach (var row in _fallbackEvents)
+				{
+					<tr>
+						<td>@row.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+						<td>@FormatMoney(row.AmountUsed)</td>
+						<td>@row.Reason</td>
+						<td>@row.SourceName</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		</div>
+	}
+</div>
+</div>
+
+@code {
+	private SavingsState? _state;
+	private bool _isLoading = true;
+	private bool _isSaving;
+	private string? _statusMessage;
+	private string _currency = "USD";
+	private readonly List<SavingsMonthlySummary> _monthlySummaries = [];
+	private readonly List<SavingsFallbackEvent> _fallbackEvents = [];
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshAsync();
+	}
+
+	private async Task RefreshAsync()
+	{
+		_isLoading = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+
+			var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync();
+			_currency = settings?.Currency ?? "USD";
+
+			var state = await db.SavingsState.FirstOrDefaultAsync();
+			if (state is null)
+			{
+				state = new SavingsState
+				{
+					Total = 0m,
+					Available = 0m,
+					Reserved = 0m,
+					FallbackEnabled = false,
+				};
+
+				db.SavingsState.Add(state);
+				await db.SaveChangesAsync();
+			}
+
+			_state = state;
+
+			var monthly = await db.SavingsMonthlySummaries
+				.AsNoTracking()
+				.OrderByDescending(x => x.Month)
+				.Take(6)
+				.ToListAsync();
+
+			_monthlySummaries.Clear();
+			_monthlySummaries.AddRange(monthly);
+
+			var fallbackEvents = await db.SavingsFallbackEvents
+				.AsNoTracking()
+				.OrderByDescending(x => x.OccurredAtUtc)
+				.Take(10)
+				.ToListAsync();
+
+			_fallbackEvents.Clear();
+			_fallbackEvents.AddRange(fallbackEvents);
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to load savings: {exception.Message}";
+		}
+		finally
+		{
+			_isLoading = false;
+		}
+	}
+
+	private async Task ToggleFallbackAsync()
+	{
+		if (_state is null)
+		{
+			return;
+		}
+
+		_isSaving = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+			var state = await db.SavingsState.FirstOrDefaultAsync();
+			if (state is null)
+			{
+				_statusMessage = "Savings state not found.";
+				return;
+			}
+
+			state.FallbackEnabled = !state.FallbackEnabled;
+			await db.SaveChangesAsync();
+
+			await RefreshAsync();
+			_statusMessage = $"Fallback {(state.FallbackEnabled ? "enabled" : "disabled")}.";
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to update fallback: {exception.Message}";
+		}
+		finally
+		{
+			_isSaving = false;
+		}
+	}
+
+	private string FormatMoney(decimal amount) => MoneyDisplay.Format(_currency, amount);
+
+	private static string StatusClass(string? message)
+	{
+		if (string.IsNullOrWhiteSpace(message))
+		{
+			return string.Empty;
+		}
+
+		return message.Contains("failed", StringComparison.OrdinalIgnoreCase)
+			? "error"
+			: "ok";
+	}
+}
