@@ -166,7 +166,7 @@ public sealed class GameLoopService : IGameLoopService
         if (bucket is null) return result;
 
         var monthlyLimit = await GetMonthlyLimitAsync(
-            bucket.Id,
+            transaction.CategoryId,
             currentYear,
             currentMonth,
             bucket.AllocatedAmount,
@@ -258,24 +258,27 @@ public sealed class GameLoopService : IGameLoopService
     }
 
     /// <summary>
-    /// Resolves the spending limit for a specific bucket in a specific month.
+    /// Resolves the spending limit for a specific category in a specific month.
     /// Priorities:
-    /// 1. Explicit 'Budget' entity for that Month/Year.
+    /// 1. Explicit 'Budget' entity for that Category/Month/Year.
     /// 2. Default 'AllocatedAmount' on the Bucket itself.
     /// </summary>
     private async Task<decimal> GetMonthlyLimitAsync(
-        int bucketId,
+        int? categoryId,
         int year,
         int month,
         decimal defaultLimit,
         CancellationToken cancellationToken)
     {
+        if (categoryId is null)
+            return defaultLimit;
+
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
         var monthlyOverride = await db.Budgets
             .AsNoTracking()
             .FirstOrDefaultAsync(b =>
-                b.CategoryId == bucketId &&
+                b.CategoryId == categoryId &&
                 b.Year == year &&
                 b.Month == month,
                 cancellationToken);
