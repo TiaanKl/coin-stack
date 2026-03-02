@@ -1,0 +1,173 @@
+@page "/buckets"
+@using CoinStack.Data
+@using CoinStack.Data.Entities
+@using CoinStack.Mobile.Core
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<CoinStackDbContext> DbFactory
+
+<h1>Buckets</h1>
+
+<p class="cs-subtitle">Track current period allocation versus spending at a glance.</p>
+
+@if (!string.IsNullOrWhiteSpace(_statusMessage))
+{
+	<p class="cs-status @StatusClass(_statusMessage)">@_statusMessage</p>
+}
+
+<div class="cs-page">
+<div class="cs-card">
+	<h3 class="cs-card-title">Current Budget Period Utilization</h3>
+
+	<div class="cs-actions" style="margin-bottom:0.5rem;">
+		<button class="cs-btn-secondary" @onclick="RefreshAsync" disabled="@_isLoading">@(_isLoading ? "Refreshing..." : "Refresh")</button>
+	</div>
+
+	@if (_isLoading)
+	{
+		<p>Loading buckets...</p>
+	}
+	else if (_rows.Count == 0)
+	{
+		<p>No buckets found.</p>
+	}
+	else
+	{
+		<div class="cs-table-wrap">
+		<table>
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Type</th>
+					<th>Allocated</th>
+					<th>Spent</th>
+					<th>Remaining</th>
+					<th>Used</th>
+				</tr>
+			</thead>
+			<tbody>
+				@foreach (var row in _rows)
+				{
+					<tr>
+						<td>@row.Name</td>
+						<td><span class="cs-pill @(row.IsSavings ? "savings" : "expense")">@(row.IsSavings ? "Savings" : "Spending")</span></td>
+						<td>@FormatMoney(row.Allocated)</td>
+						<td>@FormatMoney(row.Spent)</td>
+						<td>@FormatMoney(row.Remaining)</td>
+						<td><span class="cs-pill @BucketUtilizationClass(row.PercentUsed)">@row.PercentUsed.ToString("N0")%</span></td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		</div>
+	}
+</div>
+</div>
+
+@code {
+	private bool _isLoading = true;
+	private string? _statusMessage;
+	private string _currency = "USD";
+	private readonly List<BucketRow> _rows = [];
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshAsync();
+	}
+
+	private async Task RefreshAsync()
+	{
+		_isLoading = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+
+			var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync() ?? new AppSettings();
+			_currency = settings.Currency;
+
+			var nowUtc = DateTime.UtcNow;
+			var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(settings.MonthStartDay, nowUtc);
+
+			var buckets = await db.Buckets
+				.AsNoTracking()
+				.OrderBy(x => x.SortOrder)
+				.ThenBy(x => x.Name)
+				.ToListAsync();
+
+			var spends = await db.Transactions
+				.AsNoTracking()
+				.Where(x => x.Type == TransactionType.Expense
+							&& x.BucketId.HasValue
+							&& x.OccurredAtUtc >= startUtc
+							&& x.OccurredAtUtc < endUtc)
+				.GroupBy(x => x.BucketId!.Value)
+				.Select(g => new { BucketId = g.Key, Spent = g.Sum(x => x.Amount) })
+				.ToListAsync();
+
+			var spendByBucket = spends.ToDictionary(x => x.BucketId, x => x.Spent);
+
+			_rows.Clear();
+			foreach (var bucket in buckets)
+			{
+				var spent = spendByBucket.GetValueOrDefault(bucket.Id, 0m);
+				_rows.Add(new BucketRow(
+					bucket.Name,
+					bucket.IsSavings,
+					bucket.AllocatedAmount,
+					spent));
+			}
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to load buckets: {exception.Message}";
+		}
+		finally
+		{
+			_isLoading = false;
+		}
+	}
+
+	private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
+	{
+		if (monthStartDay is < 1 or > 28)
+		{
+			monthStartDay = 1;
+		}
+
+		var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
+		var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
+		var endUtc = startUtc.AddMonths(1);
+		return (startUtc, endUtc);
+	}
+
+	private string FormatMoney(decimal amount) => MoneyDisplay.Format(_currency, amount);
+
+	private static string StatusClass(string? message)
+	{
+		if (string.IsNullOrWhiteSpace(message))
+		{
+			return string.Empty;
+		}
+
+		return message.Contains("failed", StringComparison.OrdinalIgnoreCase)
+			? "error"
+			: "ok";
+	}
+
+	private static string BucketUtilizationClass(double percentUsed)
+	{
+		if (percentUsed >= 100)
+		{
+			return "expense";
+		}
+
+		return percentUsed >= 80 ? "neutral" : "income";
+	}
+
+	private sealed record BucketRow(string Name, bool IsSavings, decimal Allocated, decimal Spent)
+	{
+		public decimal Remaining => Allocated - Spent;
+		public double PercentUsed => Allocated > 0 ? (double)(Spent / Allocated) * 100d : 0d;
+	}
+}
