@@ -54,7 +54,7 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Monthly Net Income</label>
                     <div class="flex items-center rounded-md border border-gray-300 bg-white overflow-hidden focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700">
                         <div class="flex h-11 w-11 shrink-0 items-center justify-center border-r border-gray-300 bg-gray-100 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                            @GetCurrencySymbol(_currency)
+                            @CurrencyFormatting.GetSymbol(_currency)
                         </div>
                         <input
                             type="number"
@@ -115,7 +115,7 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Monthly Savings Amount</label>
                     <div class="flex items-center rounded-md border border-gray-300 bg-white overflow-hidden focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-700">
                         <div class="flex h-11 w-11 shrink-0 items-center justify-center border-r border-gray-300 bg-gray-100 text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-400">
-                            @GetCurrencySymbol(_currency)
+                            @CurrencyFormatting.GetSymbol(_currency)
                         </div>
                         <input
                             type="number"
@@ -387,6 +387,7 @@
             ? settings.SavingsInterestRate.Value * 100m
             : null;
         _savingsInterestIsYearly = settings.SavingsInterestIsYearly;
+        CurrencyFormatting.ApplyCurrency(_currency);
     }
 
     private async Task SaveSettings()
@@ -409,6 +410,8 @@
                 : null,
             SavingsInterestIsYearly = _savingsInterestIsYearly
         });
+
+        CurrencyFormatting.ApplyCurrency(_currency);
 
         _saved = true;
         StateHasChanged();
@@ -455,16 +458,5 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    private string FormatC(decimal amount) => $"{GetCurrencySymbol(_currency)}{amount:N2}";
-
-    private static string GetCurrencySymbol(string currency) => currency switch
-    {
-        "USD" => "$",
-        "EUR" => "€",
-        "GBP" => "£",
-        "CAD" => "C$",
-        "AUD" => "A$",
-        "ZAR" => "R",
-        _ => "$"
-    };
+    private string FormatC(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _currency, 2);
 }

@@ -35,6 +35,13 @@
                     </li>
 
                     <li>
+                        <NavLink href="/goals" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-bullseye fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Goals</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
                         <NavLink href="/transactions" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-arrow-right-arrow-left fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Transactions</span>

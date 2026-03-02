@@ -8,6 +8,8 @@
 @inject IGameLoopService GameLoop
 @inject IScoringService ScoringService
 @inject IReflectionService ReflectionService
+@inject ITransactionService TransactionService
+@inject ISettingsService SettingsService
 
 <!-- ===== Page Wrapper Start ===== -->
 <div class="flex h-screen overflow-hidden">
@@ -45,8 +47,18 @@
                 <!-- Right Header: Score, Streak, Reflect, DarkMode -->
                 <div class="hidden w-full items-center justify-end gap-4 px-5 py-4 xl:flex xl:px-0">
                     <div class="flex items-center gap-4">
+                        <div class="flex h-10 items-center gap-2 rounded-full bg-gray-100 px-4 dark:bg-gray-800">
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">Net Saved</span>
+                            <span class="text-xs font-bold text-gray-800 dark:text-white/90">@FormatC0(_netSaved)</span>
+                        </div>
+
+                        <div class="flex h-10 items-center gap-2 rounded-full bg-gray-100 px-4 dark:bg-gray-800">
+                            <span class="text-xs font-semibold text-gray-500 dark:text-gray-400">Total Spent</span>
+                            <span class="text-xs font-bold text-gray-800 dark:text-white/90">@FormatC0(_totalSpent)</span>
+                        </div>
+
                         <!-- Score -->
-                         <div class="flex items-center gap-2 rounded-full bg-brand-50 px-4 py-1.5 dark:bg-brand-500/15">
+                         <div class="flex h-10 items-center gap-2 rounded-full bg-brand-50 px-4 dark:bg-brand-500/15">
                              <span class="text-brand-500 dark:text-brand-400">
                                 <i class="fa-solid fa-star text-base"></i>
                              </span>
@@ -54,13 +66,11 @@
                          </div>
 
                         <!-- Daily Streak Widget -->
-                         <div class="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-1.5 dark:bg-gray-800">
+                         <div class="flex h-10 items-center gap-2 rounded-full bg-gray-100 px-4 dark:bg-gray-800">
                              <div class="@_streakColorClass">
                                  <i class="fa-solid fa-fire text-base"></i>
                              </div>
-                             <div class="flex flex-col">
-                                 <span class="text-xs font-bold @_streakColorClass">@_streakCount Day Streak</span>
-                             </div>
+                             <span class="text-xs font-bold @_streakColorClass">@_streakCount Day Streak</span>
                          </div>
 
                         <!-- Reflection Trigger -->
@@ -99,6 +109,9 @@
     private int _totalScore;
     private Reflection? _pendingReflection;
     private bool _showReflectionModal;
+    private decimal _totalSpent;
+    private decimal _netSaved;
+    private string _currency = "USD";
 
     private string _reflectionResponse = "";
     private int _moodBefore = 5;
@@ -122,6 +135,15 @@
     {
         try 
         {
+            var settings = await SettingsService.GetAsync();
+            _currency = settings.Currency;
+            CurrencyFormatting.ApplyCurrency(_currency);
+
+            var transactions = await TransactionService.GetAllAsync();
+            var totalIncome = transactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
+            _totalSpent = transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+            _netSaved = totalIncome - _totalSpent;
+
             var state = await GameLoop.GetCurrentStateAsync();
             var streak = state.Streaks.FirstOrDefault(s => s.Type == StreakType.DailyCheckIn);
             _streakCount = streak?.CurrentCount ?? 0;
@@ -202,14 +224,14 @@
         {
             // Ignore: can happen during prerender or if JS not ready yet.
         }
-
-        await LoadStateAsync();
     }
 
     public void Dispose()
     {
         Navigation.LocationChanged -= HandleLocationChanged;
     }
+
+    private string FormatC0(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _currency, 0);
 }
 
 <!-- Reflection Modal -->

@@ -1,0 +1,220 @@
+@page "/goals"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@using CoinStack.Services
+@inject IGoalService GoalService
+@inject ISettingsService SettingsService
+
+<PageTitle>Goals</PageTitle>
+
+<div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
+    <div class="xl:col-span-4">
+        <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+            <h2 class="mb-1 text-xl font-semibold text-gray-800 dark:text-white/90">Goals</h2>
+            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Create a savings goal with milestones and rewards.</p>
+            <form class="space-y-4" @onsubmit="CreateGoalAsync">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Goal name</label>
+                    <input @bind="_goalName" type="text" placeholder="New Car"
+                           class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Target amount</label>
+                    <input @bind-value="_goalTargetAmount" @bind-value:event="oninput" type="number" min="0" step="0.01"
+                           class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Current amount</label>
+                    <input @bind-value="_goalCurrentAmount" @bind-value:event="oninput" type="number" min="0" step="0.01"
+                           class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Target date (optional)</label>
+                    <InputDate TValue="DateTime?" @bind-Value="_goalTargetDateUtc"
+                               class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                </div>
+                @if (!string.IsNullOrWhiteSpace(_goalFormError))
+                {
+                    <div class="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">@_goalFormError</div>
+                }
+                <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-brand-500 px-4 py-3 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">Create goal</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="xl:col-span-8">
+        @if (_goals.Count == 0)
+        {
+            <div class="flex min-h-[280px] items-center justify-center rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
+                <p class="text-sm text-gray-500 dark:text-gray-400">No data available</p>
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                @foreach (var goal in _goals.OrderByDescending(x => x.CreatedAtUtc))
+                {
+                    var progressPercent = goal.TargetAmount <= 0 ? 0m : Math.Clamp(goal.CurrentAmount / goal.TargetAmount * 100m, 0m, 100m);
+                    <div class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                        <div class="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                                <h4 class="text-base font-semibold text-gray-800 dark:text-white/90">@goal.Name</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">@(goal.TargetDateUtc.HasValue ? $"Target: {goal.TargetDateUtc.Value:dd MMM yyyy}" : "No target date")</p>
+                            </div>
+                            <span class="rounded-lg px-2 py-1 text-xs font-semibold @(goal.Status == GoalStatus.Completed ? "bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500" : "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400")">@goal.Status</span>
+                        </div>
+
+                        <div class="mb-3 flex items-end justify-between">
+                            <span class="text-xl font-bold text-gray-800 dark:text-white/90">@FormatC(goal.CurrentAmount)</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">of @FormatC(goal.TargetAmount)</span>
+                        </div>
+
+                        <div class="relative mb-4 h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-800">
+                            <div class="absolute left-0 top-0 h-full rounded-full bg-brand-500" style="width: @progressPercent.ToString("F0")%;"></div>
+                        </div>
+
+                        <div class="mb-4 grid grid-cols-2 gap-2 text-xs">
+                            @foreach (var milestone in GetMilestones(progressPercent))
+                            {
+                                <div class="rounded-lg px-2.5 py-2 @(milestone.IsUnlocked ? "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400" : "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400")">
+                                    <p class="font-semibold">@milestone.Label</p>
+                                    <p>@milestone.Reward</p>
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mt-auto flex items-end gap-2">
+                            <div class="flex-1">
+                                <label class="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">Add contribution</label>
+                                <input type="number" min="0" step="0.01" value="@GetContributionInput(goal)"
+                                       @oninput="e => SetContributionInput(goal.Id, e.Value?.ToString())"
+                                       class="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                            </div>
+                            <button @onclick="() => AddContributionAsync(goal.Id)"
+                                    class="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Add</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly List<Goal> _goals = [];
+    private readonly Dictionary<int, decimal> _goalContributionInputs = new();
+
+    private string _goalName = "";
+    private decimal _goalTargetAmount;
+    private decimal _goalCurrentAmount;
+    private DateTime? _goalTargetDateUtc;
+    private string _goalFormError = "";
+    private string _currency = "USD";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var settings = await SettingsService.GetAsync();
+        _currency = settings.Currency;
+        CurrencyFormatting.ApplyCurrency(_currency);
+        await ReloadGoalsAsync();
+    }
+
+    private async Task CreateGoalAsync()
+    {
+        _goalFormError = "";
+
+        if (string.IsNullOrWhiteSpace(_goalName))
+        {
+            _goalFormError = "Goal name is required.";
+            return;
+        }
+
+        if (_goalTargetAmount <= 0)
+        {
+            _goalFormError = "Target amount must be greater than zero.";
+            return;
+        }
+
+        if (_goalCurrentAmount < 0)
+        {
+            _goalFormError = "Current amount cannot be negative.";
+            return;
+        }
+
+        var current = Math.Min(_goalCurrentAmount, _goalTargetAmount);
+
+        await GoalService.CreateAsync(new Goal
+        {
+            Name = _goalName.Trim(),
+            TargetAmount = _goalTargetAmount,
+            CurrentAmount = current,
+            TargetDateUtc = _goalTargetDateUtc,
+            Status = current >= _goalTargetAmount ? GoalStatus.Completed : GoalStatus.Active
+        });
+
+        _goalName = "";
+        _goalTargetAmount = 0;
+        _goalCurrentAmount = 0;
+        _goalTargetDateUtc = null;
+
+        await ReloadGoalsAsync();
+    }
+
+    private async Task AddContributionAsync(int goalId)
+    {
+        if (!_goalContributionInputs.TryGetValue(goalId, out var amount) || amount <= 0)
+        {
+            return;
+        }
+
+        var goal = _goals.FirstOrDefault(x => x.Id == goalId);
+        if (goal is null)
+        {
+            return;
+        }
+
+        goal.CurrentAmount = Math.Min(goal.TargetAmount, goal.CurrentAmount + amount);
+        goal.Status = goal.CurrentAmount >= goal.TargetAmount ? GoalStatus.Completed : GoalStatus.Active;
+
+        await GoalService.UpdateAsync(goal);
+        await ReloadGoalsAsync();
+    }
+
+    private async Task ReloadGoalsAsync()
+    {
+        var goals = await GoalService.GetAllAsync();
+        _goals.Clear();
+        _goals.AddRange(goals);
+    }
+
+    private decimal GetContributionInput(Goal goal)
+    {
+        if (_goalContributionInputs.TryGetValue(goal.Id, out var amount))
+        {
+            return amount;
+        }
+
+        _goalContributionInputs[goal.Id] = 0m;
+        return 0m;
+    }
+
+    private void SetContributionInput(int goalId, string? value)
+    {
+        if (decimal.TryParse(value, out var parsed))
+        {
+            _goalContributionInputs[goalId] = parsed;
+        }
+    }
+
+    private IEnumerable<MilestoneData> GetMilestones(decimal progressPercent)
+    {
+        yield return new MilestoneData("25%", "Starter Badge", progressPercent >= 25);
+        yield return new MilestoneData("50%", "Momentum Badge", progressPercent >= 50);
+        yield return new MilestoneData("75%", "Champion Badge", progressPercent >= 75);
+        yield return new MilestoneData("100%", "Goal Unlocked", progressPercent >= 100);
+    }
+
+    private string FormatC(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _currency, 2);
+
+    private sealed record MilestoneData(string Label, string Reward, bool IsUnlocked);
+}

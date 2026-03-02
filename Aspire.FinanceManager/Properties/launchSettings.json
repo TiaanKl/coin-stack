@@ -1,10 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
-    "https": {
+    "Aspire + CoinStack (https)": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
+      "launchUrl": "https://localhost:17118",
       "applicationUrl": "https://localhost:17118",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
@@ -14,10 +15,11 @@
         "ASPIRE_RESOURCE_SERVICE_ENDPOINT_URL": "https://localhost:22230"
       }
     },
-    "http": {
+    "Aspire + CoinStack (http)": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
+      "launchUrl": "http://localhost:15030",
       "applicationUrl": "http://localhost:15030",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",

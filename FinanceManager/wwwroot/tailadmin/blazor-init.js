@@ -9,27 +9,8 @@
     }
   }
 
-  // Capture Tailadmin's DOMContentLoaded init for charts/maps (registered inside bundle.js)
-  // so we can re-run it safely after Blazor internal navigation.
-  var widgetInitializers = [];
-  try {
-    var originalAdd = document.addEventListener.bind(document);
-    document.addEventListener = function (type, listener, options) {
-      if (type === 'DOMContentLoaded' && typeof listener === 'function') {
-        try {
-          var src = Function.prototype.toString.call(listener);
-          if (src.indexOf('_components_charts_chart_') !== -1 || src.indexOf('_components_map_01__') !== -1) {
-            widgetInitializers.push(listener);
-          }
-        } catch (_e) {
-          // ignore
-        }
-      }
-      return originalAdd(type, listener, options);
-    };
-  } catch (_e) {
-    // ignore
-  }
+  // Intentionally do not capture/replay Tailadmin DOMContentLoaded chart/map initializers.
+  // Replaying those routines can conflict with Blazor-managed ApexChart components.
 
   function initFlatpickr() {
     if (!window.flatpickr) return;
@@ -81,33 +62,6 @@
     }
   }
 
-  function clearWidgetContainers() {
-    try {
-      var charts = document.querySelectorAll('[id^="chart"]');
-      for (var i = 0; i < charts.length; i++) {
-        charts[i].innerHTML = '';
-      }
-    } catch (_e) {
-      // ignore
-    }
-    try {
-      var mapOne = document.getElementById('mapOne');
-      if (mapOne) mapOne.innerHTML = '';
-    } catch (_e) {
-      // ignore
-    }
-  }
-
-  function runWidgetInitializers() {
-    for (var i = 0; i < widgetInitializers.length; i++) {
-      try {
-        widgetInitializers[i]();
-      } catch (_e) {
-        // ignore
-      }
-    }
-  }
-
   function updateYear() {
     try {
       var year = document.getElementById('year');
@@ -122,8 +76,6 @@
     try {
       requestAnimationFrame(function () {
         initFlatpickr();
-        clearWidgetContainers();
-        runWidgetInitializers();
         updateYear();
 
         try {
