@@ -1,0 +1,258 @@
+@page "/transactions"
+@using CoinStack.Data
+@using CoinStack.Data.Entities
+@using CoinStack.Mobile.Core
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<CoinStackDbContext> DbFactory
+
+<h1>Transactions</h1>
+
+<p class="cs-subtitle">Capture income and expenses on mobile with instant local persistence.</p>
+
+@if (!string.IsNullOrWhiteSpace(_statusMessage))
+{
+	<p class="cs-status @StatusClass(_statusMessage)">@_statusMessage</p>
+}
+
+<div class="cs-page">
+<div class="cs-card">
+	<h3 class="cs-card-title">Add Transaction</h3>
+
+	<div class="cs-form-grid two">
+	<div class="cs-field">
+		<label>Type</label>
+		<select @bind="_formType">
+			<option value="@TransactionType.Expense">Expense</option>
+			<option value="@TransactionType.Income">Income</option>
+		</select>
+	</div>
+
+	<div class="cs-field">
+		<label>Amount</label>
+		<input type="number" step="0.01" min="0.01" @bind="_formAmount" />
+	</div>
+	</div>
+
+	<div class="cs-form-grid">
+	<div class="cs-field">
+		<label>Description</label>
+		<input @bind="_formDescription" maxlength="120" />
+	</div>
+
+	<div class="cs-field">
+		<label>Bucket (optional)</label>
+		<select @bind="_formBucketId">
+			<option value="">None</option>
+			@foreach (var bucket in _buckets)
+			{
+				<option value="@bucket.Id">@bucket.Name</option>
+			}
+		</select>
+	</div>
+	</div>
+
+	<div class="cs-form-grid two">
+	<div class="cs-field">
+		<label>Occurred (UTC)</label>
+		<input type="datetime-local" @bind="_formOccurredAtLocal" />
+	</div>
+
+	<div class="cs-field">
+		<label>
+			<input type="checkbox" @bind="_formIsImpulse" />
+			Mark as impulse buy
+		</label>
+	</div>
+	</div>
+
+    <div class="cs-actions">
+	    <button @onclick="SaveAsync" disabled="@_isSaving">@(_isSaving ? "Saving..." : "Save Transaction")</button>
+        <button class="cs-btn-secondary" @onclick="ResetFormDefaults" disabled="@_isSaving">Reset</button>
+    </div>
+</div>
+
+<div class="cs-card">
+	<h3 class="cs-card-title">Recent Transactions</h3>
+
+	<div class="cs-actions" style="margin-bottom:0.5rem;">
+		<button class="cs-btn-secondary" @onclick="LoadDataAsync" disabled="@_isLoading">@(_isLoading ? "Refreshing..." : "Refresh List")</button>
+	</div>
+
+	@if (_isLoading)
+	{
+		<p>Loading transactions...</p>
+	}
+	else if (_transactions.Count == 0)
+	{
+		<p>No transactions yet.</p>
+	}
+	else
+	{
+		<div class="cs-table-wrap">
+		<table>
+			<thead>
+				<tr>
+					<th>Date</th>
+					<th>Type</th>
+					<th>Description</th>
+					<th>Bucket</th>
+					<th>Amount</th>
+				</tr>
+			</thead>
+			<tbody>
+				@foreach (var row in _transactions)
+				{
+					<tr>
+						<td>@row.OccurredAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+						<td><span class="cs-pill @(row.Type == TransactionType.Income ? "income" : "expense")">@row.Type</span></td>
+						<td>@(string.IsNullOrWhiteSpace(row.Description) ? "(No description)" : row.Description)</td>
+						<td>@(row.Bucket?.Name ?? "-")</td>
+						<td>@(row.Type == TransactionType.Income ? "+" : "-")@FormatMoney(row.Amount)</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+		</div>
+	}
+</div>
+</div>
+
+@code {
+	private readonly List<Bucket> _buckets = [];
+	private readonly List<Transaction> _transactions = [];
+
+	private TransactionType _formType = TransactionType.Expense;
+	private decimal _formAmount = 25m;
+	private string _formDescription = string.Empty;
+	private int? _formBucketId;
+	private DateTime _formOccurredAtLocal = DateTime.Now;
+	private bool _formIsImpulse;
+
+	private bool _isSaving;
+	private bool _isLoading = true;
+	private string? _statusMessage;
+	private string _currency = "USD";
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadDataAsync();
+	}
+
+	private async Task LoadDataAsync()
+	{
+		_isLoading = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+			var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync();
+			_currency = settings?.Currency ?? "USD";
+
+			var buckets = await db.Buckets
+				.AsNoTracking()
+				.OrderBy(x => x.SortOrder)
+				.ThenBy(x => x.Name)
+				.ToListAsync();
+
+			var transactions = await db.Transactions
+				.AsNoTracking()
+				.Include(x => x.Bucket)
+				.OrderByDescending(x => x.OccurredAtUtc)
+				.Take(25)
+				.ToListAsync();
+
+			_buckets.Clear();
+			_buckets.AddRange(buckets);
+
+			_transactions.Clear();
+			_transactions.AddRange(transactions);
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to load transactions: {exception.Message}";
+		}
+		finally
+		{
+			_isLoading = false;
+		}
+	}
+
+	private async Task SaveAsync()
+	{
+		if (_isSaving)
+		{
+			return;
+		}
+
+		if (_formAmount <= 0)
+		{
+			_statusMessage = "Amount must be greater than zero.";
+			return;
+		}
+
+		if (string.IsNullOrWhiteSpace(_formDescription))
+		{
+			_statusMessage = "Description is required.";
+			return;
+		}
+
+		_isSaving = true;
+		_statusMessage = null;
+
+		try
+		{
+			await using var db = await DbFactory.CreateDbContextAsync();
+
+			var transaction = new Transaction
+			{
+				Type = _formType,
+				Amount = decimal.Round(_formAmount, 2),
+				Description = _formDescription.Trim(),
+				BucketId = _formBucketId,
+				OccurredAtUtc = DateTime.SpecifyKind(_formOccurredAtLocal, DateTimeKind.Local).ToUniversalTime(),
+				ExpenseKind = _formType == TransactionType.Expense ? ExpenseKind.Discretionary : ExpenseKind.Mandatory,
+				IsImpulse = _formIsImpulse
+			};
+
+			db.Transactions.Add(transaction);
+			await db.SaveChangesAsync();
+
+			_statusMessage = "Transaction saved.";
+			ResetFormDefaults();
+			await LoadDataAsync();
+		}
+		catch (Exception exception)
+		{
+			_statusMessage = $"Failed to save transaction: {exception.Message}";
+		}
+		finally
+		{
+			_isSaving = false;
+		}
+	}
+
+	private void ResetFormDefaults()
+	{
+		_formType = TransactionType.Expense;
+		_formAmount = 25m;
+		_formDescription = string.Empty;
+		_formBucketId = null;
+		_formOccurredAtLocal = DateTime.Now;
+		_formIsImpulse = false;
+	}
+
+	private string FormatMoney(decimal amount) => MoneyDisplay.Format(_currency, amount);
+
+	private static string StatusClass(string? message)
+	{
+		if (string.IsNullOrWhiteSpace(message))
+		{
+			return string.Empty;
+		}
+
+		return message.Contains("failed", StringComparison.OrdinalIgnoreCase)
+			? "error"
+			: "ok";
+	}
+}

@@ -388,6 +388,7 @@
             ? settings.SavingsInterestRate.Value * 100m
             : null;
         _savingsInterestIsYearly = settings.SavingsInterestIsYearly;
+        CurrencyFormatting.ApplyCurrency(_currency);
     }
 
     private async Task SaveSettings()
@@ -410,6 +411,8 @@
                 : null,
             SavingsInterestIsYearly = _savingsInterestIsYearly
         });
+
+        CurrencyFormatting.ApplyCurrency(_currency);
 
         _saved = true;
         StateHasChanged();

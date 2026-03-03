@@ -2,6 +2,7 @@ using CoinStack.Components;
 using CoinStack.Data;
 using CoinStack.Data.Entities;
 using CoinStack.Services;
+using ApexCharts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 
@@ -9,6 +10,20 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+builder.Services.AddApexCharts(options =>
+{
+    options.GlobalOptions = new ApexChartBaseOptions
+    {
+        Debug = true,
+        Chart = new Chart
+        {
+            Animations = new Animations { Enabled = false },
+            Toolbar = new Toolbar { Show = false },
+            Zoom = new Zoom { Enabled = false }
+        },
+        DataLabels = new DataLabels { Enabled = false }
+    };
+});
 
 builder.Services
     .AddIdentityApiEndpoints<ApplicationUser>(options =>
