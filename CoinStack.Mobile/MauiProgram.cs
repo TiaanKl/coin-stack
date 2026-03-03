@@ -17,15 +17,14 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 			});
 
-		builder.Services.AddMauiBlazorWebView();
 		builder.Services.AddCoinStackMobileCore();
 
 		var dbPath = Path.Combine(FileSystem.AppDataDirectory, "coinstack.mobile.db");
 		builder.Services.AddFinanceManagerData($"Data Source={dbPath}");
 		builder.Services.AddSingleton<IMobileDatabaseInitializationService, MobileDatabaseInitializationService>();
+		builder.Services.AddSingleton<IMobileFinanceService, MobileFinanceService>();
 
 #if DEBUG
-		builder.Services.AddBlazorWebViewDeveloperTools();
 		builder.Logging.AddDebug();
 #endif
 

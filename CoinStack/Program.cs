@@ -2,6 +2,7 @@ using CoinStack.Components;
 using CoinStack.Data;
 using CoinStack.Data.Entities;
 using CoinStack.Services;
+using ApexCharts;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 

@@ -169,11 +169,6 @@
 
         var now = DateTime.UtcNow;
         var transactions = await TransactionService.GetFromDateAsync(now.AddDays(-120));
-        var recentTransactions = await TransactionService.GetRecentAsync(8);
-        var totals = await TransactionService.GetLifetimeTotalsAsync();
-        _lifetimeIncome = totals.TotalIncome;
-        _lifetimeExpense = totals.TotalExpense;
-        _balanceBeforeTrendStart = await TransactionService.GetNetBalanceBeforeAsync(now.AddDays(-30).Date);
 
         _transactions.Clear();
         _transactions.AddRange(transactions);
