@@ -4,18 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Services;
 
-/// <summary>
-/// Manages the Waitlist — a behaviour-psychology tool that forces a cooling-off
-/// period before purchase and calculates a Purchase Readiness Score.
-///
-/// Readiness Score breakdown (max 100):
-///   Budget Health     0–20  — how far under/over your buckets are this month
-///   Savings Progress  0–20  — how full your savings bucket is vs. its allocation
-///   Debt Load         0–20  — monthly debt obligations relative to income
-///   Emotional State   0–15  — emotion recorded when the item was added
-///   Item Priority     0–15  — how important the item is to you
-///   Time Waited       0–10  — patience bonus; longer wait = higher confidence
-/// </summary>
 public sealed class WaitlistService : IWaitlistService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
@@ -28,10 +16,6 @@ public sealed class WaitlistService : IWaitlistService
         _dbFactory = dbFactory;
         _settingsService = settingsService;
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // CRUD
-    // ──────────────────────────────────────────────────────────────────────────
 
     public async Task<List<WaitlistItem>> GetAllAsync(CancellationToken cancellationToken = default)
     {
@@ -110,14 +94,6 @@ public sealed class WaitlistService : IWaitlistService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // Cool-off
-    // ──────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Checks all locked items and unlocks any whose cool-off period has expired.
-    /// Call this on page load so the UI reflects the latest state.
-    /// </summary>
     public async Task EvaluateCoolOffsAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
@@ -140,14 +116,6 @@ public sealed class WaitlistService : IWaitlistService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // Purchase Readiness Score
-    // ──────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Calculates and persists a readiness score for the given item.
-    /// Returns the computed score (0–100).
-    /// </summary>
     public async Task<int> CalculateReadinessScoreAsync(int itemId, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -162,8 +130,6 @@ public sealed class WaitlistService : IWaitlistService
     var settings = await _settingsService.GetAsync(cancellationToken);
     var (periodStartUtc, periodEndUtc) = GetBudgetPeriodBoundsUtc(settings.MonthStartDay, now);
 
-        // ── 1. Budget Health (0–20) ──────────────────────────────────────────
-        // Compare actual spending against bucket allocations this month.
         var buckets = await db.Buckets
             .AsNoTracking()
             .Where(x => !x.IsSavings)
@@ -196,8 +162,6 @@ public sealed class WaitlistService : IWaitlistService
             ? 10
             : (int)Math.Round(20.0 * (1.0 - (double)overCount / totalBuckets));
 
-        // ── 2. Savings Progress (0–20) ───────────────────────────────────────
-        // How full is the savings bucket vs. its allocation?
         var savingsBucket = await db.Buckets
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.IsSavings, cancellationToken);
@@ -230,8 +194,6 @@ public sealed class WaitlistService : IWaitlistService
                          : 3;
         }
 
-        // ── 3. Debt Load (0–20) ──────────────────────────────────────────────
-        // Monthly debt obligations vs. monthly income.
         var debts = await db.DebtAccounts
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -265,9 +227,6 @@ public sealed class WaitlistService : IWaitlistService
                       : 2;
         }
 
-        // ── 4. Emotional State (0–15) ────────────────────────────────────────
-        // Use the emotion recorded when the item was added. If none, check
-        // the most recent completed reflection for context.
         var emotion = item.EmotionAtTimeOfAdding;
         if (emotion is null)
         {
@@ -292,7 +251,6 @@ public sealed class WaitlistService : IWaitlistService
             _ => 8
         };
 
-        // ── 5. Item Priority (0–15) ──────────────────────────────────────────
         int priorityScore = item.Priority switch
         {
             WaitlistPriority.High => 15,
@@ -301,9 +259,6 @@ public sealed class WaitlistService : IWaitlistService
             _ => 4
         };
 
-        // ── 6. Time Waited (0–10) ────────────────────────────────────────────
-        // Patience is a virtue — the longer it has been on the list, the more
-        // considered the decision is.
         var daysWaited = (now - item.CreatedAtUtc).TotalDays;
         int timeScore = daysWaited >= 30 ? 10
                       : daysWaited >= 14 ? 8
@@ -311,7 +266,6 @@ public sealed class WaitlistService : IWaitlistService
                       : daysWaited >= 3 ? 3
                       : 0;
 
-        // ── Aggregate ────────────────────────────────────────────────────────
         var total = Math.Clamp(budgetScore + savingsScore + debtScore + emotionScore + priorityScore + timeScore, 0, 100);
 
         item.Score = total;
@@ -320,10 +274,6 @@ public sealed class WaitlistService : IWaitlistService
 
         return total;
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ──────────────────────────────────────────────────────────────────────────
 
     private static TimeSpan CoolOffDuration(CoolOffPeriod period) => period switch
     {

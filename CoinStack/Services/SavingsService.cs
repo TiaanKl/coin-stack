@@ -13,20 +13,12 @@ public sealed class SavingsService : ISavingsService
         _dbFactory = dbFactory;
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // State
-    // ──────────────────────────────────────────────────────────────────────────
-
     public async Task<SavingsState> GetStateAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.SavingsState.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
                ?? new SavingsState();
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Monthly calculation
-    // ──────────────────────────────────────────────────────────────────────────
 
     public async Task<SavingsMonthlySummary?> CalculateMonthAsync(CancellationToken cancellationToken = default)
     {
@@ -37,19 +29,17 @@ public sealed class SavingsService : ISavingsService
 
         var currentMonth = DateTime.UtcNow.ToString("yyyy-MM");
 
-        // Prevent double-counting
         var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
         if (state is not null && state.LastCalculatedMonth == currentMonth)
         {
             return null;
         }
 
-        // Already have a row for this month? Skip.
         var alreadyRecorded = await db.SavingsMonthlySummaries
             .AnyAsync(x => x.Month == currentMonth, cancellationToken);
+
         if (alreadyRecorded)
         {
-            // Sync LastCalculatedMonth and return null (already done)
             if (state is not null && state.LastCalculatedMonth != currentMonth)
             {
                 state.LastCalculatedMonth = currentMonth;
@@ -59,16 +49,13 @@ public sealed class SavingsService : ISavingsService
             return null;
         }
 
-        // Determine base savings
         decimal income = settings.MonthlyIncome;
         decimal baseSavings = settings.SavingsIsPercent
             ? income * (settings.MonthlySavingsPercent / 100m)
             : settings.MonthlySavingsAmount;
 
-        // Get current total for interest calculation
         decimal currentTotal = state?.Total ?? 0m;
 
-        // Calculate interest
         decimal interest = 0m;
         if (settings.SavingsInterestRate.HasValue && settings.SavingsInterestRate.Value > 0)
         {
@@ -80,7 +67,6 @@ public sealed class SavingsService : ISavingsService
         var totalAdded = baseSavings + interest;
         var newRunningTotal = currentTotal + totalAdded;
 
-        // Upsert state
         if (state is null)
         {
             state = new SavingsState
@@ -99,7 +85,6 @@ public sealed class SavingsService : ISavingsService
             state.LastCalculatedMonth = currentMonth;
         }
 
-        // Monthly summary record
         var summary = new SavingsMonthlySummary
         {
             Month = currentMonth,
@@ -113,10 +98,6 @@ public sealed class SavingsService : ISavingsService
         await db.SaveChangesAsync(cancellationToken);
         return summary;
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Fallback
-    // ──────────────────────────────────────────────────────────────────────────
 
     public async Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
     {
@@ -186,10 +167,6 @@ public sealed class SavingsService : ISavingsService
         return true;
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // Queries
-    // ──────────────────────────────────────────────────────────────────────────
-
     public async Task<List<SavingsMonthlySummary>> GetMonthlySummariesAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -217,10 +194,6 @@ public sealed class SavingsService : ISavingsService
             .Where(x => x.OccurredAtUtc >= startOfMonth)
             .SumAsync(x => x.AmountUsed, cancellationToken);
     }
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Projections
-    // ──────────────────────────────────────────────────────────────────────────
 
     public async Task<List<SavingsProjectionPoint>> GetProjectionsAsync(int months = 12, bool includeInterest = true, CancellationToken cancellationToken = default)
     {

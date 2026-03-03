@@ -4,9 +4,6 @@ public sealed class Category : EntityBase
 {
     public string Name { get; set; } = "";
 
-    /// <summary>
-    /// Optional hex color (e.g. #RRGGBB).
-    /// </summary>
     public string? ColorHex { get; set; }
 
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();

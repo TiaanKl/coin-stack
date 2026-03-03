@@ -1,8 +1,4 @@
 namespace CoinStack.Data.Entities;
-
-/// <summary>
-/// Singleton settings row — always stored with Id = 1.
-/// </summary>
 public sealed class AppSettings : EntityBase
 {
     public string Currency { get; set; } = "USD";

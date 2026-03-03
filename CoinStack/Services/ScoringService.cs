@@ -4,17 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Services;
 
-/// <summary>
-/// Scoring algorithm:
-///   - Under-budget spend: +5 per transaction that keeps bucket under limit
-///   - Over-budget spend: -10 per transaction that pushes bucket over limit
-///   - Savings dip: -15 when spending from a bucket named "Savings"
-///   - Streak bonuses: +10 per streak milestone (every 7 days)
-///   - Reflection completed: +3
-///   - Daily check-in: +2
-///   - Impulse resisted: +8
-///   - No upper or lower bound on score
-/// </summary>
 public sealed class ScoringService : IScoringService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;

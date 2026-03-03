@@ -4,10 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Services;
 
-/// <summary>
-/// CBT-style reflection prompts designed to increase awareness of emotional spending.
-/// Prompts are selected based on the trigger type.
-/// </summary>
 public sealed class ReflectionService : IReflectionService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;

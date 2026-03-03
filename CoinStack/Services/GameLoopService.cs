@@ -4,23 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Services;
 
-/// <summary>
-/// The game loop orchestrates the interaction between buckets, scoring, streaks, and reflections.
-///
-/// Flow when a transaction is logged:
-///   1. Determine which bucket it belongs to
-///   2. Calculate pre-transaction spent amount for that bucket
-///   3. Pass to scoring service to evaluate +/- points
-///   4. Check if the transaction triggers a CBT reflection
-///   5. Update streaks as appropriate
-///   6. Return result with points changed, message, and any triggered reflection
-///
-/// Daily check-in flow:
-///   1. Award +2 points for daily check-in
-///   2. Increment DailyCheckIn streak
-///   3. If streak milestone (every 7 days), award +10 bonus
-///   4. Check all buckets — if all under budget, increment DailyUnderBudget streak
-/// </summary>
 public sealed class GameLoopService : IGameLoopService
 {
     private const int DailyCheckInPoints = 2;
@@ -130,9 +113,6 @@ public sealed class GameLoopService : IGameLoopService
 
         if (settings.EnableStreaks && settings.EnableScoring && streak.CurrentCount > 0 && streak.CurrentCount % 7 == 0)
         {
-            // "increases weekly by 1" - interpreting as +1 point for week 1, +2 for week 2? Or just +1 flat? 
-            // "increases based on streak... more like weekly by 1" -> implies progressive or simple +1. 
-
             var weeks = streak.CurrentCount / 7;
             var points = weeks;
 
@@ -189,7 +169,6 @@ public sealed class GameLoopService : IGameLoopService
         var bucket = await _bucketService.GetByIdAsync(transaction.BucketId.Value, cancellationToken);
         if (bucket is null) return result;
 
-        // Income to a savings bucket with an explicit linked goal → advance goal progress
         if (transaction.Type == TransactionType.Income && bucket.IsSavings && bucket.GoalId.HasValue)
         {
             await using var goalDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -209,7 +188,6 @@ public sealed class GameLoopService : IGameLoopService
             }
         }
 
-        // Remainder only applies to expense transactions
         if (transaction.Type != TransactionType.Expense)
         {
             return result;
@@ -295,12 +273,6 @@ public sealed class GameLoopService : IGameLoopService
         return result;
     }
 
-    /// <summary>
-    /// Resolves the spending limit for a specific category in a specific month.
-    /// Priorities:
-    /// 1. Explicit 'Budget' entity for that Category/Month/Year.
-    /// 2. Default 'AllocatedAmount' on the Bucket itself.
-    /// </summary>
     private async Task<decimal> GetMonthlyLimitAsync(
         int? categoryId,
         int? bucketId,
@@ -314,7 +286,6 @@ public sealed class GameLoopService : IGameLoopService
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        // Prefer a budget row linked to the specific bucket for this period
         var monthlyOverride = await db.Budgets
             .AsNoTracking()
             .FirstOrDefaultAsync(b =>
@@ -328,8 +299,6 @@ public sealed class GameLoopService : IGameLoopService
 
     public async Task RevertTransactionImpactAsync(Transaction originalTransaction, CancellationToken cancellationToken)
     {
-        // Delete all score events that were recorded for this specific transaction,
-        // so their point contributions are removed before re-evaluating.
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var events = await db.ScoreEvents
             .Where(e => e.TransactionId == originalTransaction.Id)
