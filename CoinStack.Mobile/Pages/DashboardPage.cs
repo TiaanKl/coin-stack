@@ -11,6 +11,11 @@ public sealed class DashboardPage : ContentPage
     private readonly Label _expenseLabel;
     private readonly Label _netLabel;
     private readonly Label _bucketCountLabel;
+    private readonly Label _scoreLabel;
+    private readonly Label _streakLabel;
+    private readonly Label _subsLabel;
+    private readonly Label _debtsLabel;
+    private readonly Label _reflectionsLabel;
     private readonly Label _recentHeaderLabel;
     private readonly VerticalStackLayout _recentList;
 
@@ -23,6 +28,11 @@ public sealed class DashboardPage : ContentPage
         _expenseLabel = new Label { FontSize = 16, FontAttributes = FontAttributes.Bold };
         _netLabel = new Label { FontSize = 16, FontAttributes = FontAttributes.Bold };
         _bucketCountLabel = new Label { FontSize = 14 };
+        _scoreLabel = new Label { FontSize = 14 };
+        _streakLabel = new Label { FontSize = 14 };
+        _subsLabel = new Label { FontSize = 14 };
+        _debtsLabel = new Label { FontSize = 14 };
+        _reflectionsLabel = new Label { FontSize = 14 };
         _recentHeaderLabel = new Label { FontSize = 16, FontAttributes = FontAttributes.Bold, Text = "Recent Transactions" };
         _recentList = new VerticalStackLayout { Spacing = 8 };
 
@@ -39,6 +49,11 @@ public sealed class DashboardPage : ContentPage
                     _expenseLabel,
                     _netLabel,
                     _bucketCountLabel,
+                    _scoreLabel,
+                    _streakLabel,
+                    _subsLabel,
+                    _debtsLabel,
+                    _reflectionsLabel,
                     new BoxView { HeightRequest = 1 },
                     _recentHeaderLabel,
                     _recentList
@@ -57,6 +72,7 @@ public sealed class DashboardPage : ContentPage
     {
         try
         {
+            await _financeService.ProcessDailyCheckInAsync();
             var settings = await _financeService.GetSettingsAsync();
             var snapshot = await _financeService.GetDashboardSnapshotAsync();
 
@@ -65,6 +81,11 @@ public sealed class DashboardPage : ContentPage
             _expenseLabel.Text = $"Spent: {MoneyDisplay.Format(currency, snapshot.TotalExpense)}";
             _netLabel.Text = $"Net Saved: {MoneyDisplay.Format(currency, snapshot.NetSaved)}";
             _bucketCountLabel.Text = $"Buckets: {snapshot.Buckets.Count}";
+            _scoreLabel.Text = $"Total Score: {snapshot.TotalScore} pts";
+            _streakLabel.Text = $"Daily Check-in Streak: {snapshot.DailyCheckInStreak} day(s)";
+            _subsLabel.Text = $"Active Subscriptions: {snapshot.ActiveSubscriptions}";
+            _debtsLabel.Text = $"Debt Accounts: {snapshot.ActiveDebts}";
+            _reflectionsLabel.Text = $"Pending Reflections: {snapshot.PendingReflections}";
 
             _recentList.Children.Clear();
             if (snapshot.RecentTransactions.Count == 0)
