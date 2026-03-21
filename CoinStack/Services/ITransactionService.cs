@@ -20,7 +20,7 @@ public interface ITransactionService
         Transaction transaction,
         int userTimezoneOffsetHours,
         CancellationToken cancellationToken = default);
-    Task UpdateAsync(Transaction transaction, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Transaction transaction, int userTimezoneOffsetHours = 0, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 
     Task<decimal> GetExpenseTotalForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default);
