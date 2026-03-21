@@ -31,10 +31,21 @@ public sealed class BucketStatus
     public bool IsOverBudget => Spent > Allocated;
 }
 
+public enum FeedbackKind
+{
+    Normal,
+    Positive,
+    Negative,
+    SavingsDip,
+    GoalAchieved,
+    StreakMilestone,
+}
+
 public sealed class GameTransactionResult
 {
     public int PointsChanged { get; set; }
     public string? Message { get; set; }
     public bool TriggeredReflection { get; set; }
     public Reflection? Reflection { get; set; }
+    public FeedbackKind Kind { get; set; } = FeedbackKind.Normal;
 }

@@ -182,6 +182,9 @@ public sealed class GameLoopService : IGameLoopService
                     if (settings.EnableScoring)
                     {
                         await _scoringService.AddScoreEventAsync(50, ScoreChangeReason.GoalAchieved, $"Goal '{linkedGoal.Name}' Reached!", cancellationToken: cancellationToken);
+                        result.PointsChanged = 50;
+                        result.Kind = FeedbackKind.GoalAchieved;
+                        result.Message = $"Goal '{linkedGoal.Name}' Reached! +50 pts";
                     }
                 }
                 await goalDb.SaveChangesAsync(cancellationToken);
@@ -262,6 +265,14 @@ public sealed class GameLoopService : IGameLoopService
                 result.Reflection = reflection;
             }
         }
+
+        result.Kind = result.PointsChanged switch
+        {
+            > 0 => FeedbackKind.Positive,
+            < 0 when bucket.IsSavings => FeedbackKind.SavingsDip,
+            < 0 => FeedbackKind.Negative,
+            _ => FeedbackKind.Normal,
+        };
 
         result.Message = result.PointsChanged switch
         {

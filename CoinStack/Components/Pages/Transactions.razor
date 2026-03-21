@@ -7,6 +7,7 @@
 @inject CoinStack.Services.IDebtService DebtService
 @inject CoinStack.Services.ISettingsService SettingsService
 @inject CoinStack.Services.ISavingsService SavingsService
+@inject CoinStack.Services.IGameFeedbackService GameFeedbackService
 
 <PageTitle>Transactions</PageTitle>
 
@@ -459,6 +460,14 @@
             var (created, gameResult) = await TransactionService.CreateWithGameLoopAsync(transaction, 0);
             _transactions.Insert(0, created);
             _gameResult = gameResult;
+
+            if (gameResult.Kind != FeedbackKind.Normal)
+            {
+                GameFeedbackService.Trigger(new FeedbackPayload(
+                    gameResult.PointsChanged,
+                    gameResult.Message ?? "",
+                    gameResult.Kind));
+            }
 
             if (created.ExpenseKind == ExpenseKind.ForceMajeure && _formDrawFromSavings)
             {

@@ -244,6 +244,18 @@
                                                             <div class="toggle-track"></div>
                                                         </label>
                                                     </div>
+
+                                                    <div class="flex items-center justify-between">
+                                                        <div>
+                                                            <label for="enableSounds"
+                                                                   class="text-sm font-medium text-gray-800 dark:text-white/90 cursor-pointer">Sound Effects</label>
+                                                            <p class="text-xs text-gray-500 dark:text-gray-400">Play audio feedback for score events</p>
+                                                        </div>
+                                                        <label class="relative inline-flex cursor-pointer items-center">
+                                                            <input type="checkbox" id="enableSounds" @bind="_enableSounds" class="peer sr-only" />
+                                                            <div class="toggle-track"></div>
+                                                        </label>
+                                                    </div>
                                                 </div>
                                             </div>
 
@@ -396,6 +408,7 @@
     private bool _enableScoring = true;
     private bool _enableStreaks = true;
     private bool _enableToast = true;
+    private bool _enableSounds = true;
     private bool _enableReflections = true;
     private int _largeExpenseThreshold = 50;
     private bool _savingsIsPercent;
@@ -429,6 +442,7 @@
         _enableScoring = settings.EnableScoring;
         _enableStreaks = settings.EnableStreaks;
         _enableToast = settings.EnableToast;
+        _enableSounds = settings.EnableSounds;
         _enableReflections = settings.EnableReflections;
         _largeExpenseThreshold = settings.LargeExpenseThreshold;
         _savingsIsPercent = settings.SavingsIsPercent;
@@ -451,6 +465,7 @@
             EnableScoring = _enableScoring,
             EnableStreaks = _enableStreaks,
             EnableToast = _enableToast,
+            EnableSounds = _enableSounds,
             EnableReflections = _enableReflections,
             LargeExpenseThreshold = _largeExpenseThreshold,
             SavingsIsPercent = _savingsIsPercent,

@@ -11,6 +11,7 @@
 @inject ISettingsService SettingsService
 @inject ITransactionService TransactionService
 @inject IDataResetService DataResetService
+@inject IGameFeedbackService FeedbackBus
 
 <!-- ===== Page Wrapper Start ===== -->
 <div class="flex h-screen overflow-hidden">
@@ -93,6 +94,7 @@
         <!-- ===== Header End ===== -->
 
         <!-- ===== Main Content Start ===== -->
+        <GameFeedback />
         <main x-ignore>
             <div class="mx-auto w-full max-w-[1600px] p-4 md:p-6 2xl:p-10">
                 @Body
@@ -140,7 +142,17 @@
     {
         Navigation.LocationChanged += HandleLocationChanged;
         DataResetService.DataResetCompleted += HandleDataResetCompleted;
+        FeedbackBus.OnFeedback += HandleFeedbackReceived;
         await LoadStateAsync();
+    }
+
+    private void HandleFeedbackReceived(FeedbackPayload payload)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadStateAsync();
+            StateHasChanged();
+        });
     }
 
     private void HandleDataResetCompleted()
@@ -290,6 +302,7 @@
     {
         Navigation.LocationChanged -= HandleLocationChanged;
         DataResetService.DataResetCompleted -= HandleDataResetCompleted;
+        FeedbackBus.OnFeedback -= HandleFeedbackReceived;
     }
 
     private string FormatC0(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _currency, 0);
