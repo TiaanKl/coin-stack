@@ -182,6 +182,7 @@
     private FeedbackPayload? _celebration;
     private CancellationTokenSource? _toastCts;
     private AppSettings _settings = new();
+    private bool _disposed;
 
     protected override async Task OnInitializedAsync()
     {
@@ -193,6 +194,11 @@
     {
         _ = InvokeAsync(async () =>
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             if (payload.Kind == FeedbackKind.GoalAchieved)
             {
                 _celebration = payload;
@@ -208,8 +214,13 @@
             else if (_settings.EnableToast && payload.PointsChanged != 0)
             {
                 // Cancel any existing auto-dismiss timer
-                _toastCts?.Cancel();
-                _toastCts = new CancellationTokenSource();
+                ResetToastTimer();
+                var toastCts = _toastCts;
+                if (toastCts is null)
+                {
+                    return;
+                }
+
                 _toast = payload;
                 StateHasChanged();
 
@@ -221,7 +232,13 @@
 
                 try
                 {
-                    await Task.Delay(4000, _toastCts.Token);
+                    await Task.Delay(4000, toastCts.Token);
+
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
                     _toast = null;
                     await InvokeAsync(StateHasChanged);
                 }
@@ -232,7 +249,7 @@
 
     private void DismissToast()
     {
-        _toastCts?.Cancel();
+        CancelAndDisposeToastTimer();
         _toast = null;
     }
 
@@ -252,8 +269,27 @@
 
     public void Dispose()
     {
+        _disposed = true;
         FeedbackService.OnFeedback -= HandleFeedback;
-        _toastCts?.Dispose();
+        CancelAndDisposeToastTimer();
+    }
+
+    private void ResetToastTimer()
+    {
+        CancelAndDisposeToastTimer();
+        _toastCts = new CancellationTokenSource();
+    }
+
+    private void CancelAndDisposeToastTimer()
+    {
+        if (_toastCts is null)
+        {
+            return;
+        }
+
+        _toastCts.Cancel();
+        _toastCts.Dispose();
+        _toastCts = null;
     }
 
     // ---- Styling helpers ----

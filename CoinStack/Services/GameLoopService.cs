@@ -266,20 +266,27 @@ public sealed class GameLoopService : IGameLoopService
             }
         }
 
-        result.Kind = result.PointsChanged switch
+        // Preserve any explicit feedback decided earlier in the pipeline.
+        if (result.Kind == FeedbackKind.Normal)
         {
-            > 0 => FeedbackKind.Positive,
-            < 0 when bucket.IsSavings => FeedbackKind.SavingsDip,
-            < 0 => FeedbackKind.Negative,
-            _ => FeedbackKind.Normal,
-        };
+            result.Kind = result.PointsChanged switch
+            {
+                > 0 => FeedbackKind.Positive,
+                < 0 when bucket.IsSavings => FeedbackKind.SavingsDip,
+                < 0 => FeedbackKind.Negative,
+                _ => FeedbackKind.Normal,
+            };
+        }
 
-        result.Message = result.PointsChanged switch
+        if (string.IsNullOrWhiteSpace(result.Message))
         {
-            > 0 => $"+{result.PointsChanged} points! Keeping it on track!",
-            < 0 => $"{result.PointsChanged} points. Watch that budget.",
-            _ => "Transaction recorded."
-        };
+            result.Message = result.PointsChanged switch
+            {
+                > 0 => $"+{result.PointsChanged} points! Keeping it on track!",
+                < 0 => $"{result.PointsChanged} points. Watch that budget.",
+                _ => "Transaction recorded."
+            };
+        }
 
         return result;
     }
