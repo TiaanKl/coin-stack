@@ -31,6 +31,13 @@
     <Routes @rendermode="InteractiveServer" />
     <ReconnectModal />
     <script>
+                function hideAppPreloader() {
+                    const preloader = document.getElementById('app-preloader');
+                    if (preloader) {
+                        preloader.style.display = 'none';
+                    }
+                }
+
                 try {
                     const isDarkMode = JSON.parse(localStorage.getItem('darkMode') ?? 'false') === true;
                     if (isDarkMode) {
@@ -39,18 +46,25 @@
                 } catch {
                     // Ignore storage parsing/access errors.
                 }
-
-                window.addEventListener('DOMContentLoaded', () => {
-                    setTimeout(() => {
-                        const preloader = document.getElementById('app-preloader');
-                        if (preloader) {
-                            preloader.style.display = 'none';
-                        }
-                    }, 500);
-                });
-
     </script>
-    <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
+    <script>
+        const preloaderFallback = setTimeout(() => {
+        hideAppPreloader();
+        }, 8000);
+
+        Blazor.start()
+        .then(() => {
+        clearTimeout(preloaderFallback);
+        requestAnimationFrame(() => {
+        hideAppPreloader();
+        });
+        })
+        .catch(() => {
+        clearTimeout(preloaderFallback);
+        hideAppPreloader();
+        });
+    </script>
     <script src="gamification-feedback.js"></script>
 </body>
 
