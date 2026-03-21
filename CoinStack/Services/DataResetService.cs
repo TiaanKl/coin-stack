@@ -7,6 +7,8 @@ public sealed class DataResetService : IDataResetService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
+    public event Action? DataResetCompleted;
+
     public DataResetService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
@@ -17,5 +19,7 @@ public sealed class DataResetService : IDataResetService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         await db.Database.EnsureDeletedAsync(cancellationToken);
         await db.Database.MigrateAsync(cancellationToken);
+
+        DataResetCompleted?.Invoke();
     }
 }

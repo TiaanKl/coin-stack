@@ -10,6 +10,7 @@
 @inject IReflectionService ReflectionService
 @inject ISettingsService SettingsService
 @inject ITransactionService TransactionService
+@inject IDataResetService DataResetService
 
 <!-- ===== Page Wrapper Start ===== -->
 <div class="flex h-screen overflow-hidden">
@@ -138,12 +139,22 @@
     protected override async Task OnInitializedAsync()
     {
         Navigation.LocationChanged += HandleLocationChanged;
+        DataResetService.DataResetCompleted += HandleDataResetCompleted;
         await LoadStateAsync();
+    }
+
+    private void HandleDataResetCompleted()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadStateAsync();
+            StateHasChanged();
+        });
     }
 
     private async Task LoadStateAsync()
     {
-        try 
+        try
         {
             var settings = await SettingsService.GetAsync();
             _currency = settings.Currency;
@@ -278,6 +289,7 @@
     public void Dispose()
     {
         Navigation.LocationChanged -= HandleLocationChanged;
+        DataResetService.DataResetCompleted -= HandleDataResetCompleted;
     }
 
     private string FormatC0(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _currency, 0);

@@ -19,29 +19,39 @@
                 <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Input Parameters</h3>
 
                 <form class="space-y-4" @onsubmit="CalculateAsync">
-                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Interest Type</label>
-                            <select @bind="_model.InterestType"
-                                    class="h-11 w-full rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
-                                <option value="">Auto detect</option>
-                                <option value="@DebtInterestType.Simple">Simple</option>
-                                <option value="@DebtInterestType.Compound">Compound</option>
-                                <option value="@DebtInterestType.Amortizing">Amortizing</option>
-                                <option value="@DebtInterestType.None">None</option>
-                            </select>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Personal Interest Type</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" @onclick="() => SelectPersonalDebtInterestType(PersonalDebtInterestType.Fixed)" class="@(GetDebtInterestTypeChipClass(PersonalDebtInterestType.Fixed))">Fixed</button>
+                            <button type="button" @onclick="() => SelectPersonalDebtInterestType(PersonalDebtInterestType.Variable)" class="@(GetDebtInterestTypeChipClass(PersonalDebtInterestType.Variable))">Variable</button>
+                            <button type="button" @onclick="() => SelectPersonalDebtInterestType(PersonalDebtInterestType.Apr)" class="@(GetDebtInterestTypeChipClass(PersonalDebtInterestType.Apr))">APR</button>
+                            <button type="button" @onclick="() => SelectPersonalDebtInterestType(PersonalDebtInterestType.Simple)" class="@(GetDebtInterestTypeChipClass(PersonalDebtInterestType.Simple))">Simple</button>
+                            <button type="button" @onclick="() => SelectPersonalDebtInterestType(PersonalDebtInterestType.Compound)" class="@(GetDebtInterestTypeChipClass(PersonalDebtInterestType.Compound))">Compound</button>
+                            <button type="button" @onclick="() => SelectPersonalDebtInterestType(PersonalDebtInterestType.None)" class="@(GetDebtInterestTypeChipClass(PersonalDebtInterestType.None))">No Interest</button>
                         </div>
+                    </div>
 
+                    <div class="rounded-xl border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800/60">
+                        <p class="text-sm font-semibold text-gray-800 dark:text-white/90">Selected: @GetSelectedDebtInterestTitle()</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">@GetSelectedDebtInterestDescription()</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">@GetSelectedDebtInterestExample()</p>
+                    </div>
+
+                    @if (ShouldShowDebtCompounding())
+                    {
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Compounding Frequency</label>
                             <select @bind="_model.CompoundingFrequency"
                                     class="h-11 w-full rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
-                                <option value="">Auto / N/A</option>
                                 <option value="@DebtCompoundingFrequency.Monthly">Monthly</option>
                                 <option value="@DebtCompoundingFrequency.Annual">Annual</option>
                             </select>
                         </div>
-                    </div>
+                    }
+                    else
+                    {
+                        <p class="text-xs text-gray-500 dark:text-gray-400">@GetDebtCompoundingNote()</p>
+                    }
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
@@ -58,9 +68,10 @@
 
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Interest Rate (0.22 or 22)</label>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">@GetDebtRateLabel()</label>
                             <InputNumber TValue="decimal?" @bind-Value="_model.InterestRate"
                                          class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">@GetDebtRateHelpText()</p>
                         </div>
                         <div>
                             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Monthly Payment (optional)</label>
@@ -371,9 +382,20 @@
 }
 
 @code {
+    private enum PersonalDebtInterestType
+    {
+        Fixed,
+        Variable,
+        Apr,
+        Simple,
+        Compound,
+        None
+    }
+
     private DebtCalculationInput _model = new();
     private DebtCalculationResult? _result;
     private List<DebtExampleViewModel> _examples = [];
+    private PersonalDebtInterestType _selectedDebtInterestType = PersonalDebtInterestType.Fixed;
 
     private readonly List<DebtAccount> _savedDebts = [];
     private bool _isDebtLoading = true;
@@ -393,6 +415,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _model.InterestType = DebtInterestType.Amortizing;
         BuildExamples();
         await LoadSavedDebtsAsync();
     }
@@ -406,8 +429,107 @@
     private void ResetForm()
     {
         _model = new DebtCalculationInput();
+        _selectedDebtInterestType = PersonalDebtInterestType.Fixed;
+        _model.InterestType = DebtInterestType.Amortizing;
         _result = null;
     }
+
+    private void SelectPersonalDebtInterestType(PersonalDebtInterestType type)
+    {
+        _selectedDebtInterestType = type;
+
+        switch (type)
+        {
+            case PersonalDebtInterestType.Fixed:
+            case PersonalDebtInterestType.Apr:
+                _model.InterestType = DebtInterestType.Amortizing;
+                _model.CompoundingFrequency = null;
+                break;
+            case PersonalDebtInterestType.Variable:
+                _model.InterestType = DebtInterestType.Amortizing;
+                _model.CompoundingFrequency = null;
+                break;
+            case PersonalDebtInterestType.Simple:
+                _model.InterestType = DebtInterestType.Simple;
+                _model.CompoundingFrequency = null;
+                break;
+            case PersonalDebtInterestType.Compound:
+                _model.InterestType = DebtInterestType.Compound;
+                _model.CompoundingFrequency ??= DebtCompoundingFrequency.Monthly;
+                break;
+            case PersonalDebtInterestType.None:
+                _model.InterestType = DebtInterestType.None;
+                _model.CompoundingFrequency = null;
+                _model.InterestRate = 0m;
+                break;
+        }
+    }
+
+    private string GetDebtInterestTypeChipClass(PersonalDebtInterestType type)
+    {
+        var selected = _selectedDebtInterestType == type;
+        return selected
+            ? "inline-flex items-center justify-center rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white transition-colors"
+            : "inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700";
+    }
+
+    private string GetSelectedDebtInterestTitle() => _selectedDebtInterestType switch
+    {
+        PersonalDebtInterestType.Fixed => "Fixed Interest Rate",
+        PersonalDebtInterestType.Variable => "Variable Interest Rate",
+        PersonalDebtInterestType.Apr => "Annual Percentage Rate (APR)",
+        PersonalDebtInterestType.Simple => "Simple Interest",
+        PersonalDebtInterestType.Compound => "Compound Interest",
+        _ => "No Interest"
+    };
+
+    private string GetSelectedDebtInterestDescription() => _selectedDebtInterestType switch
+    {
+        PersonalDebtInterestType.Fixed => "Best for predictable loan payments where the rate stays constant.",
+        PersonalDebtInterestType.Variable => "Use current rate for planning and recalculate when your lender updates the rate.",
+        PersonalDebtInterestType.Apr => "Common for cards and personal loans; this is annualized borrowing cost.",
+        PersonalDebtInterestType.Simple => "Interest is calculated from principal and rate without interest-on-interest.",
+        PersonalDebtInterestType.Compound => "Interest accrues on principal and accumulated interest.",
+        _ => "For 0% financing or family/friend arrangements with no interest charged."
+    };
+
+    private string GetSelectedDebtInterestExample() => _selectedDebtInterestType switch
+    {
+        PersonalDebtInterestType.Fixed => "Example: $100,000 at 10% fixed keeps the rate stable across the term.",
+        PersonalDebtInterestType.Variable => "Example: A loan starts at 10% and later adjusts to 11% or 9%.",
+        PersonalDebtInterestType.Apr => "Example: 24% APR is roughly 2% monthly before daily-cycle effects.",
+        PersonalDebtInterestType.Simple => "Example: $1,000 at 10% for 3 years gives $300 simple interest.",
+        PersonalDebtInterestType.Compound => "Example: Compounding grows faster than simple interest over time.",
+        _ => "Example: $600 monthly for 36 months with 0% interest totals $21,600."
+    };
+
+    private bool ShouldShowDebtCompounding() => _selectedDebtInterestType == PersonalDebtInterestType.Compound;
+
+    private string GetDebtCompoundingNote() => _selectedDebtInterestType switch
+    {
+        PersonalDebtInterestType.Apr => "APR is annualized and does not use the compounding selector in this form.",
+        PersonalDebtInterestType.Variable => "Variable-rate loans change over time; update the rate and recalculate periodically.",
+        PersonalDebtInterestType.None => "No compounding is used for zero-interest debt.",
+        _ => "Compounding applies only when Compound interest is selected."
+    };
+
+    private string GetDebtRateLabel() => _selectedDebtInterestType switch
+    {
+        PersonalDebtInterestType.Apr => "APR (0.22 or 22)",
+        PersonalDebtInterestType.Fixed => "Fixed Interest Rate (0.22 or 22)",
+        PersonalDebtInterestType.Variable => "Current Variable Rate (0.22 or 22)",
+        PersonalDebtInterestType.Simple => "Simple Interest Rate (0.22 or 22)",
+        PersonalDebtInterestType.Compound => "Compound Interest Rate (0.22 or 22)",
+        _ => "Interest Rate (use 0 for no-interest debt)"
+    };
+
+    private string GetDebtRateHelpText() => _selectedDebtInterestType switch
+    {
+        PersonalDebtInterestType.Apr => "Enter APR as percent or decimal. Example: 24 or 0.24.",
+        PersonalDebtInterestType.Variable => "Enter your current rate now, then re-run when the rate changes.",
+        PersonalDebtInterestType.None => "Leave as 0 for no-interest debt.",
+        _ => "You can use either percent (22) or decimal (0.22)."
+    };
 
     private async Task LoadSavedDebtsAsync()
     {
@@ -549,69 +671,99 @@
 
     private void BuildExamples()
     {
+        var fixedInput = new DebtCalculationInput
+        {
+            Principal = 100000m,
+            InterestRate = 10m,
+            InterestType = DebtInterestType.Amortizing,
+            TermMonths = 180
+        };
+
+        var variableInput = new DebtCalculationInput
+        {
+            Principal = 100000m,
+            InterestRate = 11m,
+            InterestType = DebtInterestType.Amortizing,
+            TermMonths = 180
+        };
+
+        var aprInput = new DebtCalculationInput
+        {
+            Principal = 5000m,
+            InterestRate = 24m,
+            InterestType = DebtInterestType.Amortizing,
+            TermMonths = 24
+        };
+
         var simpleInput = new DebtCalculationInput
         {
-            Principal = 74000m,
-            InterestRate = 0.22m,
+            Principal = 1000m,
+            InterestRate = 10m,
             InterestType = DebtInterestType.Simple,
-            TermMonths = 84,
-            MonthlyPayment = 2000m,
-            PaymentsMade = 47
+            TermMonths = 36
         };
 
         var simpleResult = Calculator.Calculate(simpleInput);
-        var simplePayments = 47 * 2000m;
-        var simpleRemaining = simpleResult.TotalOwed.HasValue
-            ? decimal.Round(Math.Max(0m, simpleResult.TotalOwed.Value - simplePayments), 2)
-            : 0m;
+
+        var compoundInput = new DebtCalculationInput
+        {
+            Principal = 1000m,
+            InterestRate = 10m,
+            InterestType = DebtInterestType.Compound,
+            CompoundingFrequency = DebtCompoundingFrequency.Monthly,
+            TermMonths = 36
+        };
+
+        var noInterestInput = new DebtCalculationInput
+        {
+            MonthlyPayment = 600m,
+            TermMonths = 36,
+            InterestType = DebtInterestType.None
+        };
 
         _examples =
         [
             new DebtExampleViewModel(
-                "Simple-interest family loan",
+                "Fixed-rate home loan",
+                "fixed",
+                "principal=100 000, rate=10%, termMonths=180",
+                Calculator.Calculate(fixedInput),
+                "Rate remains stable for predictable budgeting."),
+
+            new DebtExampleViewModel(
+                "Variable-rate loan (current snapshot)",
+                "variable",
+                "principal=100 000, currentRate=11%, termMonths=180",
+                Calculator.Calculate(variableInput),
+                "Recalculate when the lender adjusts the rate."),
+
+            new DebtExampleViewModel(
+                "Credit card style APR",
+                "apr",
+                "principal=5 000, APR=24%, termMonths=24",
+                Calculator.Calculate(aprInput),
+                "APR is annualized; monthly cost can be high if balances persist."),
+
+            new DebtExampleViewModel(
+                "Simple-interest personal loan",
                 "simple",
-                "principal=74 000, interestRate=0.22, years=7, payments=47×2 000",
+                "principal=1 000, rate=10%, termMonths=36",
                 simpleResult,
-                $"Remaining balance after 47 payments: {simpleRemaining:C} (total {simpleResult.TotalOwed:C} - paid {simplePayments:C})"),
+                "Simple interest reference: $1,000 × 10% × 3 years = $300 interest."),
 
             new DebtExampleViewModel(
                 "Compound-interest debt (monthly)",
                 "compound",
-                "principal=120 000, interestRate=22%, termMonths=84, monthly compounding",
-                Calculator.Calculate(new DebtCalculationInput
-                {
-                    Principal = 120000m,
-                    InterestRate = 22m,
-                    InterestType = DebtInterestType.Compound,
-                    CompoundingFrequency = DebtCompoundingFrequency.Monthly,
-                    TermMonths = 84
-                }),
-                null),
-
-            new DebtExampleViewModel(
-                "Amortizing bank loan",
-                "amortizing",
-                "principal=120 000, interestRate=22%, termMonths=84",
-                Calculator.Calculate(new DebtCalculationInput
-                {
-                    Principal = 120000m,
-                    InterestRate = 22m,
-                    InterestType = DebtInterestType.Amortizing,
-                    TermMonths = 84
-                }),
-                null),
+                "principal=1 000, rate=10%, termMonths=36, monthly compounding",
+                Calculator.Calculate(compoundInput),
+                "Compound debt accrues interest on prior interest over time."),
 
             new DebtExampleViewModel(
                 "No-interest phone contract",
                 "none",
                 "monthlyPayment=600, termMonths=36",
-                Calculator.Calculate(new DebtCalculationInput
-                {
-                    MonthlyPayment = 600m,
-                    TermMonths = 36,
-                    InterestType = DebtInterestType.None
-                }),
-                null)
+                Calculator.Calculate(noInterestInput),
+                "Useful for 0% promotions and installment plans.")
         ];
     }
 
