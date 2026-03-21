@@ -213,7 +213,6 @@
             }
             else if (_settings.EnableToast && payload.PointsChanged != 0)
             {
-                // Cancel any existing auto-dismiss timer
                 ResetToastTimer();
                 var toastCts = _toastCts;
                 if (toastCts is null)
@@ -234,15 +233,18 @@
                 {
                     await Task.Delay(4000, toastCts.Token);
 
-                    if (_disposed)
+                    if (_disposed || !ReferenceEquals(_toastCts, toastCts) || toastCts.IsCancellationRequested)
                     {
                         return;
                     }
 
+                    CancelAndDisposeToastTimer();
                     _toast = null;
                     await InvokeAsync(StateHasChanged);
                 }
-                catch (TaskCanceledException) { /* replaced by newer toast */ }
+                catch (TaskCanceledException)
+                {
+                }
             }
         });
     }
@@ -258,13 +260,13 @@
     private async Task PlaySoundAsync(string type)
     {
         try { await JS.InvokeVoidAsync("gamificationFeedback.playSound", type); }
-        catch { /* ignore: JS may not be ready */ }
+        catch { }
     }
 
     private async Task SpawnConfettiAsync()
     {
         try { await JS.InvokeVoidAsync("gamificationFeedback.spawnConfetti", "confetti-container"); }
-        catch { /* ignore */ }
+        catch { }
     }
 
     public void Dispose()
@@ -291,8 +293,6 @@
         _toastCts.Dispose();
         _toastCts = null;
     }
-
-    // ---- Styling helpers ----
 
     private static string ToastBorderClass(FeedbackKind kind) => kind switch
     {
