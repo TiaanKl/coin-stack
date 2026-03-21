@@ -85,7 +85,7 @@ public sealed class TransactionService : ITransactionService
         return (created, gameResult);
     }
 
-    public async Task UpdateAsync(Transaction transaction, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(Transaction transaction, int userTimezoneOffsetHours = 0, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -110,6 +110,7 @@ public sealed class TransactionService : ITransactionService
         existing.BucketId = transaction.BucketId;
         existing.DebtAccountId = transaction.DebtAccountId;
         existing.IsImpulse = transaction.IsImpulse;
+        existing.ExpenseKind = transaction.ExpenseKind;
 
         if (oldDebtId.HasValue && oldDebtImpact > 0)
         {
@@ -123,8 +124,7 @@ public sealed class TransactionService : ITransactionService
 
         await db.SaveChangesAsync(cancellationToken);
 
-        int userOffset = 0;
-        await _gameLoop.ProcessTransactionAsync(existing, userOffset, cancellationToken);
+        await _gameLoop.ProcessTransactionAsync(existing, userTimezoneOffsetHours, cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
