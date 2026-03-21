@@ -37,6 +37,7 @@ public sealed class SettingsService : ISettingsService
             existing.EnableScoring = settings.EnableScoring;
             existing.EnableStreaks = settings.EnableStreaks;
             existing.EnableToast = settings.EnableToast;
+            existing.EnableSounds = settings.EnableSounds;
             existing.EnableReflections = settings.EnableReflections;
             existing.LargeExpenseThreshold = settings.LargeExpenseThreshold;
             existing.SavingsIsPercent = settings.SavingsIsPercent;

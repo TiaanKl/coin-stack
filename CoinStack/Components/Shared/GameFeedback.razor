@@ -1,0 +1,340 @@
+@implements IDisposable
+@using CoinStack.Data.Entities
+@inject IGameFeedbackService FeedbackService
+@inject ISettingsService SettingsService
+@inject IJSRuntime JS
+
+@* ===== Floating Score Toast ===== *@
+@if (_toast is not null)
+{
+    <div class="fixed top-20 right-4 z-[99999] flex flex-col gap-2 pointer-events-none">
+        <div class="pointer-events-auto w-80 rounded-2xl shadow-theme-lg border
+            @ToastBorderClass(_toast.Kind)
+            @ToastBgClass(_toast.Kind)
+            animate-[toastIn_0.35s_cubic-bezier(0.34,1.56,0.64,1)_both]">
+
+            <!-- Progress drain bar -->
+            <div class="h-1 rounded-t-2xl overflow-hidden">
+                <div class="h-full @ToastProgressClass(_toast.Kind)
+                animate-[drainBar_4s_linear_forwards]"></div>
+            </div>
+
+            <div class="px-4 py-3 flex items-start gap-3">
+                <!-- Icon -->
+                <div class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full
+                    @ToastIconBgClass(_toast.Kind)">
+                    <i class="@ToastIcon(_toast.Kind) text-base @ToastIconColorClass(_toast.Kind)"></i>
+                </div>
+
+                <!-- Content -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-sm font-bold @ToastTextClass(_toast.Kind)">
+                            @(_toast.PointsChanged > 0 ? "+" : "")@_toast.PointsChanged pts
+                        </span>
+                        <button class="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300
+                            transition-colors pointer-events-auto" @onclick="DismissToast">
+                            <i class="fa-solid fa-xmark text-xs"></i>
+                        </button>
+                    </div>
+                    <p class="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5 leading-snug">
+                        @_toast.Message
+                    </p>
+                    @if (!string.IsNullOrEmpty(CbtMessage(_toast.Kind)))
+                    {
+                        <p
+                            class="mt-1.5 text-xs text-gray-500 dark:text-gray-400 italic leading-snug border-t border-gray-200/60 dark:border-gray-700/60 pt-1.5">
+                            @CbtMessage(_toast.Kind)
+                        </p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ===== Goal Achieved Celebration Overlay ===== *@
+@if (_celebration is not null)
+{
+    <div class="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm
+        animate-[fadeIn_0.25s_ease-out_both]" @onclick="DismissCelebration">
+
+        <!-- Confetti container (full width, top portion) -->
+        <div id="confetti-container" class="absolute inset-x-0 top-0 h-full overflow-hidden pointer-events-none"></div>
+
+        <!-- Card -->
+        <div class="relative z-10 flex flex-col items-center gap-4 rounded-3xl bg-white dark:bg-gray-900
+            border border-yellow-200 dark:border-yellow-500/30
+            px-10 py-8 shadow-2xl max-w-xs w-full mx-4 text-center
+            animate-[celebrationIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]" @onclick:stopPropagation>
+
+            <!-- Trophy with bounce -->
+            <div class="flex h-20 w-20 items-center justify-center rounded-full
+                bg-gradient-to-br from-yellow-400 to-amber-500
+                shadow-lg animate-[trophyBounce_0.6s_0.3s_ease-out_both]">
+                <i class="fa-solid fa-trophy text-3xl text-white"></i>
+            </div>
+
+            <div>
+                <h2 class="text-2xl font-extrabold text-gray-900 dark:text-white">
+                    Goal Achieved!
+                </h2>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300 leading-snug">
+                    @_celebration.Message
+                </p>
+            </div>
+
+            <div class="flex flex-col items-center gap-1">
+                <span class="text-3xl font-black text-yellow-500">+50 pts</span>
+                <p class="text-xs text-gray-500 dark:text-gray-400 italic">
+                    "You proved saving is possible."
+                </p>
+            </div>
+
+            <button @onclick="DismissCelebration" class="mt-1 rounded-full bg-yellow-500 hover:bg-yellow-600 px-6 py-2.5
+                text-sm font-semibold text-white shadow transition-colors">
+                Keep Going!
+            </button>
+        </div>
+    </div>
+}
+
+@* ===== Keyframe & confetti CSS ===== *@
+<style>
+    @@keyframes toastIn {
+        from {
+            opacity: 0;
+            transform: translateX(120%) scale(0.85);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+
+    @@keyframes drainBar {
+        from {
+            width: 100%;
+        }
+
+        to {
+            width: 0%;
+        }
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes celebrationIn {
+        from {
+            opacity: 0;
+            transform: scale(0.5) translateY(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+
+    @@keyframes trophyBounce {
+        0% {
+            transform: scale(0) rotate(-15deg);
+        }
+
+        60% {
+            transform: scale(1.15) rotate(5deg);
+        }
+
+        80% {
+            transform: scale(0.95) rotate(-2deg);
+        }
+
+        100% {
+            transform: scale(1) rotate(0deg);
+        }
+    }
+
+    @@keyframes confettiFall {
+        0% {
+            opacity: 1;
+            transform: translateY(0) rotate(0deg);
+        }
+
+        100% {
+            opacity: 0;
+            transform: translateY(110vh) rotate(720deg);
+        }
+    }
+</style>
+
+@code
+{
+    private FeedbackPayload? _toast;
+    private FeedbackPayload? _celebration;
+    private CancellationTokenSource? _toastCts;
+    private AppSettings _settings = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _settings = await SettingsService.GetAsync();
+        FeedbackService.OnFeedback += HandleFeedback;
+    }
+
+    private void HandleFeedback(FeedbackPayload payload)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (payload.Kind == FeedbackKind.GoalAchieved)
+            {
+                _celebration = payload;
+                StateHasChanged();
+
+                if (_settings.EnableSounds)
+                {
+                    await PlaySoundAsync("celebration");
+                }
+
+                await SpawnConfettiAsync();
+            }
+            else if (_settings.EnableToast && payload.PointsChanged != 0)
+            {
+                // Cancel any existing auto-dismiss timer
+                _toastCts?.Cancel();
+                _toastCts = new CancellationTokenSource();
+                _toast = payload;
+                StateHasChanged();
+
+                if (_settings.EnableSounds)
+                {
+                    var sound = payload.PointsChanged > 0 ? "positive" : "negative";
+                    await PlaySoundAsync(sound);
+                }
+
+                try
+                {
+                    await Task.Delay(4000, _toastCts.Token);
+                    _toast = null;
+                    await InvokeAsync(StateHasChanged);
+                }
+                catch (TaskCanceledException) { /* replaced by newer toast */ }
+            }
+        });
+    }
+
+    private void DismissToast()
+    {
+        _toastCts?.Cancel();
+        _toast = null;
+    }
+
+    private void DismissCelebration() => _celebration = null;
+
+    private async Task PlaySoundAsync(string type)
+    {
+        try { await JS.InvokeVoidAsync("gamificationFeedback.playSound", type); }
+        catch { /* ignore: JS may not be ready */ }
+    }
+
+    private async Task SpawnConfettiAsync()
+    {
+        try { await JS.InvokeVoidAsync("gamificationFeedback.spawnConfetti", "confetti-container"); }
+        catch { /* ignore */ }
+    }
+
+    public void Dispose()
+    {
+        FeedbackService.OnFeedback -= HandleFeedback;
+        _toastCts?.Dispose();
+    }
+
+    // ---- Styling helpers ----
+
+    private static string ToastBorderClass(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive or FeedbackKind.StreakMilestone
+        => "border-success-200 dark:border-success-500/30",
+        FeedbackKind.GoalAchieved
+        => "border-yellow-300 dark:border-yellow-500/40",
+        FeedbackKind.SavingsDip
+        => "border-warning-300 dark:border-warning-500/40",
+        _ => "border-error-200 dark:border-error-500/30",
+    };
+
+    private static string ToastBgClass(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive or FeedbackKind.StreakMilestone
+        => "bg-success-50 dark:bg-success-500/10",
+        FeedbackKind.GoalAchieved
+        => "bg-yellow-50 dark:bg-yellow-500/10",
+        FeedbackKind.SavingsDip
+        => "bg-warning-50 dark:bg-warning-500/10",
+        _ => "bg-error-50 dark:bg-error-500/10",
+    };
+
+    private static string ToastProgressClass(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive or FeedbackKind.StreakMilestone => "bg-success-400",
+        FeedbackKind.GoalAchieved => "bg-yellow-400",
+        FeedbackKind.SavingsDip => "bg-warning-400",
+        _ => "bg-error-400",
+    };
+
+    private static string ToastIconBgClass(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive or FeedbackKind.StreakMilestone
+        => "bg-success-100 dark:bg-success-500/20",
+        FeedbackKind.GoalAchieved
+        => "bg-yellow-100 dark:bg-yellow-500/20",
+        FeedbackKind.SavingsDip
+        => "bg-warning-100 dark:bg-warning-500/20",
+        _ => "bg-error-100 dark:bg-error-500/20",
+    };
+
+    private static string ToastIcon(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive => "fa-solid fa-circle-check",
+        FeedbackKind.StreakMilestone => "fa-solid fa-fire",
+        FeedbackKind.GoalAchieved => "fa-solid fa-trophy",
+        FeedbackKind.SavingsDip => "fa-solid fa-piggy-bank",
+        _ => "fa-solid fa-triangle-exclamation",
+    };
+
+    private static string ToastIconColorClass(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive or FeedbackKind.StreakMilestone
+        => "text-success-600 dark:text-success-400",
+        FeedbackKind.GoalAchieved
+        => "text-yellow-600 dark:text-yellow-400",
+        FeedbackKind.SavingsDip
+        => "text-warning-600 dark:text-warning-400",
+        _ => "text-error-600 dark:text-error-400",
+    };
+
+    private static string ToastTextClass(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive or FeedbackKind.StreakMilestone
+        => "text-success-700 dark:text-success-400",
+        FeedbackKind.GoalAchieved
+        => "text-yellow-700 dark:text-yellow-400",
+        FeedbackKind.SavingsDip
+        => "text-warning-700 dark:text-warning-400",
+        _ => "text-error-700 dark:text-error-400",
+    };
+
+    private static string? CbtMessage(FeedbackKind kind) => kind switch
+    {
+        FeedbackKind.Positive => "Each on-budget choice strengthens your financial identity.",
+        FeedbackKind.SavingsDip => "Bouncing back from a dip is what resilience looks like.",
+        FeedbackKind.Negative => "Awareness is the first step — this is data, not failure.",
+        _ => null,
+    };
+}

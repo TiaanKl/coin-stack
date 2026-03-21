@@ -17,6 +17,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReflectionService, ReflectionService>();
         services.AddScoped<IGameLoopService, GameLoopService>();
         services.AddScoped<ISettingsService, SettingsService>();
+        services.AddScoped<IGameFeedbackService, GameFeedbackService>();
         services.AddScoped<IWaitlistService, WaitlistService>();
         services.AddScoped<ISavingsService, SavingsService>();
         services.AddScoped<IMoneyFormatter, MoneyFormatter>();
