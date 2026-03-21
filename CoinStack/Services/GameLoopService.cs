@@ -7,6 +7,8 @@ namespace CoinStack.Services;
 public sealed class GameLoopService : IGameLoopService
 {
     private const int DailyCheckInPoints = 2;
+    private const int SavingsDipPenaltyPoints = 15;
+    private const int EmergencyDipPenaltyPoints = SavingsDipPenaltyPoints * 2;
     private const string DailyCheckInDescription = "Daily check-in";
 
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
@@ -14,19 +16,22 @@ public sealed class GameLoopService : IGameLoopService
     private readonly IScoringService _scoringService;
     private readonly IReflectionService _reflectionService;
     private readonly ISettingsService _settingsService;
+    private readonly ISavingsService _savingsService;
 
     public GameLoopService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
         IBucketService bucketService,
         IScoringService scoringService,
         IReflectionService reflectionService,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        ISavingsService savingsService)
     {
         _dbFactory = dbFactory;
         _bucketService = bucketService;
         _scoringService = scoringService;
         _reflectionService = reflectionService;
         _settingsService = settingsService;
+        _savingsService = savingsService;
     }
 
     public async Task<GameState> GetCurrentStateAsync(CancellationToken cancellationToken = default)
@@ -46,7 +51,7 @@ public sealed class GameLoopService : IGameLoopService
         {
             BucketId = b.Id,
             Name = b.Name,
-            ColorHex = b.ColorHex,
+            ColorHex = b.Category?.ColorHex,
             Allocated = b.AllocatedAmount,
             Spent = spent.GetValueOrDefault(b.Id),
         }).ToList();
@@ -220,18 +225,64 @@ public sealed class GameLoopService : IGameLoopService
             await _scoringService.EvaluateTransactionAsync(transaction, monthlyLimit, spentBefore, cancellationToken);
             var scoreAfter = await _scoringService.GetTotalScoreAsync(cancellationToken);
             result.PointsChanged = scoreAfter - scoreBefore;
+        }
 
-            if (bucket.IsSavings)
+        var shortfall = await GetNewMonthlyShortfallAsync(settings.MonthStartDay, settings.MonthlyIncome, transaction, cancellationToken);
+        if (shortfall > 0)
+        {
+            var reserveCoverage = await _savingsService.ApplyReserveFallbackAsync(
+                shortfall,
+                $"Budget shortfall after '{transaction.Description}'",
+                bucket.Name,
+                settings.EnableEmergencyFallback,
+                cancellationToken);
+
+            if (settings.EnableScoring)
             {
-                await _scoringService.AddScoreEventAsync(
-                    -15,
-                    ScoreChangeReason.SavingsDip,
-                    $"Dipped into {bucket.Name} savings",
-                    transaction.Id,
-                    transaction.BucketId,
-                    cancellationToken);
+                if (reserveCoverage.SavingsUsed > 0m)
+                {
+                    await _scoringService.AddScoreEventAsync(
+                        -SavingsDipPenaltyPoints,
+                        ScoreChangeReason.SavingsDip,
+                        $"Dipped into savings after '{transaction.Description}'",
+                        transaction.Id,
+                        transaction.BucketId,
+                        cancellationToken);
 
-                result.PointsChanged -= 15;
+                    result.PointsChanged -= SavingsDipPenaltyPoints;
+                }
+
+                if (reserveCoverage.EmergencyUsed > 0m)
+                {
+                    await _scoringService.AddScoreEventAsync(
+                        -EmergencyDipPenaltyPoints,
+                        ScoreChangeReason.EmergencyFundDip,
+                        $"Dipped into emergency fund after '{transaction.Description}'",
+                        transaction.Id,
+                        transaction.BucketId,
+                        cancellationToken);
+
+                    result.PointsChanged -= EmergencyDipPenaltyPoints;
+                }
+            }
+
+            if (reserveCoverage.TotalCovered > 0m)
+            {
+                var uncovered = Math.Max(0m, shortfall - reserveCoverage.TotalCovered);
+                var parts = new List<string>();
+                if (reserveCoverage.SavingsUsed > 0m)
+                {
+                    parts.Add($"{reserveCoverage.SavingsUsed:0.##} from savings");
+                }
+
+                if (reserveCoverage.EmergencyUsed > 0m)
+                {
+                    parts.Add($"{reserveCoverage.EmergencyUsed:0.##} from emergency");
+                }
+
+                result.Message = uncovered > 0m
+                    ? $"Shortfall coverage: {string.Join(", ", parts)}. {uncovered:0.##} still uncovered."
+                    : $"Shortfall coverage: {string.Join(", ", parts)}.";
             }
         }
 
@@ -272,7 +323,7 @@ public sealed class GameLoopService : IGameLoopService
             result.Kind = result.PointsChanged switch
             {
                 > 0 => FeedbackKind.Positive,
-                < 0 when bucket.IsSavings => FeedbackKind.SavingsDip,
+                < 0 when shortfall > 0 => FeedbackKind.SavingsDip,
                 < 0 => FeedbackKind.Negative,
                 _ => FeedbackKind.Normal,
             };
@@ -327,5 +378,41 @@ public sealed class GameLoopService : IGameLoopService
             db.ScoreEvents.RemoveRange(events);
             await db.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task<decimal> GetNewMonthlyShortfallAsync(
+        int monthStartDay,
+        decimal monthlyIncome,
+        Transaction transaction,
+        CancellationToken cancellationToken)
+    {
+        var now = transaction.OccurredAtUtc;
+        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, now);
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var totalExpenseAfter = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.Type == TransactionType.Expense
+                        && t.OccurredAtUtc >= startUtc
+                        && t.OccurredAtUtc < endUtc)
+            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
+
+        var totalExpenseBefore = Math.Max(0m, totalExpenseAfter - transaction.Amount);
+        var shortfallBefore = Math.Max(0m, totalExpenseBefore - monthlyIncome);
+        var shortfallAfter = Math.Max(0m, totalExpenseAfter - monthlyIncome);
+        return shortfallAfter - shortfallBefore;
+    }
+
+    private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
+    {
+        if (monthStartDay is < 1 or > 28)
+        {
+            monthStartDay = 1;
+        }
+
+        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
+        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
+        var endUtc = startUtc.AddMonths(1);
+        return (startUtc, endUtc);
     }
 }

@@ -1,15 +1,18 @@
-﻿<aside class="@(SidebarToggle ? "translate-x-0 xl:w-[90px]" : "-translate-x-full xl:w-[290px]") sidebar fixed top-0 left-0 z-9999 flex h-screen w-[290px] flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 transition-all duration-300 xl:static xl:translate-x-0 dark:border-gray-800 dark:bg-black">
-    <div class="@(SidebarToggle ? "justify-center" : "justify-start") sidebar-header flex items-center gap-2 pt-8 pb-7 h-[90px] overflow-hidden">
-        <a href="/" class="flex h-full w-full flex-row flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
+﻿<aside
+    class="@(SidebarToggle ? "translate-x-0 xl:w-[90px]" : "-translate-x-full xl:w-[290px]") sidebar fixed top-0 left-0 z-9999 flex h-screen w-[290px] flex-col overflow-y-auto border-r border-gray-200 bg-white px-5 transition-all duration-300 xl:static xl:translate-x-0 dark:border-gray-800 dark:bg-black">
+    <div
+        class="@(SidebarToggle ? "justify-center" : "justify-start") sidebar-header flex items-center gap-2 pt-8 pb-7 h-[90px] overflow-hidden">
+        <a href="/"
+               class="flex h-full w-full flex-row flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
 
-            <div class="@(SidebarToggle ? "xl:hidden" : "") flex h-full flex-row flex-nowrap items-center gap-2 overflow-hidden">
+            <div
+                class="@(SidebarToggle ? "xl:hidden" : "") flex h-full flex-row flex-nowrap items-center gap-2 overflow-hidden">
                 <img class="h-8 w-auto shrink-0" src="/tailadmin/src/images/logo/logo.png" alt="CoinStack" />
                 <span class="truncate text-xl font-bold text-gray-800 dark:text-white">CoinStack</span>
             </div>
 
             <img class="@(SidebarToggle ? "xl:block" : "hidden") hidden shrink-0"
-                 src="/tailadmin/src/images/logo/logo.png"
-                 alt="CoinStack" />
+                 src="/tailadmin/src/images/logo/logo.png"       alt="CoinStack" />
         </a>
     </div>
     <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
@@ -21,35 +24,48 @@
 
                 <ul class="mb-6 flex flex-col gap-1">
                     <li>
-                        <NavLink href="/" Match="NavLinkMatch.All" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/" Match="NavLinkMatch.All" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-house fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Dashboard</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/budgets" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/budgets" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-wallet fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Buckets</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/goals" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/goals" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-bullseye fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Goals</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/transactions" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/transactions" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-arrow-right-arrow-left fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Transactions</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/subscriptions" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/categories" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-tags fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Categories</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
+                        <NavLink href="/subscriptions" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-rotate fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Subscriptions</span>
                         </NavLink>
@@ -63,35 +79,40 @@
                     </li>
 
                     <li>
-                        <NavLink href="/debt-simulator" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/debt-simulator" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-calculator fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Simulator</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/waitlist" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/waitlist" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-clock-rotate-left fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Waitlist</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/savings" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/savings" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-piggy-bank fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Savings</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/reports" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/reports" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-chart-line fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Reports</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/settings" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                        <NavLink href="/settings" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-gear fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Settings</span>
                         </NavLink>
@@ -102,7 +123,8 @@
     </div>
 </aside>
 
-@code {
+@code
+{
     [Parameter] public bool SidebarToggle { get; set; }
     [Parameter] public EventCallback<bool> SidebarToggleChanged { get; set; }
 

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
 @inject CoinStack.Services.IBucketService BucketService
+@inject CoinStack.Services.ICategoryService CategoryService
 @inject CoinStack.Services.ITransactionService TransactionService
 @inject CoinStack.Services.ISettingsService SettingsService
 
@@ -65,8 +66,11 @@
                 <div class="rounded-2xl border border-gray-200 bg-white p-5 transition-shadow duration-200 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03]">
                     <div class="flex items-center justify-between mb-4">
                         <div class="flex items-center gap-3">
-                            <div class="h-4 w-4 rounded-full" style="background-color: @(bucket.ColorHex ?? "#6577F3");"></div>
-                            <h4 class="text-base font-medium text-gray-800 dark:text-white/90">@bucket.Name</h4>
+                            <div class="h-4 w-4 rounded-full" style="background-color: @(bucket.Category?.ColorHex ?? "#6577F3");"></div>
+                            <div>
+                                <h4 class="text-base font-medium text-gray-800 dark:text-white/90">@bucket.Name</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">@(bucket.Category?.Name ?? "No category")</p>
+                            </div>
                         </div>
                         <div class="flex items-center gap-1">
                             <button
@@ -151,12 +155,26 @@
                     </div>
 
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Color</label>
-                        <input
-                            type="color"
-                            @bind="_formColor"
-                            class="peer block h-11 w-full rounded-md border border-gray-300 bg-transparent px-4 py-2 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:focus:border-brand-400" />
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Category</label>
+                        <select
+                            @bind="_formCategoryId"
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                            <option value="">Select a category</option>
+                            @foreach (var category in _expenseCategories)
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </select>
+                        @if (_expenseCategories.Count == 0)
+                        {
+                            <p class="mt-1.5 text-xs text-error-600 dark:text-error-400">No expense categories available. Create one on the Categories page first.</p>
+                        }
                     </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_formError))
+                    {
+                        <div class="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">@_formError</div>
+                    }
                 </div>
 
                 <div class="mt-6 flex w-full items-center justify-end gap-3">
@@ -168,6 +186,7 @@
                     </button>
                     <button
                         type="submit"
+                        disabled="@_isSaving"
                         class="flex w-full justify-center rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900 sm:w-auto">
                         @(_editingId.HasValue ? "Update" : "Create")
                     </button>
@@ -180,6 +199,7 @@
 
 @code {
     private readonly List<Bucket> _buckets = new();
+    private readonly List<Category> _expenseCategories = new();
     private Dictionary<int, decimal> _spentAmounts = new();
     private bool _isLoading = true;
 
@@ -190,7 +210,9 @@
     private int? _editingId;
     private string _formName = "";
     private decimal _formAllocated;
-    private string _formColor = "#6577F3";
+    private int? _formCategoryId;
+    private bool _isSaving;
+    private string _formError = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -201,10 +223,13 @@
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
         _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(settings.MonthStartDay, now);
 
-        var items = await BucketService.GetAllAsync();
-        _spentAmounts = await BucketService.GetSpentAmountsForPeriodAsync(settings.MonthStartDay, now);
-        _buckets.Clear();
-        _buckets.AddRange(items);
+        var categories = await CategoryService.GetAllAsync();
+        _expenseCategories.Clear();
+        _expenseCategories.AddRange(categories
+            .Where(c => c.Scope == CategoryScope.Both || c.Scope == CategoryScope.Expense)
+            .OrderBy(c => c.Name));
+
+        await ReloadBucketsAsync();
         _isLoading = false;
     }
 
@@ -213,7 +238,8 @@
         _editingId = null;
         _formName = "";
         _formAllocated = 0;
-        _formColor = "#6577F3";
+        _formCategoryId = _expenseCategories.FirstOrDefault()?.Id;
+        _formError = "";
         _showModal = true;
     }
 
@@ -222,57 +248,98 @@
         _editingId = bucket.Id;
         _formName = bucket.Name;
         _formAllocated = bucket.AllocatedAmount;
-        _formColor = bucket.ColorHex ?? "#6577F3";
+        _formCategoryId = bucket.CategoryId;
+        _formError = "";
         _showModal = true;
     }
 
     private async Task SaveBucketAsync()
     {
+        _formError = "";
+
         if (string.IsNullOrWhiteSpace(_formName))
         {
+            _formError = "Bucket name is required.";
             return;
         }
 
-        if (_editingId.HasValue)
+        if (_formAllocated < 0)
         {
-            var existing = _buckets.FirstOrDefault(b => b.Id == _editingId.Value);
-            if (existing is not null)
+            _formError = "Monthly allocation cannot be negative.";
+            return;
+        }
+
+        if (!_formCategoryId.HasValue)
+        {
+            _formError = "Please select a category.";
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            if (_editingId.HasValue)
             {
-                existing.Name = _formName.Trim();
-                existing.AllocatedAmount = _formAllocated;
-                existing.ColorHex = _formColor;
-                await BucketService.UpdateAsync(existing);
+                var existing = _buckets.FirstOrDefault(b => b.Id == _editingId.Value);
+                if (existing is not null)
+                {
+                    existing.Name = _formName.Trim();
+                    existing.AllocatedAmount = _formAllocated;
+                    existing.CategoryId = _formCategoryId;
+                    await BucketService.UpdateAsync(existing);
+                }
             }
-        }
-        else
-        {
-            var bucket = new Bucket
+            else
             {
-                Name = _formName.Trim(),
-                AllocatedAmount = _formAllocated,
-                ColorHex = _formColor,
-                SortOrder = _buckets.Count,
-            };
+                var bucket = new Bucket
+                {
+                    Name = _formName.Trim(),
+                    AllocatedAmount = _formAllocated,
+                    CategoryId = _formCategoryId,
+                    SortOrder = _buckets.Count,
+                };
 
-            var created = await BucketService.CreateAsync(bucket);
-            _buckets.Add(created);
+                await BucketService.CreateAsync(bucket);
+            }
+
+            await ReloadBucketsAsync();
+
+            _editingId = null;
+            _formName = "";
+            _formAllocated = 0;
+            _formCategoryId = null;
+            _showModal = false;
         }
-
-        _editingId = null;
-        _formName = "";
-        _formAllocated = 0;
-        _formColor = "#6577F3";
-        _showModal = false;
+        catch
+        {
+            _formError = "Unable to save bucket right now. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
     }
 
     private void CloseModal()
     {
         _showModal = false;
+        _formError = "";
     }
 
     private async Task DeleteBucketAsync(int id)
     {
         await BucketService.DeleteAsync(id);
         _buckets.RemoveAll(b => b.Id == id);
+    }
+
+    private async Task ReloadBucketsAsync()
+    {
+        var now = DateTime.UtcNow;
+        var settings = await SettingsService.GetAsync();
+        var items = await BucketService.GetAllAsync();
+        _spentAmounts = await BucketService.GetSpentAmountsForPeriodAsync(settings.MonthStartDay, now);
+        _buckets.Clear();
+        _buckets.AddRange(items);
     }
 }

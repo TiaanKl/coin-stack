@@ -45,6 +45,8 @@ public sealed class SettingsService : ISettingsService
             existing.MonthlySavingsPercent = settings.MonthlySavingsPercent;
             existing.SavingsInterestRate = settings.SavingsInterestRate;
             existing.SavingsInterestIsYearly = settings.SavingsInterestIsYearly;
+            existing.ShowReserveAwareBudget = settings.ShowReserveAwareBudget;
+            existing.EnableEmergencyFallback = settings.EnableEmergencyFallback;
         }
 
         await db.SaveChangesAsync(cancellationToken);

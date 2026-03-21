@@ -3,6 +3,7 @@ using System;
 using CoinStack.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FinanceManager.Data.Migrations
 {
     [DbContext(typeof(CoinStackDbContext))]
-    partial class FinanceManagerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260321104628_AddCategoryScope")]
+    partial class AddCategoryScope
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
@@ -30,9 +33,6 @@ namespace FinanceManager.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("TEXT");
-
-                    b.Property<bool>("EnableEmergencyFallback")
-                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("EnableReflections")
                         .HasColumnType("INTEGER");
@@ -71,9 +71,6 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("decimal(5,4)");
 
                     b.Property<bool>("SavingsIsPercent")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("ShowReserveAwareBudget")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
@@ -158,8 +155,9 @@ namespace FinanceManager.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<int?>("CategoryId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("ColorHex")
+                        .HasMaxLength(16)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
@@ -189,8 +187,6 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CategoryId");
 
                     b.HasIndex("GoalId");
 
@@ -507,14 +503,6 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("EmergencyAvailable")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("EmergencyTotal")
-                        .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("FallbackEnabled")
@@ -951,16 +939,9 @@ namespace FinanceManager.Data.Migrations
 
             modelBuilder.Entity("CoinStack.Data.Entities.Bucket", b =>
                 {
-                    b.HasOne("CoinStack.Data.Entities.Category", "Category")
-                        .WithMany("Buckets")
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.HasOne("CoinStack.Data.Entities.Goal", "Goal")
                         .WithMany()
                         .HasForeignKey("GoalId");
-
-                    b.Navigation("Category");
 
                     b.Navigation("Goal");
                 });
@@ -1100,8 +1081,6 @@ namespace FinanceManager.Data.Migrations
 
             modelBuilder.Entity("CoinStack.Data.Entities.Category", b =>
                 {
-                    b.Navigation("Buckets");
-
                     b.Navigation("Budgets");
 
                     b.Navigation("Transactions");

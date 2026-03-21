@@ -22,6 +22,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .OrderByDescending(x => x.OccurredAtUtc)
             .ToListAsync(cancellationToken);
     }
@@ -36,6 +37,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .OrderByDescending(x => x.OccurredAtUtc)
             .Take(count)
             .ToListAsync(cancellationToken);
@@ -46,6 +48,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .Where(x => x.OccurredAtUtc >= fromUtc)
             .OrderByDescending(x => x.OccurredAtUtc)
             .ToListAsync(cancellationToken);
@@ -56,6 +59,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 

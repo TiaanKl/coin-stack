@@ -4,6 +4,7 @@
 @using CoinStack.Services
 @inject CoinStack.Services.ITransactionService TransactionService
 @inject CoinStack.Services.IBucketService BucketService
+@inject CoinStack.Services.ICategoryService CategoryService
 @inject CoinStack.Services.IDebtService DebtService
 @inject CoinStack.Services.ISettingsService SettingsService
 @inject CoinStack.Services.ISavingsService SavingsService
@@ -79,6 +80,11 @@
                                         <div>
                                             <p class="text-sm font-medium text-gray-800 dark:text-white/90">@tx.Description</p>
                                             <div class="mt-0.5 flex flex-wrap items-center gap-2">
+                                                <span class="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+                                                    style="border-color: @GetCategoryColor(tx.CategoryId); color: @GetCategoryColor(tx.CategoryId); background-color: @GetCategoryBgColor(tx.CategoryId);">
+                                                    <i class="fa-solid fa-tag text-[9px]"></i>
+                                                    @(tx.CategoryId.HasValue ? GetCategoryName(tx.CategoryId) : "Uncategorized")
+                                                </span>
                                                 @if (tx.IsImpulse)
                                                 {
                                                     <span class="text-xs text-warning-600 dark:text-warning-400">Impulse</span>
@@ -109,7 +115,7 @@
                                             if (bucket is not null)
                                             {
                                                 <div class="flex items-center gap-2">
-                                                    <div class="h-2.5 w-2.5 rounded-full" style="background-color: @(bucket.ColorHex ?? "#6577F3");"></div>
+                                                    <div class="h-2.5 w-2.5 rounded-full" style="background-color: @(bucket.Category?.ColorHex ?? "#6577F3");"></div>
                                                     @bucket.Name
                                                 </div>
                                             }
@@ -214,6 +220,19 @@
                     </div>
 
                     <div class="col-span-1">
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Category</label>
+                        <select
+                            @bind="_formCategoryId"
+                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                            <option value="">— None —</option>
+                            @foreach (var category in GetCategoriesForType(_formType))
+                            {
+                                <option value="@category.Id">@category.Name</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-span-1">
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bucket</label>
                         <select
                             @bind="_formBucketId"
@@ -242,7 +261,8 @@
                     <div class="col-span-1">
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Type</label>
                         <select
-                            @bind="_formType"
+                            value="@_formType"
+                            @onchange="OnTypeChanged"
                             class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
                             @foreach (var value in Enum.GetValues<TransactionType>())
                             {
@@ -350,6 +370,7 @@
 @code {
     private readonly List<Transaction> _transactions = new();
     private List<Bucket> _buckets = new();
+    private List<Category> _categories = new();
     private List<DebtAccount> _debts = new();
     private bool _isLoading = true;
     private bool _showModal;
@@ -358,6 +379,7 @@
     private int? _editingId;
     private string _formDescription = "";
     private decimal _formAmount;
+    private int? _formCategoryId;
     private int? _formBucketId;
     private int? _formDebtAccountId;
     private TransactionType _formType = TransactionType.Expense;
@@ -377,6 +399,7 @@
 
         var items = await TransactionService.GetAllAsync();
         _buckets = await BucketService.GetAllAsync();
+        _categories = await CategoryService.GetAllAsync();
         _debts = await DebtService.GetAllAsync();
         var savingsState = await SavingsService.GetStateAsync();
         _savingsAvailable = savingsState.Available;
@@ -390,6 +413,7 @@
         _editingId = null;
         _formDescription = "";
         _formAmount = 0;
+        _formCategoryId = null;
         _formBucketId = null;
         _formDebtAccountId = null;
         _formType = TransactionType.Expense;
@@ -398,6 +422,7 @@
         _formIsImpulse = false;
         _formDrawFromSavings = true;
         _formNotes = "";
+        EnsureCategorySelectionValid();
         _showModal = true;
     }
 
@@ -406,6 +431,7 @@
         _editingId = tx.Id;
         _formDescription = tx.Description;
         _formAmount = tx.Amount;
+        _formCategoryId = tx.CategoryId;
         _formBucketId = tx.BucketId;
         _formDebtAccountId = tx.DebtAccountId;
         _formType = tx.Type;
@@ -414,6 +440,7 @@
         _formIsImpulse = tx.IsImpulse;
         _formDrawFromSavings = false;
         _formNotes = tx.Notes ?? "";
+        EnsureCategorySelectionValid();
         _showModal = true;
     }
 
@@ -432,6 +459,7 @@
                 existing.Description = _formDescription.Trim();
                 existing.Amount = _formAmount;
                 existing.Type = _formType;
+                existing.CategoryId = _formCategoryId;
                 existing.BucketId = _formBucketId;
                 existing.DebtAccountId = _formDebtAccountId;
                 existing.ExpenseKind = _formType == TransactionType.Expense ? _formExpenseKind : ExpenseKind.Discretionary;
@@ -448,6 +476,7 @@
                 Description = _formDescription.Trim(),
                 Amount = _formAmount,
                 Type = _formType,
+                CategoryId = _formCategoryId,
                 BucketId = _formBucketId,
                 DebtAccountId = _formDebtAccountId,
                 ExpenseKind = _formType == TransactionType.Expense ? _formExpenseKind : ExpenseKind.Discretionary,
@@ -493,6 +522,7 @@
         _editingId = null;
         _formDescription = "";
         _formAmount = 0;
+        _formCategoryId = null;
         _formBucketId = null;
         _formDebtAccountId = null;
         _formType = TransactionType.Expense;
@@ -513,6 +543,75 @@
     {
         await TransactionService.DeleteAsync(id);
         _transactions.RemoveAll(t => t.Id == id);
+    }
+
+    private void OnTypeChanged(ChangeEventArgs args)
+    {
+        if (args.Value is null)
+        {
+            return;
+        }
+
+        if (Enum.TryParse<TransactionType>(args.Value.ToString(), out var parsed))
+        {
+            _formType = parsed;
+            EnsureCategorySelectionValid();
+        }
+    }
+
+    private IEnumerable<Category> GetCategoriesForType(TransactionType type)
+    {
+        return _categories.Where(c => c.Scope == CategoryScope.Both ||
+            (type == TransactionType.Expense && c.Scope == CategoryScope.Expense) ||
+            (type == TransactionType.Income && c.Scope == CategoryScope.Income) ||
+            (type == TransactionType.Transfer && c.Scope == CategoryScope.Transfer));
+    }
+
+    private void EnsureCategorySelectionValid()
+    {
+        if (!_formCategoryId.HasValue)
+        {
+            return;
+        }
+
+        var allowedIds = GetCategoriesForType(_formType).Select(c => c.Id).ToHashSet();
+        if (!allowedIds.Contains(_formCategoryId.Value))
+        {
+            _formCategoryId = null;
+        }
+    }
+
+    private string GetCategoryName(int? categoryId)
+    {
+        if (!categoryId.HasValue)
+        {
+            return "Uncategorized";
+        }
+
+        return _categories.FirstOrDefault(c => c.Id == categoryId.Value)?.Name ?? "Uncategorized";
+    }
+
+    private string GetCategoryColor(int? categoryId)
+    {
+        if (!categoryId.HasValue)
+        {
+            return "#94A3B8";
+        }
+
+        return _categories.FirstOrDefault(c => c.Id == categoryId.Value)?.ColorHex ?? "#94A3B8";
+    }
+
+    private string GetCategoryBgColor(int? categoryId)
+    {
+        var color = GetCategoryColor(categoryId);
+
+        // Add soft alpha for hex colors to make chip fill obvious but readable.
+        if (color.StartsWith("#") && color.Length == 7)
+        {
+            return $"{color}22";
+        }
+
+        return "#94A3B822";
     }
 
     private static string GetExpenseKindLabel(ExpenseKind kind) => kind switch

@@ -5,6 +5,7 @@
 @using CoinStack.Data.Entities
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject ILogger<MainLayout> Logger
 @inject IGameLoopService GameLoop
 @inject IScoringService ScoringService
 @inject IReflectionService ReflectionService
@@ -259,9 +260,13 @@
         {
             await JS.InvokeVoidAsync("tailadminBlazor.refresh");
         }
-        catch
+        catch (JSException ex)
         {
-            // Ignore: can happen during prerender or if JS not ready yet.
+            Logger.LogDebug(ex, "JS interop call 'tailadminBlazor.refresh' failed during UI refresh.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogDebug(ex, "JS interop call 'tailadminBlazor.refresh' was unavailable during prerender or disconnect.");
         }
     }
 

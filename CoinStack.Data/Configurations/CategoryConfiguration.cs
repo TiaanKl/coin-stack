@@ -19,5 +19,10 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 
         builder.Property(x => x.ColorHex)
             .HasMaxLength(16);
+
+        builder.Property(x => x.Scope)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
     }
 }

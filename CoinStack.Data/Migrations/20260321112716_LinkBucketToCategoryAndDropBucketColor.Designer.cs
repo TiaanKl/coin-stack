@@ -3,6 +3,7 @@ using System;
 using CoinStack.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FinanceManager.Data.Migrations
 {
     [DbContext(typeof(CoinStackDbContext))]
-    partial class FinanceManagerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260321112716_LinkBucketToCategoryAndDropBucketColor")]
+    partial class LinkBucketToCategoryAndDropBucketColor
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.3");

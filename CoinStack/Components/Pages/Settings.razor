@@ -66,6 +66,30 @@
                             <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Used for savings calculations and budget
                                 recommendations.</p>
                             </div>
+
+                    <div class="col-span-1 sm:col-span-2 space-y-3 rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label for="showReserveAwareBudget" class="text-sm font-medium text-gray-800 dark:text-white/90 cursor-pointer">Reserve-aware budget on home card</label>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">When enabled, available budget also subtracts savings and emergency funds on hand.</p>
+                            </div>
+                            <label class="relative inline-flex cursor-pointer items-center">
+                                <input type="checkbox" id="showReserveAwareBudget" @bind="_showReserveAwareBudget" class="peer sr-only" />
+                                <div class="toggle-track"></div>
+                            </label>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <label for="enableEmergencyFallback" class="text-sm font-medium text-gray-800 dark:text-white/90 cursor-pointer">Allow emergency fund fallback</label>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">When budget and savings are insufficient, emergency funds are used as a second fallback source.</p>
+                            </div>
+                            <label class="relative inline-flex cursor-pointer items-center">
+                                <input type="checkbox" id="enableEmergencyFallback" @bind="_enableEmergencyFallback" class="peer sr-only" />
+                                <div class="toggle-track"></div>
+                            </label>
+                        </div>
+                    </div>
                         </div>
                     </div>
                 </div>
@@ -416,6 +440,8 @@
     private decimal _monthlySavingsPercent;
     private decimal? _savingsInterestRate;
     private bool _savingsInterestIsYearly = true;
+    private bool _showReserveAwareBudget;
+    private bool _enableEmergencyFallback = true;
     private PersonalInterestType _selectedInterestType = PersonalInterestType.Fixed;
     private bool _confirmReset;
     private bool _confirmResetData;
@@ -452,6 +478,8 @@
         ? settings.SavingsInterestRate.Value * 100m
         : null;
         _savingsInterestIsYearly = settings.SavingsInterestIsYearly;
+        _showReserveAwareBudget = settings.ShowReserveAwareBudget;
+        _enableEmergencyFallback = settings.EnableEmergencyFallback;
         CurrencyFormatting.ApplyCurrency(_currency);
     }
 
@@ -474,7 +502,9 @@
             SavingsInterestRate = _savingsInterestRate.HasValue && _savingsInterestRate > 0
         ? _savingsInterestRate.Value / 100m
         : null,
-            SavingsInterestIsYearly = _savingsInterestIsYearly
+            SavingsInterestIsYearly = _savingsInterestIsYearly,
+            ShowReserveAwareBudget = _showReserveAwareBudget,
+            EnableEmergencyFallback = _enableEmergencyFallback
         });
 
         CurrencyFormatting.ApplyCurrency(_currency);
@@ -514,6 +544,8 @@
         _monthlySavingsPercent = 0;
         _savingsInterestRate = null;
         _savingsInterestIsYearly = true;
+        _showReserveAwareBudget = false;
+        _enableEmergencyFallback = true;
         _selectedInterestType = PersonalInterestType.Fixed;
         _currentScore = 0;
         _confirmReset = false;

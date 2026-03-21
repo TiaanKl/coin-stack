@@ -7,6 +7,14 @@ public enum TransactionType
     Transfer = 2
 }
 
+public enum CategoryScope
+{
+    Both = 0,
+    Expense = 1,
+    Income = 2,
+    Transfer = 3
+}
+
 public enum ExpenseKind
 {
     Discretionary = 0,
@@ -48,7 +56,8 @@ public enum ScoreChangeReason
     ManualAdjustment = 7,
     GoalAchieved = 8,
     ImpulseBuy = 9,
-    ForceMajeure = 10
+    ForceMajeure = 10,
+    EmergencyFundDip = 11
 }
 
 public enum StreakType

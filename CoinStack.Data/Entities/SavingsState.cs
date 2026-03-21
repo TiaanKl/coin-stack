@@ -8,6 +8,10 @@ public sealed class SavingsState : EntityBase
 
     public decimal Reserved { get; set; } = 0;
 
+    public decimal EmergencyTotal { get; set; } = 0;
+
+    public decimal EmergencyAvailable { get; set; } = 0;
+
     public bool FallbackEnabled { get; set; } = false;
 
     public string? LastCalculatedMonth { get; set; }
