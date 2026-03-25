@@ -1,82 +1,87 @@
+using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Pages;
-using CoinStack.Mobile.Services;
 
 namespace CoinStack.Mobile;
 
-public sealed class AppShell : TabbedPage
+public sealed class AppShell : Shell
 {
-    public AppShell(IMobileFinanceService financeService)
+    public AppShell()
     {
         Title = "CoinStack";
 
-        Children.Add(new NavigationPage(new DashboardPage(financeService))
-        {
-            Title = "Dashboard"
-        });
+        // Register sub-page routes (navigated via GoToAsync from hub pages)
+        Routing.RegisterRoute("transactions", typeof(TransactionsPage));
+        Routing.RegisterRoute("income", typeof(IncomePage));
+        Routing.RegisterRoute("buckets", typeof(BucketsPage));
+        Routing.RegisterRoute("subscriptions", typeof(SubscriptionsPage));
+        Routing.RegisterRoute("categories", typeof(CategoriesPage));
+        Routing.RegisterRoute("goals", typeof(GoalsPage));
+        Routing.RegisterRoute("savings", typeof(SavingsPage));
+        Routing.RegisterRoute("debt", typeof(DebtPage));
+        Routing.RegisterRoute("debt-simulator", typeof(DebtSimulatorPage));
+        Routing.RegisterRoute("fallback-history", typeof(FallbackHistoryPage));
+        Routing.RegisterRoute("challenges", typeof(ChallengesPage));
+        Routing.RegisterRoute("achievements", typeof(AchievementsPage));
+        Routing.RegisterRoute("reflections", typeof(ReflectionsPage));
+        Routing.RegisterRoute("cbt-journal", typeof(CbtJournalPage));
+        Routing.RegisterRoute("waitlist", typeof(WaitlistPage));
+        Routing.RegisterRoute("weekly-recap", typeof(WeeklyRecapMobilePage));
+        Routing.RegisterRoute("reports", typeof(ReportsPage));
+        Routing.RegisterRoute("settings", typeof(SettingsPage));
 
-        Children.Add(new NavigationPage(new TransactionsPage(financeService))
-        {
-            Title = "Transactions"
-        });
+        var tabBar = new TabBar();
 
-        Children.Add(new NavigationPage(new BucketsPage(financeService))
+        // Home tab
+        var homeTab = new Tab { Title = "Home", Icon = AppIcons.HomeTab };
+        homeTab.Items.Add(new ShellContent
         {
-            Title = "Buckets"
+            ContentTemplate = new DataTemplate(typeof(DashboardPage))
         });
+        tabBar.Items.Add(homeTab);
 
-        Children.Add(new NavigationPage(new GoalsPage(financeService))
+        // Money tab
+        var moneyTab = new Tab { Title = "Money", Icon = AppIcons.WalletTab };
+        moneyTab.Items.Add(new ShellContent
         {
-            Title = "Goals"
+            ContentTemplate = new DataTemplate(typeof(MoneyHubPage))
         });
+        tabBar.Items.Add(moneyTab);
 
-        Children.Add(new NavigationPage(new SavingsPage(financeService))
+        // Goals tab
+        var goalsTab = new Tab { Title = "Goals", Icon = AppIcons.FlagTab };
+        goalsTab.Items.Add(new ShellContent
         {
-            Title = "Savings"
+            ContentTemplate = new DataTemplate(typeof(GoalsHubPage))
         });
+        tabBar.Items.Add(goalsTab);
 
-        Children.Add(new NavigationPage(new SubscriptionsPage(financeService))
+        // Growth tab
+        var growthTab = new Tab { Title = "Growth", Icon = AppIcons.TrophyTab };
+        growthTab.Items.Add(new ShellContent
         {
-            Title = "Subscriptions"
+            ContentTemplate = new DataTemplate(typeof(GrowthHubPage))
         });
+        tabBar.Items.Add(growthTab);
 
-        Children.Add(new NavigationPage(new DebtPage(financeService))
+        // More tab
+        var moreTab = new Tab { Title = "More", Icon = AppIcons.MoreTab };
+        moreTab.Items.Add(new ShellContent
         {
-            Title = "Debt"
+            ContentTemplate = new DataTemplate(typeof(MoreHubPage))
         });
+        tabBar.Items.Add(moreTab);
 
-        Children.Add(new NavigationPage(new ReflectionsPage(financeService))
-        {
-            Title = "Reflections"
-        });
+        Items.Add(tabBar);
 
-        Children.Add(new NavigationPage(new CbtJournalPage())
-        {
-            Title = "Mindset"
-        });
+        // Shell tab bar styling
+        Shell.SetTabBarBackgroundColor(this, AppColors.Surface);
+        Shell.SetTabBarUnselectedColor(this, AppColors.TabUnselected);
+        Shell.SetTabBarTitleColor(this, AppColors.Dark);
+        Shell.SetTabBarForegroundColor(this, AppColors.Dark);
+        Shell.SetNavBarHasShadow(this, false);
+        Shell.SetBackgroundColor(this, AppColors.Surface);
+        Shell.SetForegroundColor(this, AppColors.Dark);
 
-        Children.Add(new NavigationPage(new ChallengesPage())
-        {
-            Title = "Challenges"
-        });
-
-        Children.Add(new NavigationPage(new AchievementsPage())
-        {
-            Title = "Achievements"
-        });
-
-        Children.Add(new NavigationPage(new WeeklyRecapMobilePage())
-        {
-            Title = "Recap"
-        });
-
-        Children.Add(new NavigationPage(new ReportsPage(financeService))
-        {
-            Title = "Reports"
-        });
-
-        Children.Add(new NavigationPage(new SettingsPage(financeService))
-        {
-            Title = "Settings"
-        });
+        FlyoutBehavior = FlyoutBehavior.Disabled;
     }
 }

@@ -41,6 +41,40 @@ public interface IMobileFinanceService
 
     Task<AppSettings> GetSettingsAsync(CancellationToken cancellationToken = default);
     Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default);
+
+    // ── Categories ──
+    Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken = default);
+    Task AddCategoryAsync(string name, CategoryScope scope, string? colorHex = null, CancellationToken cancellationToken = default);
+    Task DeleteCategoryAsync(int id, CancellationToken cancellationToken = default);
+
+    // ── Income summary ──
+    Task<MobileIncomeSnapshot> GetIncomeSnapshotAsync(CancellationToken cancellationToken = default);
+
+    // ── Waitlist ──
+    Task<IReadOnlyList<WaitlistItem>> GetWaitlistItemsAsync(CancellationToken cancellationToken = default);
+    Task AddWaitlistItemAsync(string name, decimal estimatedCost, string? description = null, CancellationToken cancellationToken = default);
+    Task DeleteWaitlistItemAsync(int id, CancellationToken cancellationToken = default);
+    Task MarkWaitlistItemPurchasedAsync(int id, CancellationToken cancellationToken = default);
+
+    // ── Achievements ──
+    Task<IReadOnlyList<Achievement>> GetAchievementsAsync(CancellationToken cancellationToken = default);
+    Task<MobileLevelInfo> GetLevelInfoAsync(CancellationToken cancellationToken = default);
+
+    // ── Challenges ──
+    Task<IReadOnlyList<DailyChallenge>> GetTodaysChallengesAsync(CancellationToken cancellationToken = default);
+    Task CompleteChallengeAsync(int id, CancellationToken cancellationToken = default);
+    Task<int> GetChallengesCompletedTodayAsync(CancellationToken cancellationToken = default);
+    Task<int> GetChallengesCompletedThisWeekAsync(CancellationToken cancellationToken = default);
+
+    // ── CBT Journal ──
+    Task<IReadOnlyList<CbtJournalEntry>> GetCbtEntriesAsync(int count = 20, CancellationToken cancellationToken = default);
+    Task AddCbtEntryAsync(string situation, string automaticThought, string emotion, int emotionIntensity, string rationalResponse, int moodBefore, int moodAfter, CognitiveDistortion? distortion = null, CancellationToken cancellationToken = default);
+
+    // ── Weekly Recap ──
+    Task<IReadOnlyList<WeeklyRecap>> GetWeeklyRecapsAsync(int count = 10, CancellationToken cancellationToken = default);
+
+    // ── Score Events ──
+    Task<IReadOnlyList<ScoreEvent>> GetRecentScoreEventsAsync(int count = 20, CancellationToken cancellationToken = default);
 }
 
 public sealed record MobileDashboardSnapshot(
@@ -94,3 +128,16 @@ public sealed record MobileDailyNetRow(DateTime Date, decimal Income, decimal Ex
 {
     public decimal Net => Income - Expense;
 }
+
+public sealed record MobileIncomeSnapshot(
+    decimal MonthToDate,
+    decimal YearToDate,
+    decimal MonthlyAverage,
+    IReadOnlyList<Transaction> RecentDeposits);
+
+public sealed record MobileLevelInfo(
+    int Level,
+    string LevelName,
+    int CurrentXp,
+    int XpForNextLevel,
+    int TotalScore);

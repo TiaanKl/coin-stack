@@ -1,196 +1,274 @@
+using CoinStack.Data.Entities;
+using CoinStack.Mobile.Helpers;
+using CoinStack.Mobile.Services;
+using Microsoft.Maui.Controls.Shapes;
+
 namespace CoinStack.Mobile.Pages;
 
-/// <summary>
-/// Daily Challenges page – Duolingo-style daily tasks UI (display-only).
-/// </summary>
 public sealed class ChallengesPage : ContentPage
 {
-    public ChallengesPage()
+    private readonly IMobileFinanceService _financeService;
+    private readonly VerticalStackLayout _content;
+
+    public ChallengesPage(IMobileFinanceService financeService)
     {
+        _financeService = financeService;
         Title = "Challenges";
+        BackgroundColor = AppColors.Background;
 
-        // Level bar
-        var levelBar = new Frame
+        _content = new VerticalStackLayout
         {
-            CornerRadius = 16,
-            Padding = new Thickness(14),
-            HasShadow = false,
-            BorderColor = Color.FromArgb("#E4E7EC"),
-            BackgroundColor = Colors.White,
-            Content = new HorizontalStackLayout
-            {
-                Spacing = 12,
-                Children =
-                {
-                    new Frame
-                    {
-                        CornerRadius = 10,
-                        WidthRequest = 44,
-                        HeightRequest = 44,
-                        Padding = 0,
-                        HasShadow = false,
-                        BackgroundColor = Color.FromArgb("#6577F3"),
-                        Content = new Label
-                        {
-                            Text = "1",
-                            FontSize = 18,
-                            FontAttributes = FontAttributes.Bold,
-                            TextColor = Colors.White,
-                            HorizontalTextAlignment = TextAlignment.Center,
-                            VerticalTextAlignment = TextAlignment.Center,
-                        },
-                    },
-                    new VerticalStackLayout
-                    {
-                        Spacing = 4,
-                        VerticalOptions = LayoutOptions.Center,
-                        HorizontalOptions = LayoutOptions.FillAndExpand,
-                        Children =
-                        {
-                            new HorizontalStackLayout
-                            {
-                                Children =
-                                {
-                                    new Label { Text = "Penny Starter", FontSize = 14, FontAttributes = FontAttributes.Bold, HorizontalOptions = LayoutOptions.StartAndExpand },
-                                    new Label { Text = "0 / 50 XP", FontSize = 12, TextColor = Colors.Gray, HorizontalOptions = LayoutOptions.End },
-                                },
-                            },
-                            new ProgressBar { Progress = 0, ProgressColor = Color.FromArgb("#6577F3"), HeightRequest = 6 },
-                        },
-                    },
-                },
-            },
+            Padding = new Thickness(20),
+            Spacing = 12
         };
 
-        // Stats row
-        var statsRow = new HorizontalStackLayout
+        Content = new ScrollView { Content = _content };
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
         {
-            Spacing = 8,
-            HorizontalOptions = LayoutOptions.Center,
-            Children =
+            var levelInfo = await _financeService.GetLevelInfoAsync();
+            var challenges = await _financeService.GetTodaysChallengesAsync();
+            var completedToday = await _financeService.GetChallengesCompletedTodayAsync();
+            var completedWeek = await _financeService.GetChallengesCompletedThisWeekAsync();
+
+            _content.Children.Clear();
+
+            _content.Children.Add(new Label { Text = "Daily Challenges", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark });
+            _content.Children.Add(new Label { Text = "Complete challenges to earn XP and build healthy habits", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" });
+
+            // Level bar
+            var xpProgress = levelInfo.XpForNextLevel > 0 ? (double)levelInfo.CurrentXp / levelInfo.XpForNextLevel : 0;
+            var levelBar = new Border
             {
-                CreateStatChip("✅ 0 today", Color.FromArgb("#ECFDF5"), Color.FromArgb("#059669")),
-                CreateStatChip("📅 0 this week", Color.FromArgb("#F0F1FE"), Color.FromArgb("#6577F3")),
-            },
-        };
-
-        // Sample challenges
-        (string Title, string Desc, int Xp, string FreqLabel, bool IsCompleted)[] sampleChallenges =
-        [
-            ("No-Spend Day", "Don't log any expense transactions today.", 15, "Daily", false),
-            ("Log Every Expense", "Record at least 3 expense transactions today.", 10, "Daily", false),
-            ("Mindful Moment", "Complete a CBT thought record about a financial worry.", 15, "Daily", false),
-        ];
-
-        var challengeList = new VerticalStackLayout { Spacing = 10 };
-
-        foreach (var (title, desc, xp, freqLabel, isCompleted) in sampleChallenges)
-        {
-            var iconFrame = new Frame
-            {
-                CornerRadius = 12,
-                WidthRequest = 44,
-                HeightRequest = 44,
-                Padding = 0,
-                HasShadow = false,
-                BackgroundColor = isCompleted ? Color.FromArgb("#ECFDF5") : Color.FromArgb("#F0F1FE"),
-                Content = new Label
-                {
-                    Text = isCompleted ? "✓" : "⚡",
-                    FontSize = 18,
-                    HorizontalTextAlignment = TextAlignment.Center,
-                    VerticalTextAlignment = TextAlignment.Center,
-                    TextColor = isCompleted ? Color.FromArgb("#059669") : Color.FromArgb("#6577F3"),
-                },
-            };
-
-            var infoStack = new VerticalStackLayout
-            {
-                Spacing = 2,
-                VerticalOptions = LayoutOptions.Center,
-                HorizontalOptions = LayoutOptions.FillAndExpand,
-                Children =
-                {
-                    new HorizontalStackLayout
-                    {
-                        Spacing = 6,
-                        Children =
-                        {
-                            new Label { Text = title, FontSize = 14, FontAttributes = FontAttributes.Bold },
-                            new Frame
-                            {
-                                CornerRadius = 8,
-                                Padding = new Thickness(6, 2),
-                                HasShadow = false,
-                                BackgroundColor = Color.FromArgb("#EDE9FE"),
-                                Content = new Label { Text = freqLabel, FontSize = 9, FontAttributes = FontAttributes.Bold, TextColor = Color.FromArgb("#7C3AED") },
-                            },
-                        },
-                    },
-                    new Label { Text = desc, FontSize = 11, TextColor = Colors.Gray },
-                },
-            };
-
-            var xpLabel = new Label
-            {
-                Text = $"+{xp} XP",
-                FontSize = 13,
-                FontAttributes = FontAttributes.Bold,
-                TextColor = isCompleted ? Color.FromArgb("#059669") : Color.FromArgb("#6577F3"),
-                VerticalOptions = LayoutOptions.Center,
-            };
-
-            var card = new Frame
-            {
-                CornerRadius = 16,
+                BackgroundColor = AppColors.Surface,
+                StrokeShape = new RoundRectangle { CornerRadius = 16 },
+                Stroke = new SolidColorBrush(AppColors.Border),
+                StrokeThickness = 1,
                 Padding = new Thickness(14),
-                HasShadow = false,
-                BorderColor = isCompleted ? Color.FromArgb("#A7F3D0") : Color.FromArgb("#E4E7EC"),
-                BackgroundColor = isCompleted ? Color.FromArgb("#F0FDF9") : Colors.White,
                 Content = new HorizontalStackLayout
                 {
                     Spacing = 12,
-                    Children = { iconFrame, infoStack, xpLabel },
-                },
+                    Children =
+                    {
+                        new Border
+                        {
+                            BackgroundColor = Color.FromArgb("#6577F3"),
+                            StrokeShape = new RoundRectangle { CornerRadius = 10 },
+                            Stroke = Colors.Transparent,
+                            WidthRequest = 44,
+                            HeightRequest = 44,
+                            Padding = 0,
+                            Content = new Label
+                            {
+                                Text = levelInfo.Level.ToString(),
+                                FontSize = 18,
+                                FontFamily = "SpaceGroteskBold",
+                                TextColor = Colors.White,
+                                HorizontalTextAlignment = TextAlignment.Center,
+                                VerticalTextAlignment = TextAlignment.Center
+                            }
+                        },
+                        new VerticalStackLayout
+                        {
+                            Spacing = 4,
+                            VerticalOptions = LayoutOptions.Center,
+                            HorizontalOptions = LayoutOptions.Fill,
+                            Children =
+                            {
+                                new Grid
+                                {
+                                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                                    Children =
+                                    {
+                                        new Label { Text = levelInfo.LevelName, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark },
+                                        new Label { Text = $"{levelInfo.CurrentXp} / {levelInfo.XpForNextLevel} XP", FontSize = 12, TextColor = AppColors.Muted, HorizontalOptions = LayoutOptions.End, FontFamily = "SpaceGroteskRegular" }
+                                    }
+                                },
+                                new ProgressBar { Progress = xpProgress, ProgressColor = Color.FromArgb("#6577F3"), HeightRequest = 6 }
+                            }
+                        }
+                    }
+                }
             };
+            _content.Children.Add(levelBar);
 
-            challengeList.Children.Add(card);
-        }
-
-        Content = new ScrollView
-        {
-            Content = new VerticalStackLayout
+            // Stats row
+            var statsRow = new HorizontalStackLayout
             {
-                Padding = new Thickness(16),
-                Spacing = 12,
+                Spacing = 8,
+                HorizontalOptions = LayoutOptions.Center,
                 Children =
                 {
-                    new Label { Text = "Daily Challenges", FontSize = 22, FontAttributes = FontAttributes.Bold },
-                    new Label { Text = "Complete challenges to earn XP and build healthy habits", FontSize = 13, TextColor = Colors.Gray },
-                    levelBar,
-                    statsRow,
-                    new Label { Text = "TODAY'S CHALLENGES", FontSize = 11, FontAttributes = FontAttributes.Bold, TextColor = Colors.Gray, Margin = new Thickness(0, 8, 0, 0) },
-                    challengeList,
-                },
-            },
-        };
+                    CreateStatChip($"{AppIcons.GlyphCheck} {completedToday} today", Color.FromArgb("#ECFDF5"), AppColors.Success),
+                    CreateStatChip($"{AppIcons.GlyphCalendarWeek} {completedWeek} this week", Color.FromArgb("#F0F1FE"), Color.FromArgb("#6577F3"))
+                }
+            };
+            _content.Children.Add(statsRow);
+
+            _content.Children.Add(new Label { Text = "TODAY'S CHALLENGES", FontSize = 11, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Muted, Margin = new Thickness(0, 8, 0, 0) });
+
+            if (challenges.Count == 0)
+            {
+                _content.Children.Add(new Border
+                {
+                    BackgroundColor = AppColors.Surface,
+                    StrokeShape = new RoundRectangle { CornerRadius = 16 },
+                    Stroke = new SolidColorBrush(AppColors.Border),
+                    StrokeThickness = 1,
+                    Padding = new Thickness(24),
+                    Content = new VerticalStackLayout
+                    {
+                        Spacing = 8,
+                        HorizontalOptions = LayoutOptions.Center,
+                        Children =
+                        {
+                            new Label { Text = AppIcons.GlyphBolt, FontFamily = "FontAwesomeSolid", FontSize = 32, HorizontalOptions = LayoutOptions.Center, TextColor = AppColors.Muted },
+                            new Label { Text = "No Challenges Yet", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
+                            new Label { Text = "Challenges are generated daily. Check back soon!", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" }
+                        }
+                    }
+                });
+                return;
+            }
+
+            foreach (var challenge in challenges)
+            {
+                var isCompleted = challenge.Status == ChallengeStatus.Completed;
+                var isExpired = challenge.Status == ChallengeStatus.Expired;
+
+                var iconBg = isCompleted ? Color.FromArgb("#ECFDF5") : Color.FromArgb("#F0F1FE");
+                var iconColor = isCompleted ? AppColors.Success : Color.FromArgb("#6577F3");
+                var iconText = isCompleted ? AppIcons.GlyphCheck : AppIcons.GlyphBolt;
+
+                var iconFrame = new Border
+                {
+                    BackgroundColor = iconBg,
+                    StrokeShape = new RoundRectangle { CornerRadius = 12 },
+                    Stroke = Colors.Transparent,
+                    WidthRequest = 44,
+                    HeightRequest = 44,
+                    Padding = 0,
+                    Content = new Label
+                    {
+                        Text = iconText,
+                        FontFamily = "FontAwesomeSolid",
+                        FontSize = 18,
+                        HorizontalTextAlignment = TextAlignment.Center,
+                        VerticalTextAlignment = TextAlignment.Center,
+                        TextColor = iconColor
+                    }
+                };
+
+                var freqLabel = challenge.Frequency == ChallengeFrequency.Daily ? "Daily" : "Weekly";
+                var freqBadge = new Border
+                {
+                    BackgroundColor = Color.FromArgb("#EDE9FE"),
+                    StrokeShape = new RoundRectangle { CornerRadius = 8 },
+                    Stroke = Colors.Transparent,
+                    Padding = new Thickness(6, 2),
+                    Content = new Label { Text = freqLabel, FontSize = 9, FontFamily = "SpaceGroteskBold", TextColor = Color.FromArgb("#7C3AED") }
+                };
+
+                var titleRow = new HorizontalStackLayout
+                {
+                    Spacing = 6,
+                    Children = { new Label { Text = challenge.Title, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark }, freqBadge }
+                };
+
+                var infoStack = new VerticalStackLayout
+                {
+                    Spacing = 2,
+                    VerticalOptions = LayoutOptions.Center,
+                    HorizontalOptions = LayoutOptions.Fill,
+                    Children = { titleRow, new Label { Text = challenge.Description, FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" } }
+                };
+
+                var xpLabel = new Label
+                {
+                    Text = $"+{challenge.XpReward} XP",
+                    FontSize = 13,
+                    FontFamily = "SpaceGroteskBold",
+                    TextColor = isCompleted ? AppColors.Success : Color.FromArgb("#6577F3"),
+                    VerticalOptions = LayoutOptions.Center
+                };
+
+                var grid = new Grid
+                {
+                    ColumnDefinitions =
+                    {
+                        new ColumnDefinition(new GridLength(52)),
+                        new ColumnDefinition(GridLength.Star),
+                        new ColumnDefinition(GridLength.Auto)
+                    },
+                    ColumnSpacing = 12
+                };
+                Grid.SetColumn(iconFrame, 0);
+                Grid.SetColumn(infoStack, 1);
+                Grid.SetColumn(xpLabel, 2);
+                grid.Children.Add(iconFrame);
+                grid.Children.Add(infoStack);
+                grid.Children.Add(xpLabel);
+
+                var card = new Border
+                {
+                    BackgroundColor = isCompleted ? Color.FromArgb("#F0FDF9") : AppColors.Surface,
+                    StrokeShape = new RoundRectangle { CornerRadius = 16 },
+                    Stroke = new SolidColorBrush(isCompleted ? Color.FromArgb("#A7F3D0") : AppColors.Border),
+                    StrokeThickness = 1,
+                    Padding = new Thickness(14),
+                    Opacity = isExpired ? 0.5 : 1.0,
+                    Content = grid
+                };
+
+                if (!isCompleted && !isExpired)
+                {
+                    var tapGesture = new TapGestureRecognizer();
+                    var challengeId = challenge.Id;
+                    tapGesture.Tapped += async (_, _) =>
+                    {
+                        var confirm = await DisplayAlertAsync("Complete Challenge", $"Mark '{challenge.Title}' as completed?", "Complete", "Cancel");
+                        if (confirm)
+                        {
+                            await _financeService.CompleteChallengeAsync(challengeId);
+                            await LoadAsync();
+                        }
+                    };
+                    card.GestureRecognizers.Add(tapGesture);
+                }
+
+                _content.Children.Add(card);
+            }
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Error", ex.Message, "OK");
+        }
     }
 
-    private static Frame CreateStatChip(string text, Color bgColor, Color textColor)
+    private static Border CreateStatChip(string text, Color bgColor, Color textColor)
     {
-        return new Frame
+        return new Border
         {
-            CornerRadius = 14,
-            Padding = new Thickness(12, 6),
-            HasShadow = false,
             BackgroundColor = bgColor,
+            StrokeShape = new RoundRectangle { CornerRadius = 14 },
+            Stroke = Colors.Transparent,
+            Padding = new Thickness(12, 6),
             Content = new Label
             {
                 Text = text,
+                FontFamily = "FontAwesomeSolid",
                 FontSize = 12,
-                FontAttributes = FontAttributes.Bold,
-                TextColor = textColor,
-            },
+                TextColor = textColor
+            }
         };
     }
 }

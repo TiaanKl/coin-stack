@@ -1,5 +1,8 @@
+using CoinStack.Data.Entities;
 using CoinStack.Mobile.Core;
+using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Services;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace CoinStack.Mobile.Pages;
 
@@ -7,57 +10,154 @@ public sealed class DashboardPage : ContentPage
 {
     private readonly IMobileFinanceService _financeService;
 
-    private readonly Label _incomeLabel;
-    private readonly Label _expenseLabel;
-    private readonly Label _netLabel;
-    private readonly Label _bucketCountLabel;
-    private readonly Label _scoreLabel;
-    private readonly Label _streakLabel;
-    private readonly Label _subsLabel;
-    private readonly Label _debtsLabel;
-    private readonly Label _reflectionsLabel;
-    private readonly Label _recentHeaderLabel;
-    private readonly VerticalStackLayout _recentList;
+    // Header
+    private readonly Label _greetingLabel;
+    // Budget card
+    private readonly Label _budgetTitleLabel;
+    private readonly Label _budgetSubtitleLabel;
+    private readonly Label _plannedLabel;
+    private readonly Label _spentLabel;
+    private readonly Label _availableLabel;
+    private readonly ProgressBar _budgetProgress;
+    // Reserves card
+    private readonly Label _savingsLabel;
+    private readonly Label _emergencyLabel;
+    private readonly Label _totalReservedLabel;
+    // Lists
+    private readonly VerticalStackLayout _recentTxList;
+    private readonly VerticalStackLayout _scoreEventList;
 
     public DashboardPage(IMobileFinanceService financeService)
     {
         _financeService = financeService;
         Title = "Dashboard";
+        BackgroundColor = AppColors.Background;
 
-        _incomeLabel = new Label { FontSize = 16, FontAttributes = FontAttributes.Bold };
-        _expenseLabel = new Label { FontSize = 16, FontAttributes = FontAttributes.Bold };
-        _netLabel = new Label { FontSize = 16, FontAttributes = FontAttributes.Bold };
-        _bucketCountLabel = new Label { FontSize = 14 };
-        _scoreLabel = new Label { FontSize = 14 };
-        _streakLabel = new Label { FontSize = 14 };
-        _subsLabel = new Label { FontSize = 14 };
-        _debtsLabel = new Label { FontSize = 14 };
-        _reflectionsLabel = new Label { FontSize = 14 };
-        _recentHeaderLabel = new Label { FontSize = 16, FontAttributes = FontAttributes.Bold, Text = "Recent Transactions" };
-        _recentList = new VerticalStackLayout { Spacing = 8 };
+        // ── Header ──
+        _greetingLabel = new Label { Text = "Good morning", FontFamily = "SpaceGroteskBold", FontSize = 20, TextColor = AppColors.Dark };
+
+        var bellIcon = new Border
+        {
+            WidthRequest = 44,
+            HeightRequest = 44,
+            StrokeShape = new RoundRectangle { CornerRadius = 22 },
+            BackgroundColor = AppColors.Surface,
+            Stroke = Brush.Transparent,
+            Content = new Label { Text = AppIcons.GlyphBell, FontFamily = "FontAwesomeSolid", FontSize = 20, TextColor = AppColors.Dark, HorizontalOptions = LayoutOptions.Center, VerticalOptions = LayoutOptions.Center }
+        };
+
+        var topHeader = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+            Margin = new Thickness(0, 10, 0, 0)
+        };
+        topHeader.Add(_greetingLabel, 0, 0);
+        topHeader.Add(bellIcon, 1, 0);
+
+        // ── Monthly Budget Remaining card ──
+        _budgetTitleLabel = new Label { Text = "Monthly Budget Remaining", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark };
+        _budgetSubtitleLabel = new Label { FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" };
+        _budgetProgress = new ProgressBar { ProgressColor = AppColors.Accent, HeightRequest = 8 };
+
+        _plannedLabel = new Label { FontSize = 12, FontFamily = "SpaceGroteskBold" };
+        _spentLabel = new Label { FontSize = 12, FontFamily = "SpaceGroteskBold" };
+        _availableLabel = new Label { FontSize = 12, FontFamily = "SpaceGroteskBold" };
+
+        var budgetBadges = new FlexLayout
+        {
+            Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
+            JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
+            Children =
+            {
+                WrapBadge(_plannedLabel, Color.FromArgb("#F3F4F6"), AppColors.Muted),
+                WrapBadge(_spentLabel, Color.FromArgb("#FEF2F2"), AppColors.Danger),
+                WrapBadge(_availableLabel, Color.FromArgb("#ECFDF5"), AppColors.Success)
+            }
+        };
+
+        var budgetCard = new Border
+        {
+            BackgroundColor = AppColors.Surface,
+            StrokeShape = new RoundRectangle { CornerRadius = 16 },
+            Stroke = new SolidColorBrush(AppColors.Border),
+            StrokeThickness = 1,
+            Padding = new Thickness(16),
+            Content = new VerticalStackLayout { Spacing = 10, Children = { _budgetTitleLabel, _budgetSubtitleLabel, _budgetProgress, budgetBadges } }
+        };
+
+        // ── Reserves On Hand card ──
+        _savingsLabel = new Label { FontSize = 14, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Success };
+        _emergencyLabel = new Label { FontSize = 14, FontFamily = "SpaceGroteskBold", TextColor = Color.FromArgb("#D97706") };
+        _totalReservedLabel = new Label { FontSize = 14, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Dark };
+
+        var reservesCard = new Border
+        {
+            BackgroundColor = AppColors.Surface,
+            StrokeShape = new RoundRectangle { CornerRadius = 16 },
+            Stroke = new SolidColorBrush(AppColors.Border),
+            StrokeThickness = 1,
+            Padding = new Thickness(16),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 8,
+                Children =
+                {
+                    new Label { Text = "Reserves On Hand", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
+                    CreateReserveRow("Savings", _savingsLabel),
+                    CreateReserveRow("Emergency Fund", _emergencyLabel),
+                    new BoxView { HeightRequest = 1, Color = AppColors.Border },
+                    CreateReserveRow("Total Reserved", _totalReservedLabel)
+                }
+            }
+        };
+
+        // ── Recent Transactions ──
+        _recentTxList = new VerticalStackLayout { Spacing = 8 };
+        var txCard = new Border
+        {
+            BackgroundColor = AppColors.Surface,
+            StrokeShape = new RoundRectangle { CornerRadius = 16 },
+            Stroke = new SolidColorBrush(AppColors.Border),
+            StrokeThickness = 1,
+            Padding = new Thickness(16),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 10,
+                Children =
+                {
+                    new Label { Text = "Recent Transactions", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
+                    _recentTxList
+                }
+            }
+        };
+
+        // ── Recent Score Activity ──
+        _scoreEventList = new VerticalStackLayout { Spacing = 8 };
+        var scoreCard = new Border
+        {
+            BackgroundColor = AppColors.Surface,
+            StrokeShape = new RoundRectangle { CornerRadius = 16 },
+            Stroke = new SolidColorBrush(AppColors.Border),
+            StrokeThickness = 1,
+            Padding = new Thickness(16),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 10,
+                Children =
+                {
+                    new Label { Text = "Recent Score Activity", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
+                    _scoreEventList
+                }
+            }
+        };
 
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
             {
-                Padding = new Thickness(16),
-                Spacing = 12,
-                Children =
-                {
-                    new Label { Text = "Overview", FontSize = 22, FontAttributes = FontAttributes.Bold },
-                    _incomeLabel,
-                    _expenseLabel,
-                    _netLabel,
-                    _bucketCountLabel,
-                    _scoreLabel,
-                    _streakLabel,
-                    _subsLabel,
-                    _debtsLabel,
-                    _reflectionsLabel,
-                    new BoxView { HeightRequest = 1 },
-                    _recentHeaderLabel,
-                    _recentList
-                }
+                Padding = new Thickness(20),
+                Spacing = 16,
+                Children = { topHeader, budgetCard, reservesCard, txCard, scoreCard }
             }
         };
     }
@@ -75,35 +175,138 @@ public sealed class DashboardPage : ContentPage
             await _financeService.ProcessDailyCheckInAsync();
             var settings = await _financeService.GetSettingsAsync();
             var snapshot = await _financeService.GetDashboardSnapshotAsync();
+            var savings = await _financeService.GetSavingsSnapshotAsync();
+            var scoreEvents = await _financeService.GetRecentScoreEventsAsync(15);
 
             var currency = settings.Currency;
-            _incomeLabel.Text = $"Income: {MoneyDisplay.Format(currency, snapshot.TotalIncome)}";
-            _expenseLabel.Text = $"Spent: {MoneyDisplay.Format(currency, snapshot.TotalExpense)}";
-            _netLabel.Text = $"Net Saved: {MoneyDisplay.Format(currency, snapshot.NetSaved)}";
-            _bucketCountLabel.Text = $"Buckets: {snapshot.Buckets.Count}";
-            _scoreLabel.Text = $"Total Score: {snapshot.TotalScore} pts";
-            _streakLabel.Text = $"Daily Check-in Streak: {snapshot.DailyCheckInStreak} day(s)";
-            _subsLabel.Text = $"Active Subscriptions: {snapshot.ActiveSubscriptions}";
-            _debtsLabel.Text = $"Debt Accounts: {snapshot.ActiveDebts}";
-            _reflectionsLabel.Text = $"Pending Reflections: {snapshot.PendingReflections}";
+            var hour = DateTime.Now.Hour;
+            var greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+            _greetingLabel.Text = greeting;
 
-            _recentList.Children.Clear();
+            // Budget
+            var budgetLimit = settings.MonthlyIncome;
+            var budgetSpent = snapshot.TotalExpense;
+            var planned = snapshot.Buckets.Sum(b => Math.Max(0, b.AllocatedAmount));
+            var available = budgetLimit - budgetSpent;
+            var progress = budgetLimit > 0 ? (double)(budgetSpent / budgetLimit) : 0;
+
+            _budgetSubtitleLabel.Text = $"{MoneyDisplay.Format(currency, budgetSpent)} spent of {MoneyDisplay.Format(currency, budgetLimit)}";
+            _budgetProgress.Progress = Math.Min(progress, 1.0);
+            _budgetProgress.ProgressColor = progress > 1 ? AppColors.Danger : AppColors.Accent;
+            _plannedLabel.Text = $"Planned: {MoneyDisplay.Format(currency, planned)}";
+            _spentLabel.Text = $"Spent: {MoneyDisplay.Format(currency, budgetSpent)}";
+            _availableLabel.Text = $"Available: {MoneyDisplay.Format(currency, available)}";
+            _availableLabel.TextColor = available >= 0 ? AppColors.Success : AppColors.Danger;
+
+            // Reserves
+            var savingsState = savings.State;
+            _savingsLabel.Text = MoneyDisplay.Format(currency, savingsState.Available);
+            _emergencyLabel.Text = MoneyDisplay.Format(currency, savingsState.EmergencyAvailable);
+            _totalReservedLabel.Text = MoneyDisplay.Format(currency, savingsState.Available + savingsState.EmergencyAvailable);
+
+            // Transactions
+            _recentTxList.Children.Clear();
             if (snapshot.RecentTransactions.Count == 0)
             {
-                _recentList.Children.Add(new Label { Text = "No transactions yet." });
-                return;
+                _recentTxList.Children.Add(CreateEmptyPlaceholder("No transactions yet."));
+            }
+            else
+            {
+                foreach (var tx in snapshot.RecentTransactions)
+                {
+                    bool isIncome = tx.Type == TransactionType.Income;
+                    var prefix = isIncome ? "+" : "-";
+                    var amount = MoneyDisplay.Format(currency, tx.Amount);
+
+                    var row = new Grid
+                    {
+                        ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                        Padding = new Thickness(12, 10),
+                    };
+
+                    var info = new VerticalStackLayout
+                    {
+                        Children =
+                        {
+                            new Label { Text = tx.Description, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
+                            new Label { Text = tx.OccurredAtUtc.ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" }
+                        }
+                    };
+
+                    var amountLabel = new Label
+                    {
+                        Text = $"{prefix}{amount}",
+                        FontFamily = "SpaceGroteskBold",
+                        FontSize = 14,
+                        TextColor = isIncome ? AppColors.Success : AppColors.Dark,
+                        VerticalOptions = LayoutOptions.Center,
+                        HorizontalOptions = LayoutOptions.End
+                    };
+
+                    row.Add(info, 0, 0);
+                    row.Add(amountLabel, 1, 0);
+
+                    _recentTxList.Children.Add(new Border
+                    {
+                        BackgroundColor = Color.FromArgb("#F9FAFB"),
+                        StrokeShape = new RoundRectangle { CornerRadius = 10 },
+                        Stroke = new SolidColorBrush(AppColors.Border),
+                        StrokeThickness = 1,
+                        Content = row
+                    });
+                }
             }
 
-            foreach (var tx in snapshot.RecentTransactions)
+            // Score events
+            _scoreEventList.Children.Clear();
+            if (scoreEvents.Count == 0)
             {
-                var amount = MoneyDisplay.Format(currency, tx.Amount);
-                var prefix = tx.Type == CoinStack.Data.Entities.TransactionType.Income ? "+" : "-";
-
-                _recentList.Children.Add(new Label
+                _scoreEventList.Children.Add(CreateEmptyPlaceholder("No score activity yet."));
+            }
+            else
+            {
+                foreach (var evt in scoreEvents)
                 {
-                    Text = $"{tx.OccurredAtUtc:dd MMM} • {tx.Description} • {prefix}{amount}",
-                    FontSize = 14
-                });
+                    var pointsText = (evt.Points >= 0 ? "+" : "") + evt.Points.ToString();
+                    var pointsColor = evt.Points >= 0 ? AppColors.Success : AppColors.Danger;
+
+                    var row = new Grid
+                    {
+                        ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                        Padding = new Thickness(12, 10),
+                    };
+
+                    var info = new VerticalStackLayout
+                    {
+                        Children =
+                        {
+                            new Label { Text = evt.Description, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
+                            new Label { Text = $"{evt.Reason} \u00b7 {evt.CreatedAtUtc:dd MMM, HH:mm}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" }
+                        }
+                    };
+
+                    var pointsLabel = new Label
+                    {
+                        Text = pointsText,
+                        FontFamily = "SpaceGroteskBold",
+                        FontSize = 14,
+                        TextColor = pointsColor,
+                        VerticalOptions = LayoutOptions.Center,
+                        HorizontalOptions = LayoutOptions.End
+                    };
+
+                    row.Add(info, 0, 0);
+                    row.Add(pointsLabel, 1, 0);
+
+                    _scoreEventList.Children.Add(new Border
+                    {
+                        BackgroundColor = Color.FromArgb("#F9FAFB"),
+                        StrokeShape = new RoundRectangle { CornerRadius = 10 },
+                        Stroke = new SolidColorBrush(AppColors.Border),
+                        StrokeThickness = 1,
+                        Content = row
+                    });
+                }
             }
         }
         catch (Exception ex)
@@ -111,4 +314,40 @@ public sealed class DashboardPage : ContentPage
             await DisplayAlertAsync("Error", ex.Message, "OK");
         }
     }
+
+    private static Border CreateReserveRow(string label, Label valueLabel)
+    {
+        var grid = new Grid
+        {
+            ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+            Padding = new Thickness(12, 10),
+        };
+        grid.Add(new Label { Text = label, FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular", VerticalOptions = LayoutOptions.Center }, 0, 0);
+        grid.Add(valueLabel, 1, 0);
+
+        return new Border
+        {
+            BackgroundColor = Color.FromArgb("#F9FAFB"),
+            StrokeShape = new RoundRectangle { CornerRadius = 10 },
+            Stroke = Brush.Transparent,
+            Content = grid
+        };
+    }
+
+    private static Border WrapBadge(Label content, Color bgColor, Color dotColor)
+    {
+        var dot = new BoxView { WidthRequest = 8, HeightRequest = 8, Color = dotColor, CornerRadius = 4, VerticalOptions = LayoutOptions.Center };
+        return new Border
+        {
+            BackgroundColor = bgColor,
+            StrokeShape = new RoundRectangle { CornerRadius = 12 },
+            Stroke = Brush.Transparent,
+            Padding = new Thickness(10, 6),
+            Margin = new Thickness(0, 0, 6, 6),
+            Content = new HorizontalStackLayout { Spacing = 6, Children = { dot, content } }
+        };
+    }
+
+    private static Label CreateEmptyPlaceholder(string text) =>
+        new() { Text = text, FontFamily = "SpaceGroteskRegular", TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(0, 20) };
 }

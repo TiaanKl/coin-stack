@@ -1,77 +1,90 @@
+using CoinStack.Mobile.Helpers;
+using CoinStack.Mobile.Services;
+using Microsoft.Maui.Controls.Shapes;
+
 namespace CoinStack.Mobile.Pages;
 
-/// <summary>
-/// Weekly Recap page – summary of financial activity (display-only).
-/// </summary>
 public sealed class WeeklyRecapMobilePage : ContentPage
 {
-    public WeeklyRecapMobilePage()
+    private readonly IMobileFinanceService _financeService;
+    private readonly VerticalStackLayout _recapList;
+
+    public WeeklyRecapMobilePage(IMobileFinanceService financeService)
     {
+        _financeService = financeService;
         Title = "Weekly Recap";
+        BackgroundColor = AppColors.Background;
 
-        var emptyState = new Frame
-        {
-            CornerRadius = 16,
-            Padding = new Thickness(24),
-            HasShadow = false,
-            BorderColor = Color.FromArgb("#E4E7EC"),
-            BackgroundColor = Colors.White,
-            Content = new VerticalStackLayout
-            {
-                Spacing = 8,
-                HorizontalOptions = LayoutOptions.Center,
-                Children =
-                {
-                    new Label { Text = "📅", FontSize = 32, HorizontalOptions = LayoutOptions.Center },
-                    new Label { Text = "No Recaps Yet", FontSize = 16, FontAttributes = FontAttributes.Bold, HorizontalTextAlignment = TextAlignment.Center },
-                    new Label { Text = "Weekly recaps will appear here at the end of each week.", FontSize = 13, TextColor = Colors.Gray, HorizontalTextAlignment = TextAlignment.Center },
-                },
-            },
-        };
-
-        // Sample recap card
-        var sampleRecap = BuildRecapCard(
-            weekLabel: "Week 1, 2025",
-            income: 5000,
-            spent: 3200,
-            saved: 1800,
-            points: 45,
-            challenges: 8,
-            reflections: 3,
-            streak: 7,
-            topCategory: "Groceries",
-            insight: "You saved $1,800 this week — nice work! Most of your spending went to Groceries. Great hustle — you completed 8 challenges! Your 7-day streak is on fire!"
-        );
+        _recapList = new VerticalStackLayout { Spacing = 12 };
 
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
             {
-                Padding = new Thickness(16),
-                Spacing = 12,
+                Padding = new Thickness(20),
+                Spacing = 8,
                 Children =
                 {
-                    new Label { Text = "Weekly Recap", FontSize = 22, FontAttributes = FontAttributes.Bold },
-                    new Label { Text = "Your financial week at a glance", FontSize = 13, TextColor = Colors.Gray },
-                    sampleRecap,
-                    emptyState,
-                },
-            },
+                    new Label { Text = "Weekly Recap", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark },
+                    new Label { Text = "Your financial week at a glance", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
+                    _recapList
+                }
+            }
         };
     }
 
-    private static Frame BuildRecapCard(
-        string weekLabel,
-        decimal income,
-        decimal spent,
-        decimal saved,
-        int points,
-        int challenges,
-        int reflections,
-        int streak,
-        string topCategory,
-        string insight)
+    protected override async void OnAppearing()
     {
+        base.OnAppearing();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            var recaps = await _financeService.GetWeeklyRecapsAsync();
+            _recapList.Children.Clear();
+
+            if (recaps.Count == 0)
+            {
+                _recapList.Children.Add(new Border
+                {
+                    BackgroundColor = AppColors.Surface,
+                    StrokeShape = new RoundRectangle { CornerRadius = 16 },
+                    Stroke = new SolidColorBrush(AppColors.Border),
+                    StrokeThickness = 1,
+                    Padding = new Thickness(24),
+                    Content = new VerticalStackLayout
+                    {
+                        Spacing = 8,
+                        HorizontalOptions = LayoutOptions.Center,
+                        Children =
+                        {
+                            new Label { Text = AppIcons.GlyphCalendarWeek, FontFamily = "FontAwesomeSolid", FontSize = 32, HorizontalOptions = LayoutOptions.Center, TextColor = AppColors.Muted },
+                            new Label { Text = "No Recaps Yet", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
+                            new Label { Text = "Weekly recaps will appear here at the end of each week.", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" }
+                        }
+                    }
+                });
+                return;
+            }
+
+            foreach (var r in recaps)
+            {
+                _recapList.Children.Add(BuildRecapCard(r));
+            }
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlertAsync("Error", ex.Message, "OK");
+        }
+    }
+
+    private static Border BuildRecapCard(CoinStack.Data.Entities.WeeklyRecap r)
+    {
+        var weekLabel = $"Week {r.WeekNumber}, {r.Year}";
+
         var statsGrid = new Grid
         {
             ColumnDefinitions =
@@ -82,104 +95,112 @@ public sealed class WeeklyRecapMobilePage : ContentPage
                 new ColumnDefinition(GridLength.Star),
             ],
             RowDefinitions = [new RowDefinition(GridLength.Auto)],
-            ColumnSpacing = 8,
+            ColumnSpacing = 8
         };
 
-        statsGrid.Add(CreateStatCell("Income", income.ToString("C0"), Color.FromArgb("#059669")), 0, 0);
-        statsGrid.Add(CreateStatCell("Spent", spent.ToString("C0"), Color.FromArgb("#EF4444")), 1, 0);
-        statsGrid.Add(CreateStatCell("Saved", saved.ToString("C0"), saved >= 0 ? Color.FromArgb("#059669") : Color.FromArgb("#EF4444")), 2, 0);
-        statsGrid.Add(CreateStatCell("Points", points.ToString(), Color.FromArgb("#6577F3")), 3, 0);
+        statsGrid.Add(CreateStatCell("Income", r.TotalIncome.ToString("C0"), AppColors.Success), 0, 0);
+        statsGrid.Add(CreateStatCell("Spent", r.TotalSpent.ToString("C0"), AppColors.Danger), 1, 0);
+        statsGrid.Add(CreateStatCell("Saved", r.TotalSaved.ToString("C0"), r.TotalSaved >= 0 ? AppColors.Success : AppColors.Danger), 2, 0);
+        statsGrid.Add(CreateStatCell("Points", r.PointsEarned.ToString(), AppColors.Accent), 3, 0);
 
         var badges = new FlexLayout
         {
             Wrap = Microsoft.Maui.Layouts.FlexWrap.Wrap,
-            JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
+            JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start
         };
 
-        badges.Children.Add(CreateBadge($"⚡ {challenges} challenges", Color.FromArgb("#F0F1FE"), Color.FromArgb("#6577F3")));
-        badges.Children.Add(CreateBadge($"💡 {reflections} reflections", Color.FromArgb("#F5F3FF"), Color.FromArgb("#7C3AED")));
-        badges.Children.Add(CreateBadge($"🔥 {streak} day streak", Color.FromArgb("#FFFBEB"), Color.FromArgb("#D97706")));
-        badges.Children.Add(CreateBadge($"🏷 Top: {topCategory}", Color.FromArgb("#F3F4F6"), Color.FromArgb("#4B5563")));
+        badges.Children.Add(CreateBadge($"{r.ChallengesCompleted} challenges", AppIcons.GlyphBolt, Color.FromArgb("#F0F1FE"), Color.FromArgb("#6577F3")));
+        badges.Children.Add(CreateBadge($"{r.ReflectionsCompleted} reflections", AppIcons.GlyphBookOpen, Color.FromArgb("#F5F3FF"), Color.FromArgb("#7C3AED")));
+        badges.Children.Add(CreateBadge($"{r.StreakDays} day streak", AppIcons.GlyphFire, Color.FromArgb("#FFFBEB"), Color.FromArgb("#D97706")));
+        if (!string.IsNullOrEmpty(r.TopCategory))
+            badges.Children.Add(CreateBadge($"Top: {r.TopCategory}", AppIcons.GlyphTags, Color.FromArgb("#F3F4F6"), Color.FromArgb("#4B5563")));
 
-        var insightFrame = new Frame
+        var card = new VerticalStackLayout
         {
-            CornerRadius = 12,
-            Padding = new Thickness(12),
-            HasShadow = false,
-            BackgroundColor = Color.FromArgb("#F0F1FE"),
-            Content = new Label
+            Spacing = 12,
+            Children =
             {
-                Text = $"✨ {insight}",
-                FontSize = 13,
-                TextColor = Color.FromArgb("#4338CA"),
-            },
-        };
-
-        return new Frame
-        {
-            CornerRadius = 16,
-            Padding = new Thickness(16),
-            HasShadow = false,
-            BorderColor = Color.FromArgb("#C7D2FE"),
-            BackgroundColor = Colors.White,
-            Content = new VerticalStackLayout
-            {
-                Spacing = 12,
-                Children =
+                new HorizontalStackLayout
                 {
-                    new HorizontalStackLayout
+                    Spacing = 8,
+                    Children =
                     {
-                        Spacing = 8,
-                        Children =
-                        {
-                            new Label { Text = "📅", FontSize = 18 },
-                            new Label { Text = weekLabel, FontSize = 16, FontAttributes = FontAttributes.Bold, VerticalOptions = LayoutOptions.Center },
-                        },
-                    },
-                    statsGrid,
-                    badges,
-                    insightFrame,
+                        new Label { Text = AppIcons.GlyphCalendarWeek, FontFamily = "FontAwesomeSolid", FontSize = 16, TextColor = AppColors.Accent, VerticalOptions = LayoutOptions.Center },
+                        new Label { Text = weekLabel, FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, VerticalOptions = LayoutOptions.Center }
+                    }
                 },
-            },
+                statsGrid,
+                badges
+            }
+        };
+
+        if (!string.IsNullOrEmpty(r.InsightMessage))
+        {
+            card.Children.Add(new Border
+            {
+                BackgroundColor = Color.FromArgb("#F0F1FE"),
+                StrokeShape = new RoundRectangle { CornerRadius = 12 },
+                Stroke = Brush.Transparent,
+                Padding = new Thickness(12),
+                Content = new Label
+                {
+                    Text = r.InsightMessage,
+                    FontSize = 13,
+                    TextColor = Color.FromArgb("#4338CA"),
+                    FontFamily = "SpaceGroteskRegular"
+                }
+            });
+        }
+
+        return new Border
+        {
+            BackgroundColor = AppColors.Surface,
+            StrokeShape = new RoundRectangle { CornerRadius = 16 },
+            Stroke = new SolidColorBrush(AppColors.Border),
+            StrokeThickness = 1,
+            Padding = new Thickness(16),
+            Content = card
         };
     }
 
-    private static Frame CreateStatCell(string label, string value, Color valueColor)
+    private static Border CreateStatCell(string label, string value, Color valueColor)
     {
-        return new Frame
+        return new Border
         {
-            CornerRadius = 10,
-            Padding = new Thickness(8),
-            HasShadow = false,
             BackgroundColor = Color.FromArgb("#F8F9FA"),
+            StrokeShape = new RoundRectangle { CornerRadius = 10 },
+            Stroke = Brush.Transparent,
+            Padding = new Thickness(8),
             Content = new VerticalStackLayout
             {
                 HorizontalOptions = LayoutOptions.Center,
                 Children =
                 {
-                    new Label { Text = label, FontSize = 10, TextColor = Colors.Gray, HorizontalTextAlignment = TextAlignment.Center },
-                    new Label { Text = value, FontSize = 16, FontAttributes = FontAttributes.Bold, TextColor = valueColor, HorizontalTextAlignment = TextAlignment.Center },
-                },
-            },
+                    new Label { Text = label, FontSize = 10, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" },
+                    new Label { Text = value, FontSize = 16, FontFamily = "SpaceGroteskBold", TextColor = valueColor, HorizontalTextAlignment = TextAlignment.Center }
+                }
+            }
         };
     }
 
-    private static Frame CreateBadge(string text, Color bgColor, Color textColor)
+    private static Border CreateBadge(string text, string iconGlyph, Color bgColor, Color textColor)
     {
-        return new Frame
+        return new Border
         {
-            CornerRadius = 12,
+            BackgroundColor = bgColor,
+            StrokeShape = new RoundRectangle { CornerRadius = 12 },
+            Stroke = Brush.Transparent,
             Padding = new Thickness(10, 4),
             Margin = new Thickness(0, 0, 6, 6),
-            HasShadow = false,
-            BackgroundColor = bgColor,
-            Content = new Label
+            Content = new HorizontalStackLayout
             {
-                Text = text,
-                FontSize = 11,
-                FontAttributes = FontAttributes.Bold,
-                TextColor = textColor,
-            },
+                Spacing = 4,
+                Children =
+                {
+                    new Label { Text = iconGlyph, FontFamily = "FontAwesomeSolid", FontSize = 10, TextColor = textColor, VerticalOptions = LayoutOptions.Center },
+                    new Label { Text = text, FontSize = 11, FontFamily = "SpaceGroteskBold", TextColor = textColor }
+                }
+            }
         };
     }
 }

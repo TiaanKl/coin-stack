@@ -878,4 +878,242 @@ public sealed class MobileFinanceService : IMobileFinanceService
         var endUtc = startUtc.AddMonths(1);
         return (startUtc, endUtc);
     }
+
+    // ── Categories ──
+
+    public async Task<IReadOnlyList<Category>> GetCategoriesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Categories.OrderBy(c => c.Name).ToListAsync(cancellationToken);
+    }
+
+    public async Task AddCategoryAsync(string name, CategoryScope scope, string? colorHex = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("Category name is required.");
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        db.Categories.Add(new Category
+        {
+            Name = name.Trim(),
+            Scope = scope,
+            ColorHex = colorHex?.Trim(),
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteCategoryAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var category = await db.Categories.FindAsync([id], cancellationToken);
+        if (category is not null)
+        {
+            db.Categories.Remove(category);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    // ── Income Snapshot ──
+
+    public async Task<MobileIncomeSnapshot> GetIncomeSnapshotAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var startOfMonth = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var startOfYear = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var mtd = await db.Transactions
+            .Where(t => t.Type == TransactionType.Income && t.OccurredAtUtc >= startOfMonth)
+            .SumAsync(t => t.Amount, cancellationToken);
+
+        var ytd = await db.Transactions
+            .Where(t => t.Type == TransactionType.Income && t.OccurredAtUtc >= startOfYear)
+            .SumAsync(t => t.Amount, cancellationToken);
+
+        var monthsElapsed = now.Month;
+        var monthlyAverage = monthsElapsed > 0 ? ytd / monthsElapsed : 0;
+
+        var recentDeposits = await db.Transactions
+            .Where(t => t.Type == TransactionType.Income)
+            .OrderByDescending(t => t.OccurredAtUtc)
+            .Take(20)
+            .ToListAsync(cancellationToken);
+
+        return new MobileIncomeSnapshot(mtd, ytd, monthlyAverage, recentDeposits);
+    }
+
+    // ── Waitlist ──
+
+    public async Task<IReadOnlyList<WaitlistItem>> GetWaitlistItemsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.WaitlistItems
+            .OrderByDescending(w => w.CreatedAtUtc)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AddWaitlistItemAsync(string name, decimal estimatedCost, string? description = null, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new InvalidOperationException("Item name is required.");
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        db.WaitlistItems.Add(new WaitlistItem
+        {
+            Name = name.Trim(),
+            Description = description?.Trim(),
+            EstimatedCost = estimatedCost,
+            CoolOffUntil = DateTime.UtcNow.AddDays(7),
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteWaitlistItemAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var item = await db.WaitlistItems.FindAsync([id], cancellationToken);
+        if (item is not null)
+        {
+            db.WaitlistItems.Remove(item);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task MarkWaitlistItemPurchasedAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var item = await db.WaitlistItems.FindAsync([id], cancellationToken);
+        if (item is not null)
+        {
+            item.IsPurchased = true;
+            item.PurchasedAtUtc = DateTime.UtcNow;
+            item.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    // ── Achievements ──
+
+    public async Task<IReadOnlyList<Achievement>> GetAchievementsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.Achievements.OrderBy(a => a.Category).ThenBy(a => a.Title).ToListAsync(cancellationToken);
+    }
+
+    public async Task<MobileLevelInfo> GetLevelInfoAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var userLevel = await db.UserLevels.FirstOrDefaultAsync(cancellationToken);
+        var totalScore = await db.ScoreEvents.SumAsync(s => s.Points, cancellationToken);
+
+        if (userLevel is null)
+        {
+            return new MobileLevelInfo(1, "Penny Starter", 0, 50, totalScore);
+        }
+
+        // XP required grows: 50 * level
+        var xpForNext = 50 * userLevel.Level;
+
+        return new MobileLevelInfo(
+            userLevel.Level,
+            userLevel.Title,
+            userLevel.CurrentXp,
+            xpForNext,
+            totalScore);
+    }
+
+    // ── Challenges ──
+
+    public async Task<IReadOnlyList<DailyChallenge>> GetTodaysChallengesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var todayStart = DateTime.UtcNow.Date;
+        var todayEnd = todayStart.AddDays(1);
+        return await db.DailyChallenges
+            .Where(c => c.AssignedDateUtc >= todayStart && c.AssignedDateUtc < todayEnd)
+            .OrderBy(c => c.Status)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task CompleteChallengeAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var challenge = await db.DailyChallenges.FindAsync([id], cancellationToken);
+        if (challenge is not null && challenge.Status != ChallengeStatus.Completed)
+        {
+            challenge.Status = ChallengeStatus.Completed;
+            challenge.CompletedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<int> GetChallengesCompletedTodayAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var todayStart = DateTime.UtcNow.Date;
+        return await db.DailyChallenges
+            .CountAsync(c => c.Status == ChallengeStatus.Completed && c.CompletedAtUtc >= todayStart, cancellationToken);
+    }
+
+    public async Task<int> GetChallengesCompletedThisWeekAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var today = DateTime.UtcNow.Date;
+        var weekStart = today.AddDays(-(int)today.DayOfWeek);
+        return await db.DailyChallenges
+            .CountAsync(c => c.Status == ChallengeStatus.Completed && c.CompletedAtUtc >= weekStart, cancellationToken);
+    }
+
+    // ── CBT Journal ──
+
+    public async Task<IReadOnlyList<CbtJournalEntry>> GetCbtEntriesAsync(int count = 20, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.CbtJournalEntries
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task AddCbtEntryAsync(string situation, string automaticThought, string emotion, int emotionIntensity, string rationalResponse, int moodBefore, int moodAfter, CognitiveDistortion? distortion = null, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        db.CbtJournalEntries.Add(new CbtJournalEntry
+        {
+            Situation = situation.Trim(),
+            AutomaticThought = automaticThought.Trim(),
+            Emotion = emotion.Trim(),
+            EmotionIntensity = emotionIntensity,
+            RationalResponse = rationalResponse.Trim(),
+            MoodBefore = moodBefore,
+            MoodAfter = moodAfter,
+            Distortion = distortion,
+            CreatedAtUtc = DateTime.UtcNow,
+            UpdatedAtUtc = DateTime.UtcNow
+        });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // ── Weekly Recap ──
+
+    public async Task<IReadOnlyList<WeeklyRecap>> GetWeeklyRecapsAsync(int count = 10, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.WeeklyRecaps
+            .OrderByDescending(r => r.Year).ThenByDescending(r => r.WeekNumber)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ScoreEvent>> GetRecentScoreEventsAsync(int count = 20, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        return await db.ScoreEvents
+            .AsNoTracking()
+            .OrderByDescending(e => e.CreatedAtUtc)
+            .Take(count)
+            .ToListAsync(cancellationToken);
+    }
 }

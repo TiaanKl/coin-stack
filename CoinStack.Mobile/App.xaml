@@ -3,15 +3,87 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:CoinStack.Mobile"
              x:Class="CoinStack.Mobile.App">
-    <Application.Resources>
-        <ResourceDictionary>
+        <Application.Resources>
+                <ResourceDictionary>
 
-            <!--
-                For information about styling .NET MAUI pages
-                please refer to the documentation:
-                https://go.microsoft.com/fwlink/?linkid=2282329
-            -->
+                        <!-- Design System Colors (Neobank-inspired) -->
+                        <Color x:Key="Dark">#202020</Color>
+                        <Color x:Key="Accent">#c9f158</Color>
+                        <Color x:Key="Background">#f2f3f5</Color>
+                        <Color x:Key="Surface">#ffffff</Color>
+                        <Color x:Key="Border">#e5e7eb</Color>
+                        <Color x:Key="Muted">#6b7280</Color>
+                        <Color x:Key="Success">#047857</Color>
+                        <Color x:Key="Danger">#b91c1c</Color>
 
-        </ResourceDictionary>
-    </Application.Resources>
+                        <!-- Global Page Style -->
+                        <Style TargetType="ContentPage"
+                               ApplyToDerivedTypes="True">
+                                <Setter Property="BackgroundColor"
+                                        Value="{StaticResource Background}"/>
+                        </Style>
+
+                        <!-- Navigation Bar Style -->
+                        <Style TargetType="NavigationPage">
+                                <Setter Property="BarBackgroundColor"
+                                        Value="{StaticResource Surface}"/>
+                                <Setter Property="BarTextColor"
+                                        Value="{StaticResource Dark}"/>
+                        </Style>
+
+                        <!-- Typography -->
+                        <Style TargetType="Label">
+                                <Setter Property="TextColor"
+                                        Value="{StaticResource Dark}"/>
+                                <Setter Property="FontFamily"
+                                        Value="SpaceGroteskRegular"/>
+                        </Style>
+
+                        <!-- Button Styles -->
+                        <Style TargetType="Button">
+                                <Setter Property="BackgroundColor"
+                                        Value="{StaticResource Dark}"/>
+                                <Setter Property="TextColor"
+                                        Value="{StaticResource Surface}"/>
+                                <Setter Property="CornerRadius"
+                                        Value="24"/>
+                                <Setter Property="FontAttributes"
+                                        Value="Bold"/>
+                                <Setter Property="Padding"
+                                        Value="16,12"/>
+                                <Setter Property="FontFamily"
+                                        Value="SpaceGroteskBold"/>
+                                <Setter Property="HeightRequest"
+                                        Value="48"/>
+                        </Style>
+
+                        <!-- Entry Styles -->
+                        <Style TargetType="Entry">
+                                <Setter Property="BackgroundColor"
+                                        Value="{StaticResource Surface}"/>
+                                <Setter Property="TextColor"
+                                        Value="{StaticResource Dark}"/>
+                                <Setter Property="PlaceholderColor"
+                                        Value="{StaticResource Muted}"/>
+                                <Setter Property="FontFamily"
+                                        Value="SpaceGroteskRegular"/>
+                        </Style>
+
+                        <!-- Card style -->
+                        <Style x:Key="Card"
+                               TargetType="Border">
+                                <Setter Property="BackgroundColor"
+                                        Value="{StaticResource Surface}"/>
+                                <Setter Property="StrokeShape"
+                                        Value="RoundRectangle 24"/>
+                                <Setter Property="Stroke"
+                                        Value="Transparent"/>
+                                <Setter Property="StrokeThickness"
+                                        Value="0"/>
+                                <Setter Property="Padding"
+                                        Value="20"/>
+                        </Style>
+
+                </ResourceDictionary>
+        </Application.Resources>
 </Application>
