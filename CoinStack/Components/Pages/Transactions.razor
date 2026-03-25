@@ -396,6 +396,7 @@
         var now = DateTime.UtcNow;
         var settings = await SettingsService.GetAsync();
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
+        await TransactionService.ApplyAutoIncomeForBudgetPeriodAsync(settings.MonthStartDay, settings.MonthlyIncome, now);
 
         var items = await TransactionService.GetAllAsync();
         _buckets = await BucketService.GetAllAsync();

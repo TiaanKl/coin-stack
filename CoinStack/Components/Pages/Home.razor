@@ -197,8 +197,14 @@
         _settings = await SettingsService.GetAsync();
         CurrencyFormatting.ApplyCurrency(_settings.Currency);
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
+        await TransactionService.ApplyAutoIncomeForBudgetPeriodAsync(_settings.MonthStartDay, _settings.MonthlyIncome,
+DateTime.UtcNow);
         _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
         _savingsState = await SavingsService.GetStateAsync();
+
+        var buckets = await BucketService.GetAllAsync();
+        var spentAmounts = await BucketService.GetSpentAmountsForPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
+        _totalPlanned = buckets.Sum(b => Math.Max(0, b.AllocatedAmount - spentAmounts.GetValueOrDefault(b.Id)));
 
         await GameLoop.ProcessDailyCheckInAsync();
         _state = await GameLoop.GetCurrentStateAsync();

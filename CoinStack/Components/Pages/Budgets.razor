@@ -221,6 +221,7 @@
         var settings = await SettingsService.GetAsync();
         _budgetLimit = settings.MonthlyIncome;
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
+        await TransactionService.ApplyAutoIncomeForBudgetPeriodAsync(settings.MonthStartDay, settings.MonthlyIncome, now);
         _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(settings.MonthStartDay, now);
 
         var categories = await CategoryService.GetAllAsync();

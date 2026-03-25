@@ -384,6 +384,44 @@ public sealed class TransactionService : ITransactionService
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task ApplyAutoIncomeForBudgetPeriodAsync(
+        int monthStartDay,
+        decimal monthlyIncome,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        if (monthlyIncome <= 0)
+        {
+            return;
+        }
+
+        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, utcNow);
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var alreadyHasIncome = await db.Transactions
+            .AsNoTracking()
+            .AnyAsync(t => t.Type == TransactionType.Income
+                           && t.Description == "Monthly Income"
+                           && t.OccurredAtUtc >= startUtc
+                           && t.OccurredAtUtc < endUtc, cancellationToken);
+
+        if (alreadyHasIncome)
+        {
+            return;
+        }
+
+        db.Transactions.Add(new Transaction
+        {
+            OccurredAtUtc = startUtc,
+            Amount = monthlyIncome,
+            Type = TransactionType.Income,
+            Description = "Monthly Income",
+        });
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
     {
         if (monthStartDay is < 1 or > 28)
