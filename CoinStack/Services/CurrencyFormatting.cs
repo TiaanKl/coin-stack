@@ -47,6 +47,13 @@ public static class CurrencyFormatting
 
         var culture = (CultureInfo)CultureInfo.GetCultureInfo(cultureName).Clone();
         culture.NumberFormat.CurrencySymbol = currencySymbol;
+        // Ensure "." is always the decimal separator so that Blazor's
+        // <input type="number"> bindings (which per the HTML spec always
+        // use "." regardless of locale) can round-trip without a
+        // FormatException in cultures like fr-FR or en-ZA that default
+        // to ",".
+        culture.NumberFormat.NumberDecimalSeparator = ".";
+        culture.NumberFormat.CurrencyDecimalSeparator = ".";
         return culture;
     }
 }
