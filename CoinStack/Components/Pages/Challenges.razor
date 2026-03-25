@@ -1,0 +1,157 @@
+@page "/challenges"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@inject CoinStack.Services.IDailyChallengeService ChallengeService
+@inject CoinStack.Services.ILevelService LevelService
+
+<PageTitle>Daily Challenges</PageTitle>
+
+<div>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Daily Challenges</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Complete challenges to earn XP and build healthy
+                habits</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2 rounded-full bg-success-50 px-3 py-1.5 dark:bg-success-500/15">
+                    <i class="fa-solid fa-check-circle text-success-500 text-sm"></i>
+                    <span class="text-xs font-bold text-success-600 dark:text-success-400">@_completedToday today</span>
+                </div>
+                <div class="flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1.5 dark:bg-brand-500/15">
+                    <i class="fa-solid fa-calendar-week text-brand-500 text-sm"></i>
+                    <span class="text-xs font-bold text-brand-600 dark:text-brand-400">@_completedThisWeek this week</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Level Progress Bar -->
+        @if (_level is not null)
+        {
+            <div class="m3-card mb-6 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div class="flex items-center gap-4">
+                    <div
+                        class="flex h-11 w-11 items-center justify-center rounded-xl bg-gray-800 text-white font-bold text-base shadow-sm shrink-0 dark:bg-white dark:text-gray-900">
+                        @_level.Level
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm font-medium text-gray-800 dark:text-white/90">@_level.Title</span>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">@_level.CurrentXp / @_xpRequired XP</span>
+                        </div>
+                        <div class="m3-progress-track h-2.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                            <div class="m3-progress-bar h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-500"
+                                 style="width: @(Math.Min(100, _xpRequired > 0 ? (int)((double)_level.CurrentXp / _xpRequired * 100) : 0))%">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_isLoading)
+        {
+            <div class="text-sm text-gray-500 dark:text-gray-400">Loading challenges...</div>
+        }
+        else if (_challenges.Count == 0)
+        {
+            <div class="rounded-2xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+                <div
+                    class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/15">
+                    <i class="fa-solid fa-bolt text-2xl text-brand-500"></i>
+                </div>
+                <h3 class="mb-2 text-base font-semibold text-gray-800 dark:text-white/90">No Challenges Yet</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Challenges will appear here each day. Check back soon!</p>
+            </div>
+        }
+        else
+        {
+            <div class="space-y-3">
+                @foreach (var challenge in _challenges)
+                {
+                    var isCompleted = challenge.Status == ChallengeStatus.Completed;
+                    var isExpired = challenge.Status == ChallengeStatus.Expired;
+
+                    <div
+                        class="@(isCompleted ? "border-success-200 bg-success-50/50 dark:border-success-500/30 dark:bg-success-500/5" : isExpired ? "border-gray-200 bg-gray-50 opacity-50 dark:border-gray-800 dark:bg-gray-900" : "border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]") rounded-2xl border p-5 transition-all">
+                        <div class="flex items-center gap-4">
+                            <div
+                                class="@(isCompleted ? "bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400" : isExpired ? "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600" : "bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400") flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+                                @if (isCompleted)
+                                {
+                                    <i class="fa-solid fa-check text-lg"></i>
+                                }
+                                else
+                                {
+                                    <i class="fa-solid @challenge.Icon text-lg"></i>
+                                }
+                            </div>
+
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    <h3 class="text-sm font-semibold text-gray-800 dark:text-white/90">@challenge.Title</h3>
+                                    <span
+                                        class="@(challenge.Frequency == ChallengeFrequency.Weekly ? "bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400" : "bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400") inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium">
+                                        @(challenge.Frequency == ChallengeFrequency.Weekly ? "Weekly" : "Daily")
+                                    </span>
+                                </div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">@challenge.Description</p>
+                                @if (isCompleted && challenge.CompletedAtUtc.HasValue)
+                                {
+                                    <p class="mt-1 text-[10px] text-success-500 dark:text-success-400">
+                                        Completed @challenge.CompletedAtUtc.Value.ToString("h:mm tt")
+                                    </p>
+                                }
+                            </div>
+
+                            <div class="flex items-center gap-3 shrink-0">
+                                <span
+                                    class="@(isCompleted ? "text-success-500" : "text-brand-500") text-sm font-bold">+@(challenge.XpReward)
+                                    XP</span>
+                                    @if (!isCompleted && !isExpired)
+                                    {
+                                        <button @onclick="() => CompleteChallengeAsync(challenge.Id)"
+                                                class="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white shadow-sm hover:bg-brand-600 transition-colors">
+                                            <i class="fa-solid fa-check"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+@code
+{
+    private List<DailyChallenge> _challenges = [];
+    private UserLevel? _level;
+    private int _xpRequired;
+    private int _completedToday;
+    private int _completedThisWeek;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ChallengeService.ExpireOldChallengesAsync();
+        _challenges = await ChallengeService.GetTodaysChallengesAsync();
+        _completedToday = await ChallengeService.GetCompletedCountTodayAsync();
+        _completedThisWeek = await ChallengeService.GetCompletedCountThisWeekAsync();
+        _level = await LevelService.GetCurrentLevelAsync();
+        if (_level is not null)
+            _xpRequired = LevelService.GetXpRequiredForLevel(_level.Level);
+        _isLoading = false;
+    }
+
+    private async Task CompleteChallengeAsync(int id)
+    {
+        await ChallengeService.CompleteChallengeAsync(id);
+        _challenges = await ChallengeService.GetTodaysChallengesAsync();
+        _completedToday = await ChallengeService.GetCompletedCountTodayAsync();
+        _completedThisWeek = await ChallengeService.GetCompletedCountThisWeekAsync();
+        _level = await LevelService.GetCurrentLevelAsync();
+        if (_level is not null)
+            _xpRequired = LevelService.GetXpRequiredForLevel(_level.Level);
+    }
+}

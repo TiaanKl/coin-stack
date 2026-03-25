@@ -18,15 +18,18 @@ internal sealed class BucketConfiguration : IEntityTypeConfiguration<Bucket>
             .HasPrecision(18, 2)
             .IsRequired();
 
-        builder.Property(x => x.ColorHex)
-            .HasMaxLength(16);
-
         builder.Property(x => x.Icon)
             .HasMaxLength(64);
+
+        builder.HasOne(x => x.Category)
+            .WithMany(x => x.Buckets)
+            .HasForeignKey(x => x.CategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(x => x.Name)
             .IsUnique();
 
         builder.HasIndex(x => x.SortOrder);
+        builder.HasIndex(x => x.CategoryId);
     }
 }

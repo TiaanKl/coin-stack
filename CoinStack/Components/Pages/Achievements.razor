@@ -1,0 +1,137 @@
+@page "/achievements"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@inject CoinStack.Services.IAchievementService AchievementService
+@inject CoinStack.Services.ILevelService LevelService
+
+<PageTitle>Achievements</PageTitle>
+
+<div>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Achievements</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Unlock badges as you build better financial habits
+            </p>
+        </div>
+        <div class="flex items-center gap-2 rounded-full bg-brand-50 px-4 py-2 dark:bg-brand-500/15">
+            <i class="fa-solid fa-trophy text-brand-500"></i>
+            <span class="text-sm font-bold text-brand-600 dark:text-brand-400">@_unlockedCount /
+                @_achievements.Count</span>
+            </div>
+        </div>
+
+        <!-- Level Progress -->
+        @if (_level is not null)
+        {
+            <div class="m3-card mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-800 text-white font-bold text-lg shadow-sm dark:bg-white dark:text-gray-900">
+                            @_level.Level
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-gray-800 dark:text-white/90">@_level.Title</h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">@_level.TotalXp XP total</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-medium text-gray-800 dark:text-white/90">@_level.CurrentXp / @_xpRequired XP</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">to level @(_level.Level + 1)</p>
+                    </div>
+                </div>
+                <div class="m3-progress-track h-3 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                    <div class="m3-progress-bar h-full rounded-full bg-gradient-to-r from-brand-400 to-brand-600 transition-all duration-500"
+                         style="width: @(Math.Min(100, _xpRequired > 0 ? (int)((double)_level.CurrentXp / _xpRequired * 100) : 0))%">
+                    </div>
+                </div>
+            </div>
+        }
+
+        <!-- Achievement Categories -->
+        @foreach (var category in Enum.GetValues<AchievementCategory>())
+        {
+            var categoryAchievements = _achievements.Where(a => a.Category == category).ToList();
+            if (categoryAchievements.Count == 0) continue;
+
+            var unlockedInCategory = categoryAchievements.Count(a => a.IsUnlocked);
+
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider dark:text-gray-400">
+                        @GetCategoryIcon(category) @GetCategoryName(category)
+                    </h3>
+                    <span class="text-xs text-gray-400 dark:text-gray-500">@unlockedInCategory /
+                        @categoryAchievements.Count</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        @foreach (var achievement in categoryAchievements)
+                        {
+                            <div
+                                class="@(achievement.IsUnlocked ? "border-brand-200 bg-brand-50/50 dark:border-brand-500/30 dark:bg-brand-500/5" : "border-gray-200 bg-white opacity-60 dark:border-gray-800 dark:bg-white/[0.03]") m3-surface-tint rounded-2xl border p-4 transition-all">
+                                <div class="flex items-center gap-3 mb-2">
+                                    <div
+                                        class="@(achievement.IsUnlocked ? "bg-brand-100 text-brand-600 dark:bg-brand-500/20 dark:text-brand-400" : "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-600") flex h-10 w-10 items-center justify-center rounded-xl">
+                                        <i class="fa-solid @achievement.Icon"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <h4 class="text-sm font-medium text-gray-800 dark:text-white/90 truncate">@achievement.Title
+                                        </h4>
+                                        @if (achievement.IsUnlocked && achievement.UnlockedAtUtc.HasValue)
+                                        {
+                                            <p class="text-[10px] text-brand-500 dark:text-brand-400">Unlocked
+                                                @achievement.UnlockedAtUtc.Value.ToString("MMM dd")</p>
+                                            }
+                                        </div>
+                                        <span
+                                        class="text-xs font-bold @(achievement.IsUnlocked ? "text-brand-500" : "text-gray-400")">+@(achievement.XpReward)XP</span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">@achievement.Description</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+@code
+{
+    private List<Achievement> _achievements = [];
+    private UserLevel? _level;
+    private int _unlockedCount;
+    private int _xpRequired;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _achievements = await AchievementService.GetAllAsync();
+        _unlockedCount = _achievements.Count(a => a.IsUnlocked);
+        _level = await LevelService.GetCurrentLevelAsync();
+        if (_level is not null)
+            _xpRequired = LevelService.GetXpRequiredForLevel(_level.Level);
+    }
+
+    private static string GetCategoryName(AchievementCategory category) => category switch
+    {
+        AchievementCategory.Streaks => "Streaks",
+        AchievementCategory.Budgeting => "Budgeting",
+        AchievementCategory.Mindfulness => "Mindfulness",
+        AchievementCategory.Milestones => "Milestones",
+        AchievementCategory.Saving => "Saving",
+        AchievementCategory.Challenges => "Challenges",
+        AchievementCategory.DebtFreedom => "Debt Freedom",
+        _ => category.ToString()
+    };
+
+    private static string GetCategoryIcon(AchievementCategory category) => category switch
+    {
+        AchievementCategory.Streaks => "🔥",
+        AchievementCategory.Budgeting => "📊",
+        AchievementCategory.Mindfulness => "🧠",
+        AchievementCategory.Milestones => "🏆",
+        AchievementCategory.Saving => "💰",
+        AchievementCategory.Challenges => "⚡",
+        AchievementCategory.DebtFreedom => "💳",
+        _ => "🎖️"
+    };
+}

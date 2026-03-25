@@ -6,7 +6,8 @@ public sealed class Bucket : EntityBase
 
     public decimal AllocatedAmount { get; set; }
 
-    public string? ColorHex { get; set; }
+    public int? CategoryId { get; set; }
+    public Category? Category { get; set; }
 
     public string? Icon { get; set; }
 

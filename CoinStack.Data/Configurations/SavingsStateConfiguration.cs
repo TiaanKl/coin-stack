@@ -13,6 +13,8 @@ internal sealed class SavingsStateConfiguration : IEntityTypeConfiguration<Savin
         builder.Property(x => x.Total).HasPrecision(18, 2);
         builder.Property(x => x.Available).HasPrecision(18, 2);
         builder.Property(x => x.Reserved).HasPrecision(18, 2);
+        builder.Property(x => x.EmergencyTotal).HasPrecision(18, 2);
+        builder.Property(x => x.EmergencyAvailable).HasPrecision(18, 2);
         builder.Property(x => x.LastCalculatedMonth).HasMaxLength(7);
     }
 }

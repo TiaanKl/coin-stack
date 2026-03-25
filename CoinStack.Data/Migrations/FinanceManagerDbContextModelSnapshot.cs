@@ -17,6 +17,51 @@ namespace FinanceManager.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.3");
 
+            modelBuilder.Entity("CoinStack.Data.Entities.Achievement", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Category")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsUnlocked")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UnlockedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("XpReward")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Achievements");
+                });
+
             modelBuilder.Entity("CoinStack.Data.Entities.AppSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -30,6 +75,9 @@ namespace FinanceManager.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(8)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("EnableEmergencyFallback")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("EnableReflections")
                         .HasColumnType("INTEGER");
@@ -68,6 +116,9 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("decimal(5,4)");
 
                     b.Property<bool>("SavingsIsPercent")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ShowReserveAwareBudget")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
@@ -152,9 +203,8 @@ namespace FinanceManager.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ColorHex")
-                        .HasMaxLength(16)
-                        .HasColumnType("TEXT");
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
@@ -184,6 +234,8 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
 
                     b.HasIndex("GoalId");
 
@@ -253,6 +305,11 @@ namespace FinanceManager.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -262,6 +319,106 @@ namespace FinanceManager.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Categories", (string)null);
+                });
+
+            modelBuilder.Entity("CoinStack.Data.Entities.CbtJournalEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AutomaticThought")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Distortion")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Emotion")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("EmotionIntensity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MoodAfter")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MoodBefore")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RationalResponse")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Situation")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("SpendingAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("TransactionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransactionId");
+
+                    b.ToTable("CbtJournalEntries");
+                });
+
+            modelBuilder.Entity("CoinStack.Data.Entities.DailyChallenge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("AssignedDateUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Frequency")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Icon")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("XpReward")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DailyChallenges");
                 });
 
             modelBuilder.Entity("CoinStack.Data.Entities.DebtAccount", b =>
@@ -497,6 +654,14 @@ namespace FinanceManager.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("EmergencyAvailable")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EmergencyTotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("FallbackEnabled")
                         .HasColumnType("INTEGER");
 
@@ -726,6 +891,36 @@ namespace FinanceManager.Data.Migrations
                     b.ToTable("Transactions", (string)null);
                 });
 
+            modelBuilder.Entity("CoinStack.Data.Entities.UserLevel", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CurrentXp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Level")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TotalXp")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("UserLevels");
+                });
+
             modelBuilder.Entity("CoinStack.Data.Entities.WaitlistItem", b =>
                 {
                     b.Property<int>("Id")
@@ -799,6 +994,61 @@ namespace FinanceManager.Data.Migrations
                     b.HasIndex("IsUnlocked");
 
                     b.ToTable("WaitlistItems", (string)null);
+                });
+
+            modelBuilder.Entity("CoinStack.Data.Entities.WeeklyRecap", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ChallengesCompleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("InsightMessage")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsViewed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PointsEarned")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ReflectionsCompleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("StreakDays")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TopCategory")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalIncome")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalSaved")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalSpent")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("WeekNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("WeeklyRecaps");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -931,9 +1181,16 @@ namespace FinanceManager.Data.Migrations
 
             modelBuilder.Entity("CoinStack.Data.Entities.Bucket", b =>
                 {
+                    b.HasOne("CoinStack.Data.Entities.Category", "Category")
+                        .WithMany("Buckets")
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("CoinStack.Data.Entities.Goal", "Goal")
                         .WithMany()
                         .HasForeignKey("GoalId");
+
+                    b.Navigation("Category");
 
                     b.Navigation("Goal");
                 });
@@ -953,6 +1210,15 @@ namespace FinanceManager.Data.Migrations
                     b.Navigation("Bucket");
 
                     b.Navigation("Category");
+                });
+
+            modelBuilder.Entity("CoinStack.Data.Entities.CbtJournalEntry", b =>
+                {
+                    b.HasOne("CoinStack.Data.Entities.Transaction", "Transaction")
+                        .WithMany()
+                        .HasForeignKey("TransactionId");
+
+                    b.Navigation("Transaction");
                 });
 
             modelBuilder.Entity("CoinStack.Data.Entities.Reflection", b =>
@@ -1073,6 +1339,8 @@ namespace FinanceManager.Data.Migrations
 
             modelBuilder.Entity("CoinStack.Data.Entities.Category", b =>
                 {
+                    b.Navigation("Buckets");
+
                     b.Navigation("Budgets");
 
                     b.Navigation("Transactions");

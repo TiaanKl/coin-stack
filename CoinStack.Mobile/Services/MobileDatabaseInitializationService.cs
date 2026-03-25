@@ -55,6 +55,22 @@ public sealed class MobileDatabaseInitializationService : IMobileDatabaseInitial
 
         if (!await db.Buckets.AnyAsync(cancellationToken))
         {
+            if (!await db.Categories.AnyAsync(cancellationToken))
+            {
+                db.Categories.AddRange(
+                    new Category { Name = "Groceries", ColorHex = "#22C55E", Scope = CategoryScope.Expense },
+                    new Category { Name = "Entertainment", ColorHex = "#A855F7", Scope = CategoryScope.Expense },
+                    new Category { Name = "Savings", ColorHex = "#3B82F6", Scope = CategoryScope.Both }
+                );
+
+                await db.SaveChangesAsync(cancellationToken);
+                changed = true;
+            }
+
+            var categoriesByName = await db.Categories
+                .AsNoTracking()
+                .ToDictionaryAsync(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
             var defaults = new[]
             {
                 new Bucket
@@ -64,7 +80,7 @@ public sealed class MobileDatabaseInitializationService : IMobileDatabaseInitial
                     IsDefault = true,
                     SortOrder = 1,
                     IsSavings = false,
-                    ColorHex = "#3B82F6"
+                    CategoryId = categoriesByName.GetValueOrDefault("Groceries")
                 },
                 new Bucket
                 {
@@ -73,7 +89,7 @@ public sealed class MobileDatabaseInitializationService : IMobileDatabaseInitial
                     IsDefault = true,
                     SortOrder = 2,
                     IsSavings = false,
-                    ColorHex = "#F59E0B"
+                    CategoryId = categoriesByName.GetValueOrDefault("Entertainment")
                 },
                 new Bucket
                 {
@@ -82,7 +98,7 @@ public sealed class MobileDatabaseInitializationService : IMobileDatabaseInitial
                     IsDefault = true,
                     SortOrder = 3,
                     IsSavings = true,
-                    ColorHex = "#10B981"
+                    CategoryId = categoriesByName.GetValueOrDefault("Savings")
                 }
             };
 

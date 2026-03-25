@@ -3,6 +3,7 @@
 @inject IGameFeedbackService FeedbackService
 @inject ISettingsService SettingsService
 @inject IJSRuntime JS
+@inject ILogger<GameFeedback> Logger
 
 @* ===== Floating Score Toast ===== *@
 @if (_toast is not null)
@@ -259,14 +260,34 @@
 
     private async Task PlaySoundAsync(string type)
     {
-        try { await JS.InvokeVoidAsync("gamificationFeedback.playSound", type); }
-        catch { }
+        try
+        {
+            await JS.InvokeVoidAsync("gamificationFeedback.playSound", type);
+        }
+        catch (JSException ex)
+        {
+            Logger.LogDebug(ex, "JS interop call 'gamificationFeedback.playSound' failed for sound type {SoundType}.", type);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogDebug(ex, "JS interop call 'gamificationFeedback.playSound' was unavailable during prerender or disconnect.");
+        }
     }
 
     private async Task SpawnConfettiAsync()
     {
-        try { await JS.InvokeVoidAsync("gamificationFeedback.spawnConfetti", "confetti-container"); }
-        catch { }
+        try
+        {
+            await JS.InvokeVoidAsync("gamificationFeedback.spawnConfetti", "confetti-container");
+        }
+        catch (JSException ex)
+        {
+            Logger.LogDebug(ex, "JS interop call 'gamificationFeedback.spawnConfetti' failed.");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Logger.LogDebug(ex, "JS interop call 'gamificationFeedback.spawnConfetti' was unavailable during prerender or disconnect.");
+        }
     }
 
     public void Dispose()

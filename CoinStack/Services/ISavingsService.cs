@@ -42,6 +42,23 @@ public interface ISavingsService
     /// Builds a month-by-month projection going <paramref name="months"/> months into the future.
     /// </summary>
     Task<List<SavingsProjectionPoint>> GetProjectionsAsync(int months = 12, bool includeInterest = true, CancellationToken cancellationToken = default);
+
+    /// <summary>Adds funds from available budget into savings.</summary>
+    Task<ReserveTransferResult> AddToSavingsAsync(decimal amount, string reason, CancellationToken cancellationToken = default);
+
+    /// <summary>Adds funds from available budget into emergency funds.</summary>
+    Task<ReserveTransferResult> AddToEmergencyFundAsync(decimal amount, string reason, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Applies reserve fallback in order: savings first, then emergency fund (if enabled).
+    /// Returns how much was covered from each source.
+    /// </summary>
+    Task<ReserveCoverageResult> ApplyReserveFallbackAsync(decimal amount, string reason, string sourceName, bool allowEmergencyFund, CancellationToken cancellationToken = default);
 }
 
 public sealed record SavingsProjectionPoint(string Month, decimal Projected);
+public sealed record ReserveTransferResult(decimal SavingsAdded, decimal EmergencyAdded);
+public sealed record ReserveCoverageResult(decimal SavingsUsed, decimal EmergencyUsed)
+{
+    public decimal TotalCovered => SavingsUsed + EmergencyUsed;
+}

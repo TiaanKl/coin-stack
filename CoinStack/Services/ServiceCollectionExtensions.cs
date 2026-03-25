@@ -21,6 +21,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IWaitlistService, WaitlistService>();
         services.AddScoped<ISavingsService, SavingsService>();
         services.AddScoped<IMoneyFormatter, MoneyFormatter>();
+        services.AddScoped<ICbtService, CbtService>();
+        services.AddScoped<IAchievementService, AchievementService>();
+        services.AddScoped<ILevelService, LevelService>();
+        services.AddScoped<IDailyChallengeService, DailyChallengeService>();
+        services.AddScoped<IWeeklyRecapService, WeeklyRecapService>();
 
         return services;
     }

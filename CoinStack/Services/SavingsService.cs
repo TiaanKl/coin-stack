@@ -124,6 +124,52 @@ public sealed class SavingsService : ISavingsService
         return withdrawn;
     }
 
+    public async Task<ReserveTransferResult> AddToSavingsAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
+    {
+        var normalizedAmount = Math.Max(0m, amount);
+        if (normalizedAmount == 0m)
+        {
+            return new ReserveTransferResult(0m, 0m);
+        }
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
+        if (state is null)
+        {
+            state = new SavingsState();
+            db.SavingsState.Add(state);
+        }
+
+        state.Total += normalizedAmount;
+        state.Available += normalizedAmount;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return new ReserveTransferResult(normalizedAmount, 0m);
+    }
+
+    public async Task<ReserveTransferResult> AddToEmergencyFundAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
+    {
+        var normalizedAmount = Math.Max(0m, amount);
+        if (normalizedAmount == 0m)
+        {
+            return new ReserveTransferResult(0m, 0m);
+        }
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
+        if (state is null)
+        {
+            state = new SavingsState();
+            db.SavingsState.Add(state);
+        }
+
+        state.EmergencyTotal += normalizedAmount;
+        state.EmergencyAvailable += normalizedAmount;
+
+        await db.SaveChangesAsync(cancellationToken);
+        return new ReserveTransferResult(0m, normalizedAmount);
+    }
+
     public async Task SetFallbackEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
@@ -144,27 +190,72 @@ public sealed class SavingsService : ISavingsService
 
     public async Task<bool> ApplyFallbackAsync(decimal amount, string reason, string sourceName, CancellationToken cancellationToken = default)
     {
+        var result = await ApplyReserveFallbackAsync(amount, reason, sourceName, allowEmergencyFund: false, cancellationToken);
+        return result.TotalCovered >= amount;
+    }
+
+    public async Task<ReserveCoverageResult> ApplyReserveFallbackAsync(
+        decimal amount,
+        string reason,
+        string sourceName,
+        bool allowEmergencyFund,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedAmount = Math.Max(0m, amount);
+        if (normalizedAmount == 0m)
+        {
+            return new ReserveCoverageResult(0m, 0m);
+        }
+
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
         var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
-        if (state is null || !state.FallbackEnabled || state.Available < amount)
+        if (state is null || !state.FallbackEnabled)
         {
-            return false;
+            return new ReserveCoverageResult(0m, 0m);
         }
 
-        state.Available -= amount;
-
-        var evt = new SavingsFallbackEvent
+        var remaining = normalizedAmount;
+        var savingsUsed = Math.Min(remaining, state.Available);
+        if (savingsUsed > 0m)
         {
-            OccurredAtUtc = DateTime.UtcNow,
-            AmountUsed = amount,
-            Reason = reason,
-            SourceName = sourceName
-        };
-        db.SavingsFallbackEvents.Add(evt);
+            state.Available -= savingsUsed;
+            remaining -= savingsUsed;
 
-        await db.SaveChangesAsync(cancellationToken);
-        return true;
+            db.SavingsFallbackEvents.Add(new SavingsFallbackEvent
+            {
+                OccurredAtUtc = DateTime.UtcNow,
+                AmountUsed = savingsUsed,
+                Reason = reason,
+                SourceName = string.IsNullOrWhiteSpace(sourceName) ? "Savings" : sourceName
+            });
+        }
+
+        var emergencyUsed = 0m;
+        if (allowEmergencyFund && remaining > 0m)
+        {
+            emergencyUsed = Math.Min(remaining, state.EmergencyAvailable);
+            if (emergencyUsed > 0m)
+            {
+                state.EmergencyAvailable -= emergencyUsed;
+                remaining -= emergencyUsed;
+
+                db.SavingsFallbackEvents.Add(new SavingsFallbackEvent
+                {
+                    OccurredAtUtc = DateTime.UtcNow,
+                    AmountUsed = emergencyUsed,
+                    Reason = reason,
+                    SourceName = "Emergency Fund"
+                });
+            }
+        }
+
+        if (savingsUsed > 0m || emergencyUsed > 0m)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return new ReserveCoverageResult(savingsUsed, emergencyUsed);
     }
 
     public async Task<List<SavingsMonthlySummary>> GetMonthlySummariesAsync(CancellationToken cancellationToken = default)
@@ -191,7 +282,7 @@ public sealed class SavingsService : ISavingsService
         var startOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         return await db.SavingsFallbackEvents
             .AsNoTracking()
-            .Where(x => x.OccurredAtUtc >= startOfMonth)
+            .Where(x => x.OccurredAtUtc >= startOfMonth && x.AmountUsed > 0)
             .SumAsync(x => x.AmountUsed, cancellationToken);
     }
 

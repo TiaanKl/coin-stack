@@ -18,6 +18,7 @@ public sealed class BucketService : IBucketService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Buckets
             .AsNoTracking()
+            .Include(x => x.Category)
             .OrderBy(x => x.SortOrder)
             .ThenBy(x => x.Name)
             .ToListAsync(cancellationToken);
@@ -51,7 +52,7 @@ public sealed class BucketService : IBucketService
 
         existing.Name = bucket.Name;
         existing.AllocatedAmount = bucket.AllocatedAmount;
-        existing.ColorHex = bucket.ColorHex;
+        existing.CategoryId = bucket.CategoryId;
         existing.Icon = bucket.Icon;
         existing.SortOrder = bucket.SortOrder;
 

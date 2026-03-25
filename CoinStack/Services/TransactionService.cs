@@ -22,6 +22,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .OrderByDescending(x => x.OccurredAtUtc)
             .ToListAsync(cancellationToken);
     }
@@ -36,6 +37,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .OrderByDescending(x => x.OccurredAtUtc)
             .Take(count)
             .ToListAsync(cancellationToken);
@@ -46,6 +48,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .Where(x => x.OccurredAtUtc >= fromUtc)
             .OrderByDescending(x => x.OccurredAtUtc)
             .ToListAsync(cancellationToken);
@@ -56,6 +59,7 @@ public sealed class TransactionService : ITransactionService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.Transactions
             .AsNoTracking()
+            .Include(x => x.Category)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
 
@@ -85,7 +89,7 @@ public sealed class TransactionService : ITransactionService
         return (created, gameResult);
     }
 
-    public async Task UpdateAsync(Transaction transaction, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(Transaction transaction, int userTimezoneOffsetHours = 0, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -110,6 +114,7 @@ public sealed class TransactionService : ITransactionService
         existing.BucketId = transaction.BucketId;
         existing.DebtAccountId = transaction.DebtAccountId;
         existing.IsImpulse = transaction.IsImpulse;
+        existing.ExpenseKind = transaction.ExpenseKind;
 
         if (oldDebtId.HasValue && oldDebtImpact > 0)
         {
@@ -123,8 +128,7 @@ public sealed class TransactionService : ITransactionService
 
         await db.SaveChangesAsync(cancellationToken);
 
-        int userOffset = 0;
-        await _gameLoop.ProcessTransactionAsync(existing, userOffset, cancellationToken);
+        await _gameLoop.ProcessTransactionAsync(existing, userTimezoneOffsetHours, cancellationToken);
     }
 
     public async Task DeleteAsync(int id, CancellationToken cancellationToken = default)
@@ -376,6 +380,44 @@ public sealed class TransactionService : ITransactionService
                 await AdjustDebtBalanceAsync(db, autoTx.DebtAccountId.Value, -createDebtImpact, cancellationToken);
             }
         }
+
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ApplyAutoIncomeForBudgetPeriodAsync(
+        int monthStartDay,
+        decimal monthlyIncome,
+        DateTime utcNow,
+        CancellationToken cancellationToken = default)
+    {
+        if (monthlyIncome <= 0)
+        {
+            return;
+        }
+
+        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, utcNow);
+
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var alreadyHasIncome = await db.Transactions
+            .AsNoTracking()
+            .AnyAsync(t => t.Type == TransactionType.Income
+                           && t.Description == "Monthly Income"
+                           && t.OccurredAtUtc >= startUtc
+                           && t.OccurredAtUtc < endUtc, cancellationToken);
+
+        if (alreadyHasIncome)
+        {
+            return;
+        }
+
+        db.Transactions.Add(new Transaction
+        {
+            OccurredAtUtc = startUtc,
+            Amount = monthlyIncome,
+            Type = TransactionType.Income,
+            Description = "Monthly Income",
+        });
 
         await db.SaveChangesAsync(cancellationToken);
     }

@@ -49,6 +49,26 @@ public sealed class AppShell : TabbedPage
             Title = "Reflections"
         });
 
+        Children.Add(new NavigationPage(new CbtJournalPage())
+        {
+            Title = "Mindset"
+        });
+
+        Children.Add(new NavigationPage(new ChallengesPage())
+        {
+            Title = "Challenges"
+        });
+
+        Children.Add(new NavigationPage(new AchievementsPage())
+        {
+            Title = "Achievements"
+        });
+
+        Children.Add(new NavigationPage(new WeeklyRecapMobilePage())
+        {
+            Title = "Recap"
+        });
+
         Children.Add(new NavigationPage(new ReportsPage(financeService))
         {
             Title = "Reports"
