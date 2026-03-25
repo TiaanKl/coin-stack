@@ -190,3 +190,23 @@ internal sealed class FakeReflectionService : IReflectionService
         return Task.FromResult<List<EmotionSpendPattern>>([]);
     }
 }
+
+internal sealed class FakeLevelService : ILevelService
+{
+    public int AddXpCalls { get; private set; }
+    public int LastXpAmount { get; private set; }
+
+    public Task<UserLevel> GetCurrentLevelAsync(CancellationToken ct = default)
+        => Task.FromResult(new UserLevel { Id = 1, Level = 1, CurrentXp = 0, TotalXp = 0 });
+
+    public Task<UserLevel> AddXpAsync(int xpAmount, CancellationToken ct = default)
+    {
+        AddXpCalls++;
+        LastXpAmount = xpAmount;
+        return Task.FromResult(new UserLevel { Id = 1, Level = 1, CurrentXp = xpAmount, TotalXp = xpAmount });
+    }
+
+    public int GetXpRequiredForLevel(int level) => 50;
+    public string GetTitleForLevel(int level) => "Novice";
+    public Task<bool> CheckLevelUpAsync(CancellationToken ct = default) => Task.FromResult(false);
+}

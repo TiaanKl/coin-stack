@@ -41,7 +41,7 @@ public sealed class GameLoopServiceTests
             MonthStartDay = 1,
         });
 
-        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService);
+        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService, new FakeLevelService());
 
         var tx = new Transaction
         {
@@ -93,7 +93,7 @@ public sealed class GameLoopServiceTests
             MonthStartDay = 1,
         });
 
-        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService);
+        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService, new FakeLevelService());
 
         var tx = new Transaction
         {
@@ -144,7 +144,7 @@ public sealed class GameLoopServiceTests
             MonthStartDay = 1,
         });
 
-        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService);
+        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService, new FakeLevelService());
 
         var tx = new Transaction
         {
@@ -229,7 +229,7 @@ public sealed class GameLoopServiceTests
         });
         var savingsService = new SavingsService(factory);
 
-        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService);
+        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService, new FakeLevelService());
 
         Transaction tx;
         await using (var txDb = new CoinStackDbContext(options))
@@ -310,7 +310,7 @@ public sealed class GameLoopServiceTests
         });
         var savingsService = new SavingsService(factory);
 
-        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService);
+        var gameLoop = new GameLoopService(factory, fakeBucketService, fakeScoring, fakeReflection, settings, savingsService, new FakeLevelService());
 
         Transaction tx;
         await using (var txDb = new CoinStackDbContext(options))

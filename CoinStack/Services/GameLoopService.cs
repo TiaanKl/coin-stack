@@ -17,6 +17,7 @@ public sealed class GameLoopService : IGameLoopService
     private readonly IReflectionService _reflectionService;
     private readonly ISettingsService _settingsService;
     private readonly ISavingsService _savingsService;
+    private readonly ILevelService _levelService;
 
     public GameLoopService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
@@ -24,7 +25,8 @@ public sealed class GameLoopService : IGameLoopService
         IScoringService scoringService,
         IReflectionService reflectionService,
         ISettingsService settingsService,
-        ISavingsService savingsService)
+        ISavingsService savingsService,
+        ILevelService levelService)
     {
         _dbFactory = dbFactory;
         _bucketService = bucketService;
@@ -32,6 +34,7 @@ public sealed class GameLoopService : IGameLoopService
         _reflectionService = reflectionService;
         _settingsService = settingsService;
         _savingsService = savingsService;
+        _levelService = levelService;
     }
 
     public async Task<GameState> GetCurrentStateAsync(CancellationToken cancellationToken = default)
@@ -86,6 +89,7 @@ public sealed class GameLoopService : IGameLoopService
             {
                 await _scoringService.AddScoreEventAsync(2, ScoreChangeReason.DailyCheckIn, "Daily check-in!", cancellationToken: cancellationToken);
             }
+            await _levelService.AddXpAsync(2, cancellationToken);
             return;
         }
 
@@ -115,6 +119,7 @@ public sealed class GameLoopService : IGameLoopService
         {
             await _scoringService.AddScoreEventAsync(DailyCheckInPoints, ScoreChangeReason.DailyCheckIn, DailyCheckInDescription, cancellationToken: cancellationToken);
         }
+        await _levelService.AddXpAsync(2, cancellationToken);
 
         if (settings.EnableStreaks && settings.EnableScoring && streak.CurrentCount > 0 && streak.CurrentCount % 7 == 0)
         {
@@ -338,6 +343,9 @@ public sealed class GameLoopService : IGameLoopService
                 _ => "Transaction recorded."
             };
         }
+
+        // Award XP for logging a transaction
+        await _levelService.AddXpAsync(5, cancellationToken);
 
         return result;
     }
