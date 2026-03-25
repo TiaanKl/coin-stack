@@ -1,7 +1,68 @@
 /*
   Tailadmin's compiled Tailwind CSS is now loaded after Bootstrap/app.css.
-  These overrides just ensure the base font/link colors match Tailadmin.
+  These overrides ensure the base font/link colors match Tailadmin,
+  plus Material 3-inspired design tokens for a unified Tailwind + M3 feel.
 */
+
+/* ===== M3 Design Tokens ===== */
+:root {
+  /* Surface tonal palette — brand-tinted (#6577F3) for genuine M3 feel */
+  --m3-surface: #fefbff;
+  --m3-surface-dim: #ddd8e4;
+  --m3-surface-container-lowest: #ffffff;
+  --m3-surface-container-low: #f7f2fe;
+  --m3-surface-container: #f1ecf8;
+  --m3-surface-container-high: #ebe6f2;
+  --m3-surface-container-highest: #e5e1ed;
+  --m3-on-surface: #1c1b1f;
+  --m3-on-surface-variant: #49454f;
+  --m3-outline: #7a757f;
+  --m3-outline-variant: #cbc4cf;
+  --m3-primary-container: #e5deff;
+  --m3-on-primary-container: #1e0060;
+
+  /* Elevation (M3 tonal elevation — brand tinted shadows) */
+  --m3-elevation-0: none;
+  --m3-elevation-1: 0 1px 2px rgba(101, 119, 243, 0.08), 0 1px 3px 1px rgba(0, 0, 0, 0.06);
+  --m3-elevation-2: 0 1px 2px rgba(101, 119, 243, 0.08), 0 2px 6px 2px rgba(0, 0, 0, 0.06);
+  --m3-elevation-3: 0 1px 3px rgba(101, 119, 243, 0.10), 0 4px 8px 3px rgba(0, 0, 0, 0.06);
+
+  /* Transition tokens */
+  --m3-motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --m3-motion-easing: cubic-bezier(0.2, 0, 0, 1);
+  --m3-motion-easing-decelerate: cubic-bezier(0, 0, 0, 1);
+  --m3-motion-duration-short: 150ms;
+  --m3-motion-duration-medium: 300ms;
+  --m3-motion-duration-long: 500ms;
+
+  /* Shape tokens */
+  --m3-shape-corner-xs: 4px;
+  --m3-shape-corner-sm: 8px;
+  --m3-shape-corner-md: 12px;
+  --m3-shape-corner-lg: 16px;
+  --m3-shape-corner-xl: 28px;
+  --m3-shape-corner-full: 9999px;
+}
+
+.dark {
+  --m3-surface: #141218;
+  --m3-surface-dim: #141218;
+  --m3-surface-container-lowest: #0f0d13;
+  --m3-surface-container-low: #1d1b20;
+  --m3-surface-container: #211f26;
+  --m3-surface-container-high: #2b2930;
+  --m3-surface-container-highest: #363438;
+  --m3-on-surface: #e6e0e9;
+  --m3-on-surface-variant: #cac4d0;
+  --m3-outline: #948f99;
+  --m3-outline-variant: #49454f;
+  --m3-primary-container: #4a47a3;
+  --m3-on-primary-container: #e5deff;
+  --m3-elevation-0: none;
+  --m3-elevation-1: 0 1px 3px 1px rgba(0, 0, 0, 0.25), 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --m3-elevation-2: 0 2px 6px 2px rgba(0, 0, 0, 0.25), 0 1px 2px 0 rgba(0, 0, 0, 0.35);
+  --m3-elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.25), 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+}
 
 html,
 body {
@@ -50,15 +111,17 @@ a {
   animation: modalPanelIn 0.3s ease-out both;
 }
 
-/* Toggle switch component */
+/* Toggle switch component — use high specificity to prevent M3 surface overrides */
 .toggle-track {
   position: relative;
   flex-shrink: 0;
   width: 2.75rem;
   height: 1.5rem;
   border-radius: 9999px;
-  background-color: var(--color-gray-200, #e4e7ec);
+  background-color: var(--color-gray-300, #d0d5dd) !important;
   transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .toggle-track::after {
@@ -70,12 +133,12 @@ a {
   height: 1.25rem;
   border-radius: 9999px;
   border: 1px solid var(--color-gray-300, #d0d5dd);
-  background-color: #fff;
+  background-color: #fff !important;
   transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .peer:checked ~ .toggle-track {
-  background-color: var(--color-brand-500, #3b82f6);
+  background-color: var(--color-brand-500, #6577F3) !important;
 }
 
 .peer:checked ~ .toggle-track::after {
@@ -85,13 +148,549 @@ a {
 
 .peer:focus ~ .toggle-track {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500, #3b82f6) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500, #6577F3) 20%, transparent) !important;
 }
 
 .dark .toggle-track {
-  background-color: var(--color-gray-700, #344054);
+  background-color: var(--color-gray-600, #475467) !important;
+}
+
+.dark .peer:checked ~ .toggle-track {
+  background-color: var(--color-brand-500, #6577F3) !important;
 }
 
 .dark .peer:focus ~ .toggle-track {
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-800, #252dae) 30%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-800, #252dae) 30%, transparent) !important;
+}
+
+/* ===== M3 Global Surface System ===== */
+/* These overrides automatically restyle existing Tailwind patterns with M3 characteristics,
+   affecting ALL pages without needing per-page markup changes. */
+
+/* --- Cards: M3 tonal surface + elevation --- */
+/* Target the common card pattern: rounded-2xl + border (used on every page) */
+.rounded-2xl.border {
+  background: var(--m3-surface-container-lowest) !important;
+  border-color: var(--m3-outline-variant) !important;
+  border-radius: var(--m3-shape-corner-lg);
+  box-shadow: var(--m3-elevation-1);
+  transition: box-shadow var(--m3-motion-duration-medium) var(--m3-motion-easing),
+              transform var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.rounded-2xl.border:hover {
+  box-shadow: var(--m3-elevation-2);
+}
+
+.dark .rounded-2xl.border {
+  background: var(--m3-surface-container) !important;
+  border-color: var(--m3-outline-variant) !important;
+}
+
+/* --- Stat/metric boxes: M3 surface-container-low --- */
+.rounded-xl.bg-gray-50,
+.rounded-xl[class*="bg-gray-50"] {
+  background: var(--m3-surface-container-low) !important;
+  border-radius: var(--m3-shape-corner-md);
+}
+
+.dark .rounded-xl[class*="dark:bg-gray-800"] {
+  background: var(--m3-surface-container-high) !important;
+}
+
+/* --- Inline list rows (transactions, score events): M3 surface --- */
+.rounded-lg.border.border-gray-100 {
+  background: var(--m3-surface-container-lowest);
+  border-color: var(--m3-outline-variant) !important;
+  border-radius: var(--m3-shape-corner-md);
+}
+
+.dark .rounded-lg.border[class*="dark:border-gray-800"] {
+  border-color: var(--m3-outline-variant) !important;
+}
+
+/* --- M3-style buttons: State layers + pill shape --- */
+button, a[role="button"], .menu-item {
+  transition: all var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+/* Primary filled buttons (rounded-full + bg-brand-500): M3 filled button */
+.rounded-full[class*="bg-brand-500"] {
+  box-shadow: var(--m3-elevation-1);
+  letter-spacing: 0.01em;
+  transition: box-shadow var(--m3-motion-duration-short) var(--m3-motion-easing),
+              background-color var(--m3-motion-duration-short) var(--m3-motion-easing),
+              transform var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.rounded-full[class*="bg-brand-500"]:hover {
+  box-shadow: var(--m3-elevation-2);
+  filter: brightness(1.06);
+}
+
+.rounded-full[class*="bg-brand-500"]:active {
+  box-shadow: var(--m3-elevation-0);
+  transform: scale(0.97);
+  filter: brightness(0.95);
+}
+
+/* Outlined / secondary buttons (rounded-full + border): M3 outlined button */
+.rounded-full[class*="border"][class*="bg-white"],
+.rounded-full[class*="border"][class*="bg-transparent"] {
+  border-color: var(--m3-outline) !important;
+  letter-spacing: 0.01em;
+  transition: background-color var(--m3-motion-duration-short) var(--m3-motion-easing),
+              border-color var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.rounded-full[class*="border"][class*="bg-white"]:hover,
+.rounded-full[class*="border"][class*="bg-transparent"]:hover {
+  background-color: color-mix(in oklab, var(--color-brand-500, #6577F3) 6%, transparent) !important;
+}
+
+/* --- M3-style chips / badges: tonal containers --- */
+.rounded-full[class*="px-2"],
+.rounded-full[class*="px-3"] {
+  border-radius: var(--m3-shape-corner-sm);
+  transition: background-color var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+/* --- M3-style inputs: single clean focus indicator --- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea,
+select {
+  border-radius: var(--m3-shape-corner-sm) !important;
+  transition: border-color var(--m3-motion-duration-medium) var(--m3-motion-easing);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+textarea:focus,
+select:focus {
+  border-color: var(--color-brand-500, #6577F3) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* --- Modals: M3 dialog surface --- */
+.rounded-3xl {
+  background: var(--m3-surface-container-high) !important;
+  border-radius: var(--m3-shape-corner-xl) !important;
+  box-shadow: var(--m3-elevation-3);
+}
+
+.dark .rounded-3xl {
+  background: var(--m3-surface-container-high) !important;
+}
+
+/* --- Progress bars: M3 linear indicator (exclude toggle tracks) --- */
+.overflow-hidden > .rounded-full.bg-gray-200,
+.overflow-hidden.rounded-full.bg-gray-200,
+.rounded-full.bg-gray-200:not(.toggle-track):not(button) {
+  background: color-mix(in oklab, var(--color-brand-500, #6577F3) 14%, #e0e0e6) !important;
+  border-radius: var(--m3-shape-corner-full);
+}
+
+.dark .overflow-hidden > .rounded-full[class*="dark:bg-gray-700"],
+.dark .overflow-hidden.rounded-full[class*="dark:bg-gray-700"],
+.dark .rounded-full[class*="dark:bg-gray-700"]:not(.toggle-track):not(button) {
+  background: color-mix(in oklab, var(--color-brand-400, #8898ff) 12%, #3a3a44) !important;
+}
+
+/* Progress bar fill */
+.bg-gradient-to-r {
+  background-size: 200% 100%;
+  border-radius: var(--m3-shape-corner-full);
+}
+
+/* Small inner progress bars (bucket planned/actual tracks, exclude toggle) */
+.overflow-hidden > .rounded-full.bg-gray-100,
+.overflow-hidden.rounded-full.bg-gray-100 {
+  background: color-mix(in oklab, var(--color-brand-500, #6577F3) 10%, #e8e8ee) !important;
+}
+
+.dark .overflow-hidden > .rounded-full[class*="dark:bg-gray-800"],
+.dark .overflow-hidden.rounded-full[class*="dark:bg-gray-800"] {
+  background: color-mix(in oklab, var(--color-brand-400, #8898ff) 10%, #303038) !important;
+}
+
+/* --- M3 Navigation Rail / Sidebar enhancement --- */
+.sidebar .menu-item {
+  border-radius: var(--m3-shape-corner-full);
+  position: relative;
+  overflow: hidden;
+}
+
+.sidebar .menu-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.sidebar .menu-item:hover::before {
+  opacity: 0.06;
+}
+
+.sidebar .menu-item:active::before {
+  opacity: 0.1;
+}
+
+/* --- M3 icon containers: tonal fill --- */
+.rounded-xl[class*="bg-brand-50"] {
+  background: var(--m3-primary-container) !important;
+  color: var(--m3-on-primary-container) !important;
+}
+
+.dark .rounded-xl[class*="dark:bg-brand-500"] {
+  background: color-mix(in oklab, var(--color-brand-400, #8898ff) 18%, transparent) !important;
+}
+
+/* --- Empty state circular icons --- */
+.rounded-full[class*="bg-brand-50"]:not([class*="px-"]) {
+  background: var(--m3-primary-container) !important;
+}
+
+.dark .rounded-full[class*="dark:bg-brand-500/15"]:not([class*="px-"]) {
+  background: color-mix(in oklab, var(--color-brand-400, #8898ff) 18%, transparent) !important;
+}
+
+/* --- M3 scrollbar styling --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--m3-outline-variant);
+  border-radius: var(--m3-shape-corner-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--m3-outline);
+}
+
+/* --- M3 body background tint --- */
+body {
+  background-color: var(--m3-surface) !important;
+}
+
+.dark body,
+body.dark {
+  background-color: var(--m3-surface-dim) !important;
+}
+
+/* ===== M3 Filled Card (tonal surface layering) ===== */
+.m3-card {
+  background: var(--m3-surface-container-low);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: 1rem;
+  box-shadow: var(--m3-elevation-1);
+  transition: box-shadow var(--m3-motion-duration-medium) var(--m3-motion-easing);
+}
+
+.m3-card:hover {
+  box-shadow: var(--m3-elevation-2);
+}
+
+.dark .m3-card {
+  background: var(--m3-surface-container);
+}
+
+/* M3 Outlined Card */
+.m3-card-outlined {
+  background: var(--m3-surface);
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: 1rem;
+}
+
+.dark .m3-card-outlined {
+  background: var(--m3-surface-container-low);
+}
+
+/* M3 Filled Button */
+.m3-btn-filled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1.5rem;
+  border-radius: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  background-color: var(--color-brand-500, #6577F3);
+  color: #fff;
+  border: none;
+  box-shadow: none;
+  transition: box-shadow var(--m3-motion-duration-short) var(--m3-motion-easing),
+              background-color var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.m3-btn-filled:hover {
+  box-shadow: var(--m3-elevation-1);
+  filter: brightness(1.08);
+}
+
+.m3-btn-filled:active {
+  box-shadow: none;
+  filter: brightness(0.94);
+}
+
+/* M3 Tonal Button */
+.m3-btn-tonal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1.5rem;
+  border-radius: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  background-color: color-mix(in oklab, var(--color-brand-500, #6577F3) 12%, transparent);
+  color: var(--color-brand-600, #5268e5);
+  border: none;
+  transition: background-color var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.dark .m3-btn-tonal {
+  background-color: color-mix(in oklab, var(--color-brand-400, #8898ff) 18%, transparent);
+  color: var(--color-brand-300, #a4b1ff);
+}
+
+.m3-btn-tonal:hover {
+  background-color: color-mix(in oklab, var(--color-brand-500, #6577F3) 18%, transparent);
+}
+
+/* M3 Outlined Button */
+.m3-btn-outlined {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 1.5rem;
+  border-radius: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  background: transparent;
+  color: var(--color-brand-600, #5268e5);
+  border: 1px solid var(--m3-outline);
+  transition: background-color var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.dark .m3-btn-outlined {
+  color: var(--color-brand-400, #8898ff);
+  border-color: var(--m3-outline-variant);
+}
+
+.m3-btn-outlined:hover {
+  background-color: color-mix(in oklab, var(--color-brand-500, #6577F3) 8%, transparent);
+}
+
+/* M3 Chip (filter / assist) */
+.m3-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2rem;
+  padding: 0 1rem;
+  border: 1px solid var(--m3-outline-variant);
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--m3-on-surface);
+  background: transparent;
+  transition: background-color var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.m3-chip:hover {
+  background-color: color-mix(in oklab, var(--m3-on-surface) 8%, transparent);
+}
+
+.m3-chip-selected {
+  background-color: color-mix(in oklab, var(--color-brand-500, #6577F3) 14%, transparent);
+  color: var(--color-brand-600, #5268e5);
+  border-color: transparent;
+}
+
+.dark .m3-chip-selected {
+  background-color: color-mix(in oklab, var(--color-brand-400, #8898ff) 22%, transparent);
+  color: var(--color-brand-300, #a4b1ff);
+}
+
+/* M3 Text Field – filled style bottom border */
+.m3-input {
+  width: 100%;
+  height: 3.5rem;
+  padding: 0.5rem 1rem 0;
+  border: none;
+  border-bottom: 1px solid var(--m3-outline);
+  border-radius: 0.25rem 0.25rem 0 0;
+  background: var(--m3-surface-container-highest, var(--m3-surface-container-high));
+  font-size: 0.875rem;
+  color: var(--m3-on-surface);
+  transition: border-color var(--m3-motion-duration-medium) var(--m3-motion-easing);
+}
+
+.m3-input:focus {
+  outline: none;
+  border-bottom: 2px solid var(--color-brand-500, #6577F3);
+}
+
+.dark .m3-input {
+  background: var(--m3-surface-container-high);
+  color: var(--m3-on-surface);
+  border-bottom-color: var(--m3-outline-variant);
+}
+
+/* M3 Segmented Button Row */
+.m3-segment-group {
+  display: inline-flex;
+  border: 1px solid var(--m3-outline);
+  border-radius: 1.25rem;
+  overflow: hidden;
+}
+
+.m3-segment-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  height: 2.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--m3-on-surface);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--m3-outline);
+  transition: background-color var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.m3-segment-btn:last-child {
+  border-right: none;
+}
+
+.m3-segment-btn:hover {
+  background-color: color-mix(in oklab, var(--m3-on-surface) 8%, transparent);
+}
+
+.m3-segment-btn[aria-pressed="true"],
+.m3-segment-btn.active {
+  background-color: color-mix(in oklab, var(--color-brand-500, #6577F3) 14%, transparent);
+  color: var(--color-brand-600, #5268e5);
+}
+
+.dark .m3-segment-btn[aria-pressed="true"],
+.dark .m3-segment-btn.active {
+  background-color: color-mix(in oklab, var(--color-brand-400, #8898ff) 22%, transparent);
+  color: var(--color-brand-300, #a4b1ff);
+}
+
+/* M3 Linear Progress Indicator */
+.m3-progress-track {
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--color-brand-500, #6577F3) 18%, transparent);
+  overflow: hidden;
+}
+
+.m3-progress-bar {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--color-brand-500, #6577F3);
+  transition: width var(--m3-motion-duration-medium) var(--m3-motion-easing);
+}
+
+/* M3 Divider */
+.m3-divider {
+  border: none;
+  border-top: 1px solid var(--m3-outline-variant);
+  margin: 0;
+}
+
+/* M3 Dialog / Modal surface */
+.m3-dialog {
+  background: var(--m3-surface-container-high);
+  border-radius: 1.75rem;
+  box-shadow: var(--m3-elevation-3);
+  padding: 1.5rem;
+}
+
+.dark .m3-dialog {
+  background: var(--m3-surface-container-high);
+}
+
+/* M3 Surface tint on interactive cards */
+.m3-surface-tint {
+  position: relative;
+}
+
+.m3-surface-tint::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--color-brand-500, #6577F3);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--m3-motion-duration-short) var(--m3-motion-easing);
+}
+
+.m3-surface-tint:hover::after {
+  opacity: 0.05;
+}
+
+.dark .m3-surface-tint:hover::after {
+  opacity: 0.08;
+}
+
+/* M3 Navigation Indicator (active nav item pill) */
+.m3-nav-indicator {
+  position: relative;
+}
+
+.m3-nav-indicator.active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--color-brand-500, #6577F3) 14%, transparent);
+}
+
+.dark .m3-nav-indicator.active::before {
+  background: color-mix(in oklab, var(--color-brand-400, #8898ff) 22%, transparent);
+}
+
+/* Smooth page transitions */
+main {
+  animation: m3-fade-in var(--m3-motion-duration-medium) var(--m3-motion-easing);
+}
+
+@keyframes m3-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* M3 focus ring style — exclude inputs (they use border-color only) */
+*:focus-visible:not(input):not(textarea):not(select) {
+  outline: 2px solid var(--color-brand-500, #6577F3);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
 }
