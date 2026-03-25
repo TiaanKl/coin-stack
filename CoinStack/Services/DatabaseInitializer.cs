@@ -27,6 +27,12 @@ public static class DatabaseInitializer
         var db = scope.ServiceProvider.GetRequiredService<CoinStackDbContext>();
         await db.Database.MigrateAsync(cancellationToken);
         await SeedMissingDefaultCategoriesAsync(db, cancellationToken);
+
+        var achievementService = scope.ServiceProvider.GetRequiredService<IAchievementService>();
+        await achievementService.SeedAchievementsAsync(cancellationToken);
+
+        var levelService = scope.ServiceProvider.GetRequiredService<ILevelService>();
+        await levelService.GetCurrentLevelAsync(cancellationToken); // ensures UserLevel row exists
     }
 
     public static async Task SeedMissingDefaultCategoriesAsync(CoinStackDbContext db, CancellationToken cancellationToken)
