@@ -57,7 +57,11 @@ public enum ScoreChangeReason
     GoalAchieved = 8,
     ImpulseBuy = 9,
     ForceMajeure = 10,
-    EmergencyFundDip = 11
+    EmergencyFundDip = 11,
+    ChallengeCompleted = 12,
+    AchievementUnlocked = 13,
+    LevelUp = 14,
+    CbtExerciseCompleted = 15
 }
 
 public enum StreakType
@@ -104,4 +108,45 @@ public enum CoolOffPeriod
     Days3 = 1,
     Days7 = 2,
     Days30 = 3
+}
+
+public enum CognitiveDistortion
+{
+    AllOrNothing = 0,
+    Catastrophizing = 1,
+    EmotionalReasoning = 2,
+    FortuneTelling = 3,
+    MentalFilter = 4,
+    Overgeneralisation = 5,
+    Personalisation = 6,
+    ShouldStatements = 7,
+    Labelling = 8,
+    MagnificationMinimisation = 9,
+    ScarcityThinking = 10,
+    SocialComparison = 11
+}
+
+public enum AchievementCategory
+{
+    Saving = 0,
+    Budgeting = 1,
+    Streaks = 2,
+    Mindfulness = 3,
+    DebtFreedom = 4,
+    Milestones = 5,
+    Challenges = 6
+}
+
+public enum ChallengeFrequency
+{
+    Daily = 0,
+    Weekly = 1
+}
+
+public enum ChallengeStatus
+{
+    Active = 0,
+    Completed = 1,
+    Expired = 2,
+    Skipped = 3
 }

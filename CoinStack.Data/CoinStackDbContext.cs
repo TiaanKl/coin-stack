@@ -25,6 +25,11 @@ public sealed class CoinStackDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<SavingsState> SavingsState => Set<SavingsState>();
     public DbSet<SavingsMonthlySummary> SavingsMonthlySummaries => Set<SavingsMonthlySummary>();
     public DbSet<SavingsFallbackEvent> SavingsFallbackEvents => Set<SavingsFallbackEvent>();
+    public DbSet<CbtJournalEntry> CbtJournalEntries => Set<CbtJournalEntry>();
+    public DbSet<Achievement> Achievements => Set<Achievement>();
+    public DbSet<UserLevel> UserLevels => Set<UserLevel>();
+    public DbSet<DailyChallenge> DailyChallenges => Set<DailyChallenge>();
+    public DbSet<WeeklyRecap> WeeklyRecaps => Set<WeeklyRecap>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
