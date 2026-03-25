@@ -1,0 +1,417 @@
+@page "/cbt-journal"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@inject CoinStack.Services.ICbtService CbtService
+@inject CoinStack.Services.ILevelService LevelService
+@inject CoinStack.Services.IScoringService ScoringService
+@inject CoinStack.Services.ISettingsService SettingsService
+
+<PageTitle>CBT Journal</PageTitle>
+
+<div>
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Money Mindset Journal</h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Challenge unhelpful financial thoughts with CBT
+                techniques</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button
+                    class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900"
+                    @onclick="OpenNewEntry">
+                    <i class="fa-solid fa-plus"></i>
+                    New Thought Record
+                </button>
+            </div>
+        </div>
+
+        <!-- Exercises Quick Access -->
+        <div class="mb-6">
+            <h3 class="mb-3 text-sm font-semibold text-gray-600 uppercase tracking-wider dark:text-gray-400">Guided
+                Exercises</h3>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    @foreach (var exercise in _exercises)
+                    {
+                        <button @onclick="() => StartExercise(exercise)"
+                                class="m3-surface-tint group flex items-start gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-left transition-all hover:border-brand-200 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03] dark:hover:border-brand-500/30">
+                            <div
+                                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500 transition-colors group-hover:bg-brand-100 dark:bg-brand-500/15 dark:group-hover:bg-brand-500/25">
+                                <i class="fa-solid @exercise.Icon"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-medium text-gray-800 dark:text-white/90">@exercise.Title</h4>
+                                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">@exercise.Description</p>
+                            </div>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <!-- Distortion Frequency Summary -->
+            @if (_distortionFrequency.Count > 0)
+            {
+                <div class="m3-card mb-6 rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                    <h3 class="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Your Thought Patterns</h3>
+                    <p class="mb-4 text-xs text-gray-500 dark:text-gray-400">These are the cognitive distortions you've identified
+                        most often. Awareness is the first step!</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach (var (distortion, count) in _distortionFrequency.OrderByDescending(x => x.Value).Take(5))
+                            {
+                                <span
+                                    class="inline-flex items-center gap-1.5 rounded-full bg-warning-50 px-3 py-1.5 text-xs font-medium text-warning-700 dark:bg-warning-500/15 dark:text-warning-400">
+                                    <span>@CbtService.GetDistortionLabel(distortion)</span>
+                                    <span
+                                    class="rounded-full bg-warning-200 px-1.5 py-0.5 text-[10px] font-bold dark:bg-warning-500/30">@count</span>
+                                </span>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <!-- Journal Entries -->
+                @if (_isLoading)
+                {
+                    <div class="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
+                }
+                else if (_entries.Count == 0)
+                {
+                    <div class="rounded-2xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+                        <div
+                            class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/15">
+                            <i class="fa-solid fa-brain text-2xl text-brand-500"></i>
+                        </div>
+                        <h3 class="mb-2 text-base font-semibold text-gray-800 dark:text-white/90">Start Your Mindset Journal</h3>
+                        <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Record financial thoughts and challenge them with
+                            evidence-based CBT techniques.</p>
+                            <button @onclick="OpenNewEntry"
+                                    class="m3-btn-filled inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600">
+                                Create First Entry
+                            </button>
+                        </div>
+                    }
+    else
+                    {
+                        <div class="space-y-4">
+                            @foreach (var entry in _entries)
+                            {
+                                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="text-xs text-gray-400 dark:text-gray-500">@entry.CreatedAtUtc.ToString("MMM dd, yyyy h:mm tt")</span>
+                                                @if (entry.Distortion.HasValue)
+                                                {
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-warning-50 px-2 py-0.5 text-[10px] font-medium text-warning-700 dark:bg-warning-500/15 dark:text-warning-400">
+                                                        @CbtService.GetDistortionLabel(entry.Distortion.Value)
+                                                    </span>
+                                                }
+                                                @if (entry.SpendingAmount.HasValue)
+                                                {
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-error-50 px-2 py-0.5 text-[10px] font-medium text-error-600 dark:bg-error-500/15 dark:text-error-400">
+                                                        @entry.SpendingAmount.Value.ToString("C")
+                                                    </span>
+                                                }
+                                            </div>
+                                            <p class="text-sm font-medium text-gray-800 dark:text-white/90 mb-1">@entry.Situation</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                                <span class="font-medium text-error-500">Thought:</span> @entry.AutomaticThought
+                                            </p>
+                                            @if (!string.IsNullOrWhiteSpace(entry.RationalResponse))
+                                            {
+                                                <p class="text-sm text-gray-600 dark:text-gray-300">
+                                                    <span class="font-medium text-success-500">Reframe:</span> @entry.RationalResponse
+                                                </p>
+                                            }
+                                        </div>
+                                        <div class="flex flex-col items-center gap-1">
+                                            @if (entry.MoodBefore > 0 && entry.MoodAfter > 0)
+                                            {
+                                                <div class="flex items-center gap-1 text-xs">
+                                                    <span class="text-gray-400">@entry.MoodBefore</span>
+                                                    <i class="fa-solid fa-arrow-right text-[10px] text-gray-400"></i>
+                                                    <span
+                                                    class="@(entry.MoodAfter >= entry.MoodBefore ? "text-success-500" : "text-error-500")">@entry.MoodAfter</span>
+                                                </div>
+                                            }
+                                            <button @onclick="() => DeleteEntryAsync(entry.Id)"
+                                                    class="text-gray-400 hover:text-error-500 transition-colors" title="Delete entry">
+                                                <i class="fa-solid fa-trash-can text-xs"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    <!-- New/Edit Entry Modal -->
+                    @if (_showModal)
+                    {
+                        <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5">
+                            <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @onclick="CloseModal"></div>
+                            <div
+                                class="relative w-full max-w-[600px] max-h-[90vh] overflow-y-auto rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8">
+                                <button @onclick="CloseModal" type="button"
+                                        class="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-gray-200 text-gray-500 hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+
+                                <div class="mb-5">
+                                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+                                        @(_selectedExercise is not null ? _selectedExercise.Title : "Thought Record")
+                                    </h3>
+                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                        @(_selectedExercise is not null ? _selectedExercise.Description : "Capture the situation, your automatic thought, and create a balanced reframe.")
+                                    </p>
+                                </div>
+
+                                <form @onsubmit="SaveEntryAsync" @onsubmit:preventDefault="true">
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label
+                                            class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Situation</label>
+                                            <textarea @bind="_formSituation" rows="2"
+                                                      placeholder="What was happening? (e.g., 'I was browsing online and saw a sale...')"
+                                                      class="block w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-white/30"></textarea>
+                                        </div>
+
+                                        <div>
+                                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Automatic
+                                                Thought</label>
+                                                <textarea @bind="_formThought" rows="2"
+                                                          placeholder="What thought popped into your mind? (e.g., 'I deserve this, I've had a hard week...')"
+                                                          class="block w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-white/30"></textarea>
+                                            </div>
+
+                                            <div>
+                                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Emotion &
+                                                    Intensity</label>
+                                                    <div class="flex items-center gap-3">
+                                                        <input @bind="_formEmotion" type="text" placeholder="e.g., Anxious, Guilty, Excited"
+                                                               class="flex-1 rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-white/30" />
+                                                        <div class="flex items-center gap-2">
+                                                            <input @bind="_formEmotionIntensity" type="range" min="1" max="10"
+                                                                   class="w-20 accent-brand-500" />
+                                                            <span
+                                                            class="text-sm font-medium text-gray-600 dark:text-gray-300 w-6 text-center">@_formEmotionIntensity</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Cognitive
+                                                        Distortion</label>
+                                                        <div class="flex flex-wrap gap-2">
+                                                            @foreach (var distortion in Enum.GetValues<CognitiveDistortion>())
+                                                            {
+                                                                var isSelected = _formDistortion == distortion;
+                                                                <button type="button" @onclick="() => SelectDistortion(distortion)"
+                                                                        class="m3-chip @(isSelected ? "m3-chip-selected border-brand-500 bg-brand-50 text-brand-700 dark:border-brand-400 dark:bg-brand-500/15 dark:text-brand-400" : "border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400") rounded-full border px-3 py-1 text-xs font-medium transition-colors">
+                                                                    @CbtService.GetDistortionLabel(distortion)
+                                                                </button>
+                                                            }
+                                                        </div>
+                                                        @if (_formDistortion.HasValue)
+                                                        {
+                                                            <div
+                                                                class="mt-2 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                                                                <span class="font-medium">What it means:</span>
+                                                                @CbtService.GetDistortionDescription(_formDistortion.Value)
+                                                            </div>
+                                                        }
+                                                    </div>
+
+                                                    <div>
+                                                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Rational
+                                                            Response / Reframe</label>
+                                                            @if (_formDistortion.HasValue)
+                                                            {
+                                                                <div
+                                                                    class="mb-2 rounded-lg bg-success-50 px-3 py-2 text-xs text-success-700 dark:bg-success-500/10 dark:text-success-400">
+                                                                    <span class="font-medium">Try this:</span>
+                                                                    @CbtService.GetReframingPrompt(_formDistortion.Value)
+                                                                </div>
+                                                            }
+                                                            <textarea @bind="_formReframe" rows="2"
+                                                                      placeholder="What's a more balanced way to think about this?"
+                                                                      class="block w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-white/30"></textarea>
+                                                        </div>
+
+                                                        <div>
+                                                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Spending Amount
+                                                                (optional)</label>
+                                                                <input @bind="_formSpendingAmount" type="number" step="0.01" inputmode="decimal"
+                                                                       placeholder="0.00"
+                                                                       class="block w-full rounded-lg border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder:text-white/30" />
+                                                            </div>
+
+                                                            <div>
+                                                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-400">Mood
+                                                                    Check</label>
+                                                                    <div class="flex items-center gap-6">
+                                                                        <div class="flex items-center gap-2">
+                                                                            <span class="text-xs text-gray-500">Before</span>
+                                                                            <input @bind="_formMoodBefore" type="range" min="1" max="10"
+                                                                                   class="w-24 accent-brand-500" />
+                                                                            <span
+                                                                            class="text-sm font-medium text-gray-600 dark:text-gray-300 w-6 text-center">@_formMoodBefore</span>
+                                                                        </div>
+                                                                        <div class="flex items-center gap-2">
+                                                                            <span class="text-xs text-gray-500">After</span>
+                                                                            <input @bind="_formMoodAfter" type="range" min="1" max="10"
+                                                                                   class="w-24 accent-brand-500" />
+                                                                            <span
+                                                                            class="text-sm font-medium text-gray-600 dark:text-gray-300 w-6 text-center">@_formMoodAfter</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                @if (!string.IsNullOrWhiteSpace(_formError))
+                                                                {
+                                                                    <div
+                                                                        class="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+                                                                        @_formError</div>
+                                                                    }
+                                                                </div>
+
+                                                                <div class="mt-6 flex items-center justify-end gap-3">
+                                                                    <button @onclick="CloseModal" type="button"
+                                                                            class="rounded-full border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-transparent dark:text-gray-300 dark:hover:bg-white/[0.05]">
+                                                                        Cancel
+                                                                    </button>
+                                                                    <button type="submit" disabled="@_isSaving"
+                                                                            class="rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600">
+                                                                        Save Entry
+                                                                    </button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+
+@code
+{
+    private List<CbtJournalEntry> _entries = [];
+    private Dictionary<CognitiveDistortion, int> _distortionFrequency = new();
+    private IReadOnlyList<CbtExercise> _exercises = [];
+    private bool _isLoading = true;
+
+    private bool _showModal;
+    private CbtExercise? _selectedExercise;
+    private string _formSituation = "";
+    private string _formThought = "";
+    private string _formEmotion = "";
+    private int _formEmotionIntensity = 5;
+    private CognitiveDistortion? _formDistortion;
+    private string _formReframe = "";
+    private decimal? _formSpendingAmount;
+    private int _formMoodBefore = 5;
+    private int _formMoodAfter = 5;
+    private bool _isSaving;
+    private string _formError = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _exercises = CbtService.GetExercises();
+        _entries = await CbtService.GetAllEntriesAsync();
+        _distortionFrequency = await CbtService.GetDistortionFrequencyAsync();
+        _isLoading = false;
+    }
+
+    private void OpenNewEntry()
+    {
+        ResetForm();
+        _selectedExercise = null;
+        _showModal = true;
+    }
+
+    private void StartExercise(CbtExercise exercise)
+    {
+        ResetForm();
+        _selectedExercise = exercise;
+        _formSituation = "";
+        _showModal = true;
+    }
+
+    private void SelectDistortion(CognitiveDistortion distortion)
+    {
+        _formDistortion = _formDistortion == distortion ? null : distortion;
+    }
+
+    private async Task SaveEntryAsync()
+    {
+        _formError = "";
+        if (string.IsNullOrWhiteSpace(_formSituation) || string.IsNullOrWhiteSpace(_formThought))
+        {
+            _formError = "Situation and automatic thought are required.";
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            var entry = new CbtJournalEntry
+            {
+                Situation = _formSituation.Trim(),
+                AutomaticThought = _formThought.Trim(),
+                Emotion = _formEmotion.Trim(),
+                EmotionIntensity = _formEmotionIntensity,
+                Distortion = _formDistortion,
+                RationalResponse = _formReframe.Trim(),
+                SpendingAmount = _formSpendingAmount > 0 ? _formSpendingAmount : null,
+                MoodBefore = _formMoodBefore,
+                MoodAfter = _formMoodAfter,
+            };
+
+            await CbtService.CreateEntryAsync(entry);
+
+            var settings = await SettingsService.GetAsync();
+            if (settings.EnableScoring)
+            {
+                await ScoringService.AddScoreEventAsync(5, ScoreChangeReason.CbtExerciseCompleted, "Completed a CBT thought record");
+            }
+            await LevelService.AddXpAsync(10);
+
+            _entries = await CbtService.GetAllEntriesAsync();
+            _distortionFrequency = await CbtService.GetDistortionFrequencyAsync();
+            CloseModal();
+        }
+        catch
+        {
+            _formError = "Unable to save entry. Please try again.";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task DeleteEntryAsync(int id)
+    {
+        await CbtService.DeleteEntryAsync(id);
+        _entries.RemoveAll(e => e.Id == id);
+    }
+
+    private void CloseModal()
+    {
+        _showModal = false;
+        _formError = "";
+    }
+
+    private void ResetForm()
+    {
+        _formSituation = "";
+        _formThought = "";
+        _formEmotion = "";
+        _formEmotionIntensity = 5;
+        _formDistortion = null;
+        _formReframe = "";
+        _formSpendingAmount = null;
+        _formMoodBefore = 5;
+        _formMoodAfter = 5;
+        _formError = "";
+    }
+}

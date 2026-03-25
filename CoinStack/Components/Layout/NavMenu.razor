@@ -109,7 +109,47 @@
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Reports</span>
                         </NavLink>
                     </li>
+                </ul>
 
+                <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
+                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">MINDSET & GROWTH</span>
+                </h3>
+
+                <ul class="mb-6 flex flex-col gap-1">
+                    <li>
+                        <NavLink href="/cbt-journal" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-brain fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Mindset Journal</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
+                        <NavLink href="/challenges" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-bolt fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Challenges</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
+                        <NavLink href="/achievements" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-trophy fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Achievements</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
+                        <NavLink href="/recap" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-calendar-week fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Weekly Recap</span>
+                        </NavLink>
+                    </li>
+                </ul>
+
+                <ul class="mb-6 flex flex-col gap-1">
                     <li>
                         <NavLink href="/settings" class="menu-item group menu-item-inactive"
                                  ActiveClass="menu-item-active">

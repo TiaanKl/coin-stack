@@ -1,0 +1,146 @@
+@page "/recap"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@inject CoinStack.Services.IWeeklyRecapService RecapService
+@inject CoinStack.Services.ISettingsService SettingsService
+
+<PageTitle>Weekly Recap</PageTitle>
+
+<div>
+    <div class="mb-6">
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Weekly Recap</h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Your financial week at a glance</p>
+    </div>
+
+    @if (_isLoading)
+    {
+        <div class="text-sm text-gray-500 dark:text-gray-400">Loading...</div>
+    }
+    else if (_recaps.Count == 0)
+    {
+        <div class="rounded-2xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+            <div
+                class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-brand-50 dark:bg-brand-500/15">
+                <i class="fa-solid fa-calendar-week text-2xl text-brand-500"></i>
+            </div>
+            <h3 class="mb-2 text-base font-semibold text-gray-800 dark:text-white/90">No Recaps Yet</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Weekly recaps will be generated at the end of each week.</p>
+            <button @onclick="GenerateRecapAsync"
+                    class="m3-btn-filled mt-4 inline-flex items-center gap-2 rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Now
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="space-y-6">
+            @foreach (var recap in _recaps)
+            {
+                var isCurrent = recap == _recaps.First();
+                <div
+                    class="@(isCurrent ? "border-brand-200 dark:border-brand-500/30" : "border-gray-200 dark:border-gray-800") m3-card rounded-2xl border bg-white p-6 dark:bg-white/[0.03]">
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/15">
+                                <i class="fa-solid fa-calendar-week text-brand-500"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Week @recap.WeekNumber,
+                                    @recap.Year</h3>
+                                    @if (!recap.IsViewed)
+                                    {
+                                        <span
+                                        class="inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">New</span>
+                                    }
+                                </div>
+                            </div>
+                            @if (!recap.IsViewed)
+                            {
+                                <button @onclick="() => MarkViewedAsync(recap.Id)"
+                                        class="text-xs text-gray-400 hover:text-brand-500 transition-colors">
+                                    Mark as read
+                                </button>
+                            }
+                        </div>
+
+                        <!-- Stats Grid -->
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
+                            <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Income</p>
+                                <p class="text-lg font-bold text-success-600 dark:text-success-400">
+                                    @recap.TotalIncome.ToString("C0")</p>
+                                </div>
+                                <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Spent</p>
+                                    <p class="text-lg font-bold text-error-600 dark:text-error-400">@recap.TotalSpent.ToString("C0")</p>
+                                </div>
+                                <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">Saved</p>
+                                    <p
+                                        class="text-lg font-bold @(recap.TotalSaved >= 0 ? "text-success-600 dark:text-success-400" : "text-error-600 dark:text-error-400")">
+                                        @recap.TotalSaved.ToString("C0")</p>
+                                    </div>
+                                    <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/50">
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Points</p>
+                                        <p class="text-lg font-bold text-brand-600 dark:text-brand-400">@recap.PointsEarned</p>
+                                    </div>
+                                </div>
+
+                                <!-- Activity Summary -->
+                                <div class="flex flex-wrap gap-3 mb-4">
+                                    <div
+                                        class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">
+                                        <i class="fa-solid fa-bolt"></i> @recap.ChallengesCompleted challenges
+                                    </div>
+                                    <div
+                                        class="inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs text-purple-700 dark:bg-purple-500/15 dark:text-purple-400">
+                                        <i class="fa-solid fa-lightbulb"></i> @recap.ReflectionsCompleted reflections
+                                    </div>
+                                    <div
+                                        class="inline-flex items-center gap-1.5 rounded-full bg-warning-50 px-3 py-1 text-xs text-warning-700 dark:bg-warning-500/15 dark:text-warning-400">
+                                        <i class="fa-solid fa-fire"></i> @recap.StreakDays day streak
+                                    </div>
+                                    <div
+                                        class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300">
+                                        <i class="fa-solid fa-tag"></i> Top: @recap.TopCategory
+                                    </div>
+                                </div>
+
+                                <!-- Insight -->
+                                @if (!string.IsNullOrWhiteSpace(recap.InsightMessage))
+                                {
+                                    <div
+                                        class="rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                                        <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> @recap.InsightMessage
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+
+@code
+{
+    private List<WeeklyRecap> _recaps = [];
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _recaps = await RecapService.GetAllAsync();
+        _isLoading = false;
+    }
+
+    private async Task GenerateRecapAsync()
+    {
+        await RecapService.GenerateRecapAsync();
+        _recaps = await RecapService.GetAllAsync();
+    }
+
+    private async Task MarkViewedAsync(int id)
+    {
+        await RecapService.MarkViewedAsync(id);
+        var recap = _recaps.FirstOrDefault(r => r.Id == id);
+        if (recap is not null) recap.IsViewed = true;
+    }
+}
