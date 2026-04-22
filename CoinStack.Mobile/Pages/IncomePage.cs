@@ -17,11 +17,10 @@ public sealed class IncomePage : ContentPage
     {
         _financeService = financeService;
         Title = "Income";
-        BackgroundColor = AppColors.Background;
 
-        _mtdLabel = new Label { Text = "$0.00", FontFamily = "SpaceGroteskBold", FontSize = 28, TextColor = AppColors.Dark };
-        _ytdLabel = new Label { Text = "$0.00", FontFamily = "SpaceGroteskBold", FontSize = 18, TextColor = AppColors.Success };
-        _avgLabel = new Label { Text = "$0.00", FontFamily = "SpaceGroteskRegular", FontSize = 14, TextColor = AppColors.Muted };
+        _mtdLabel = new Label { Text = "$0.00", FontFamily = "InterBold", FontSize = 28, TextColor = AppColors.Dark };
+        _ytdLabel = new Label { Text = "$0.00", FontFamily = "InterBold", FontSize = 18, TextColor = AppColors.Success };
+        _avgLabel = new Label { Text = "$0.00", FontFamily = "InterRegular", FontSize = 14, TextColor = AppColors.Muted };
         _depositsList = new VerticalStackLayout { Spacing = 8 };
 
         var summaryCard = new Border
@@ -36,7 +35,7 @@ public sealed class IncomePage : ContentPage
                 Spacing = 12,
                 Children =
                 {
-                    new Label { Text = "Month to Date", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
+                    new Label { Text = "Month to Date", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
                     _mtdLabel,
                     new BoxView { HeightRequest = 1, Color = AppColors.Border },
                     CreateStatRow("Year to Date", _ytdLabel),
@@ -57,7 +56,7 @@ public sealed class IncomePage : ContentPage
                 Spacing = 12,
                 Children =
                 {
-                    new Label { Text = "Recent Deposits", FontFamily = "SpaceGroteskBold", FontSize = 18, TextColor = AppColors.Dark },
+                    new Label { Text = "Recent Deposits", FontFamily = "InterBold", FontSize = 18, TextColor = AppColors.Dark },
                     _depositsList
                 }
             }
@@ -71,7 +70,7 @@ public sealed class IncomePage : ContentPage
                 Spacing = 16,
                 Children =
                 {
-                    new Label { Text = "Income Streams", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark },
+                    new Label { Text = "Income Streams", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark },
                     summaryCard,
                     depositsCard
                 }
@@ -99,7 +98,7 @@ public sealed class IncomePage : ContentPage
             _depositsList.Children.Clear();
             if (snapshot.RecentDeposits.Count == 0)
             {
-                _depositsList.Children.Add(new Label { Text = "No income recorded yet.", FontFamily = "SpaceGroteskRegular", FontSize = 14, TextColor = AppColors.Muted });
+                _depositsList.Children.Add(new Label { Text = "No income recorded yet.", FontFamily = "InterRegular", FontSize = 14, TextColor = AppColors.Muted });
                 return;
             }
 
@@ -114,15 +113,15 @@ public sealed class IncomePage : ContentPage
                 {
                     Children =
                     {
-                        new Label { Text = tx.Description, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark },
-                        new Label { Text = tx.OccurredAtUtc.ToString("dd MMM yyyy"), FontSize = 12, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" }
+                        new Label { Text = tx.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark },
+                        new Label { Text = tx.OccurredAtUtc.ToString("dd MMM yyyy"), FontSize = 12, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                     }
                 };
                 Grid.SetColumn(info, 0);
                 var amount = new Label
                 {
                     Text = $"+{MoneyDisplay.Format(settings.Currency, tx.Amount)}",
-                    FontFamily = "SpaceGroteskBold",
+                    FontFamily = "InterBold",
                     FontSize = 14,
                     TextColor = AppColors.Success,
                     VerticalOptions = LayoutOptions.Center,
@@ -146,7 +145,7 @@ public sealed class IncomePage : ContentPage
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
         };
-        var lbl = new Label { Text = label, FontSize = 14, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular", VerticalOptions = LayoutOptions.Center };
+        var lbl = new Label { Text = label, FontSize = 14, TextColor = AppColors.Muted, FontFamily = "InterRegular", VerticalOptions = LayoutOptions.Center };
         Grid.SetColumn(lbl, 0);
         Grid.SetColumn(valueLabel, 1);
         grid.Children.Add(lbl);

@@ -6,8 +6,18 @@ public sealed class MoneyHubPage : ContentPage
 {
     public MoneyHubPage()
     {
+        BuildContent();
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        BuildContent();
+    }
+
+    private void BuildContent()
+    {
         Title = "Money";
-        BackgroundColor = AppColors.Background;
 
         Content = new ScrollView
         {

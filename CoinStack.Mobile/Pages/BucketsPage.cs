@@ -1,5 +1,7 @@
 using CoinStack.Mobile.Core;
+using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Services;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace CoinStack.Mobile.Pages;
 
@@ -26,30 +28,46 @@ public sealed class BucketsPage : ContentPage
 
         _list = new VerticalStackLayout { Spacing = 8 };
 
+        // ── Add Bucket Card ──
+        var formCard = CreateCard(new VerticalStackLayout
+        {
+            Spacing = 12,
+            Children =
+            {
+                new Label { Text = "New Bucket", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                _nameEntry,
+                _amountEntry,
+                new Grid
+                {
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                    Children =
+                    {
+                        new Label { Text = "Savings bucket", FontFamily = "InterRegular", FontSize = 14, TextColor = AppColors.Dark, VerticalOptions = LayoutOptions.Center },
+                    }
+                },
+                addButton
+            }
+        });
+        ((Grid)((VerticalStackLayout)formCard.Content).Children[3]).Add(_isSavingsSwitch, 1, 0);
+
+        // ── Buckets List Card ──
+        var listCard = CreateCard(new VerticalStackLayout
+        {
+            Spacing = 10,
+            Children =
+            {
+                new Label { Text = "Current Buckets", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                _list
+            }
+        });
+
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
             {
-                Padding = new Thickness(16),
-                Spacing = 10,
-                Children =
-                {
-                    _nameEntry,
-                    _amountEntry,
-                    new HorizontalStackLayout
-                    {
-                        Spacing = 8,
-                        Children =
-                        {
-                            new Label { Text = "Savings bucket", VerticalTextAlignment = TextAlignment.Center },
-                            _isSavingsSwitch
-                        }
-                    },
-                    addButton,
-                    new BoxView { HeightRequest = 1 },
-                    new Label { Text = "Current Buckets", FontSize = 18, FontAttributes = FontAttributes.Bold },
-                    _list
-                }
+                Padding = new Thickness(20),
+                Spacing = 16,
+                Children = { formCard, listCard }
             }
         };
     }
@@ -92,16 +110,39 @@ public sealed class BucketsPage : ContentPage
             _list.Children.Clear();
             if (buckets.Count == 0)
             {
-                _list.Children.Add(new Label { Text = "No buckets yet." });
+                _list.Children.Add(new Label { Text = "No buckets yet.", FontFamily = "InterRegular", TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(0, 16) });
                 return;
             }
 
             foreach (var bucket in buckets)
             {
-                _list.Children.Add(new Label
+                var typeBadge = new Border
                 {
-                    Text = $"{bucket.Name} • {MoneyDisplay.Format(settings.Currency, bucket.AllocatedAmount)} • {(bucket.IsSavings ? "Savings" : "Spending")}",
-                    FontSize = 14
+                    BackgroundColor = bucket.IsSavings ? AppColors.BgSuccess : AppColors.SurfaceContainer,
+                    StrokeShape = new RoundRectangle { CornerRadius = 8 },
+                    Stroke = Brush.Transparent,
+                    Padding = new Thickness(8, 4),
+                    Content = new Label { Text = bucket.IsSavings ? "Savings" : "Spending", FontSize = 11, FontFamily = "InterBold", TextColor = bucket.IsSavings ? AppColors.Success : AppColors.Muted }
+                };
+
+                var row = new Grid
+                {
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                    RowDefinitions = { new RowDefinition(GridLength.Auto), new RowDefinition(GridLength.Auto) },
+                    ColumnSpacing = 8,
+                    RowSpacing = 4,
+                    Padding = new Thickness(12, 10)
+                };
+                row.Add(new Label { Text = bucket.Name, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark }, 0, 0);
+                row.Add(new Label { Text = MoneyDisplay.Format(settings.Currency, bucket.AllocatedAmount), FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, HorizontalOptions = LayoutOptions.End }, 1, 0);
+                row.Add(typeBadge, 0, 1);
+
+                _list.Children.Add(new Border
+                {
+                    BackgroundColor = AppColors.SurfaceDim,
+                    StrokeShape = new RoundRectangle { CornerRadius = 10 },
+                    Stroke = Brush.Transparent,
+                    Content = row
                 });
             }
         }
@@ -110,4 +151,14 @@ public sealed class BucketsPage : ContentPage
             await DisplayAlertAsync("Error", ex.Message, "OK");
         }
     }
+
+    private static Border CreateCard(View content) => new()
+    {
+        BackgroundColor = AppColors.Surface,
+        StrokeShape = new RoundRectangle { CornerRadius = 16 },
+        Stroke = new SolidColorBrush(AppColors.Border),
+        StrokeThickness = 1,
+        Padding = new Thickness(16),
+        Content = content
+    };
 }

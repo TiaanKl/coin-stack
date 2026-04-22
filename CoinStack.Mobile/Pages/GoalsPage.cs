@@ -1,6 +1,8 @@
 using CoinStack.Data.Entities;
 using CoinStack.Mobile.Core;
+using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Services;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace CoinStack.Mobile.Pages;
 
@@ -27,26 +29,42 @@ public sealed class GoalsPage : ContentPage
         var addButton = new Button { Text = "Add Goal" };
         addButton.Clicked += async (_, _) => await AddGoalAsync();
 
-        _list = new VerticalStackLayout { Spacing = 8 };
+        _list = new VerticalStackLayout { Spacing = 10 };
+
+        // ── Add Goal Card ──
+        var formCard = CreateCard(new VerticalStackLayout
+        {
+            Spacing = 12,
+            Children =
+            {
+                new Label { Text = "New Goal", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                _nameEntry,
+                _targetEntry,
+                _currentEntry,
+                new Label { Text = "Target date", FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Muted },
+                _targetDatePicker,
+                addButton
+            }
+        });
+
+        // ── Goals List Card ──
+        var listCard = CreateCard(new VerticalStackLayout
+        {
+            Spacing = 10,
+            Children =
+            {
+                new Label { Text = "Goals", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                _list
+            }
+        });
 
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
             {
-                Padding = new Thickness(16),
-                Spacing = 10,
-                Children =
-                {
-                    _nameEntry,
-                    _targetEntry,
-                    _currentEntry,
-                    new Label { Text = "Target date" },
-                    _targetDatePicker,
-                    addButton,
-                    new BoxView { HeightRequest = 1 },
-                    new Label { Text = "Goals", FontSize = 18, FontAttributes = FontAttributes.Bold },
-                    _list
-                }
+                Padding = new Thickness(20),
+                Spacing = 16,
+                Children = { formCard, listCard }
             }
         };
     }
@@ -115,47 +133,73 @@ public sealed class GoalsPage : ContentPage
             _list.Children.Clear();
             if (goals.Count == 0)
             {
-                _list.Children.Add(new Label { Text = "No goals yet." });
+                _list.Children.Add(new Label { Text = "No goals yet.", FontFamily = "InterRegular", TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(0, 16) });
                 return;
             }
 
             foreach (var goal in goals)
             {
                 var percent = goal.TargetAmount > 0 ? Math.Min(100, (goal.CurrentAmount / goal.TargetAmount) * 100m) : 0m;
+                var statusColor = goal.Status == GoalStatus.Completed ? AppColors.Success : AppColors.Dark;
 
-                var item = new VerticalStackLayout { Spacing = 4 };
+                var item = new VerticalStackLayout { Spacing = 6 };
+
+                var header = new Grid
+                {
+                    ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
+                };
+                header.Add(new Label { Text = goal.Name, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark }, 0, 0);
+                var statusBadge = new Border
+                {
+                    BackgroundColor = goal.Status == GoalStatus.Completed ? AppColors.BgSuccess : AppColors.SurfaceContainer,
+                    StrokeShape = new RoundRectangle { CornerRadius = 8 },
+                    Stroke = Brush.Transparent,
+                    Padding = new Thickness(8, 4),
+                    Content = new Label { Text = goal.Status.ToString(), FontSize = 11, FontFamily = "InterBold", TextColor = statusColor },
+                    HorizontalOptions = LayoutOptions.End
+                };
+                header.Add(statusBadge, 1, 0);
+                item.Children.Add(header);
+
+                item.Children.Add(new ProgressBar { Progress = (double)(percent / 100m), ProgressColor = AppColors.Accent, HeightRequest = 6 });
                 item.Children.Add(new Label
                 {
-                    Text = $"{goal.Name} ({goal.Status})",
-                    FontAttributes = FontAttributes.Bold,
-                    FontSize = 14
+                    Text = $"{MoneyDisplay.Format(settings.Currency, goal.CurrentAmount)} / {MoneyDisplay.Format(settings.Currency, goal.TargetAmount)} · {percent:0.#}%",
+                    FontSize = 12,
+                    FontFamily = "InterRegular",
+                    TextColor = AppColors.Muted
                 });
-                item.Children.Add(new Label
-                {
-                    Text = $"{MoneyDisplay.Format(settings.Currency, goal.CurrentAmount)} / {MoneyDisplay.Format(settings.Currency, goal.TargetAmount)} • {percent:0.#}%",
-                    FontSize = 13
-                });
+
                 if (goal.TargetDateUtc.HasValue)
                 {
                     item.Children.Add(new Label
                     {
-                        Text = $"Target date: {goal.TargetDateUtc.Value:dd MMM yyyy}",
-                        FontSize = 12
+                        Text = $"Target: {goal.TargetDateUtc.Value:dd MMM yyyy}",
+                        FontSize = 11,
+                        FontFamily = "InterRegular",
+                        TextColor = AppColors.Muted
                     });
                 }
 
-                var actions = new HorizontalStackLayout { Spacing = 8 };
-                var contributeButton = new Button { Text = "Add", FontSize = 12, Padding = new Thickness(10, 4) };
-                var deleteButton = new Button { Text = "Delete", FontSize = 12, Padding = new Thickness(10, 4) };
+                var actions = new HorizontalStackLayout { Spacing = 8, Margin = new Thickness(0, 4, 0, 0) };
+                var contributeButton = new Button { Text = "Add", FontSize = 12, Padding = new Thickness(12, 6), HeightRequest = 36, CornerRadius = 18 };
+                var deleteButton = new Button { Text = "Delete", FontSize = 12, Padding = new Thickness(12, 6), HeightRequest = 36, CornerRadius = 18, BackgroundColor = AppColors.Danger };
                 var id = goal.Id;
                 contributeButton.Clicked += async (_, _) => await ContributeAsync(id);
                 deleteButton.Clicked += async (_, _) => await DeleteAsync(id);
                 actions.Children.Add(contributeButton);
                 actions.Children.Add(deleteButton);
-
                 item.Children.Add(actions);
-                item.Children.Add(new BoxView { HeightRequest = 1 });
-                _list.Children.Add(item);
+
+                _list.Children.Add(new Border
+                {
+                    BackgroundColor = AppColors.SurfaceDim,
+                    StrokeShape = new RoundRectangle { CornerRadius = 12 },
+                    Stroke = new SolidColorBrush(AppColors.Border),
+                    StrokeThickness = 1,
+                    Padding = new Thickness(14, 12),
+                    Content = item
+                });
             }
         }
         catch (Exception ex)
@@ -163,4 +207,14 @@ public sealed class GoalsPage : ContentPage
             await DisplayAlertAsync("Error", ex.Message, "OK");
         }
     }
+
+    private static Border CreateCard(View content) => new()
+    {
+        BackgroundColor = AppColors.Surface,
+        StrokeShape = new RoundRectangle { CornerRadius = 16 },
+        Stroke = new SolidColorBrush(AppColors.Border),
+        StrokeThickness = 1,
+        Padding = new Thickness(16),
+        Content = content
+    };
 }

@@ -73,7 +73,35 @@ public sealed class AppShell : Shell
 
         Items.Add(tabBar);
 
-        // Shell tab bar styling
+        ApplyThemeColors();
+        FlyoutBehavior = FlyoutBehavior.Disabled;
+
+        // Pop sub-pages off the navigation stack when the user switches tabs,
+        // so each tab always shows its root hub page.
+        Navigating += OnShellNavigating;
+    }
+
+    private static async void OnShellNavigating(object? sender, ShellNavigatingEventArgs e)
+    {
+        // Only act on tab-switch navigation (ShellNavigationSource.ShellSectionChanged)
+        if (e.Source != ShellNavigationSource.ShellSectionChanged)
+            return;
+
+        if (Shell.Current?.CurrentPage?.Navigation is { } nav && nav.NavigationStack.Count > 1)
+        {
+            // We can't modify the stack during the Navigating event,
+            // so defer until the navigation completes.
+            Shell.Current.Dispatcher.Dispatch(async () =>
+            {
+                while (nav.NavigationStack.Count > 1)
+                    await nav.PopAsync(animated: false);
+            });
+        }
+    }
+
+    /// <summary>Re-apply shell chrome colours from the current AppColors tokens.</summary>
+    internal void ApplyThemeColors()
+    {
         Shell.SetTabBarBackgroundColor(this, AppColors.Surface);
         Shell.SetTabBarUnselectedColor(this, AppColors.TabUnselected);
         Shell.SetTabBarTitleColor(this, AppColors.Dark);
@@ -81,7 +109,5 @@ public sealed class AppShell : Shell
         Shell.SetNavBarHasShadow(this, false);
         Shell.SetBackgroundColor(this, AppColors.Surface);
         Shell.SetForegroundColor(this, AppColors.Dark);
-
-        FlyoutBehavior = FlyoutBehavior.Disabled;
     }
 }

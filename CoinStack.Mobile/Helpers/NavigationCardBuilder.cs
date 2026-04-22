@@ -9,13 +9,13 @@ public static class NavigationCardBuilder
 {
     public static View Create(string title, string subtitle, string iconGlyph, string route)
     {
-        var iconLabel = AppIcons.CreateLabel(iconGlyph, AppColors.Dark, 24);
-        iconLabel.WidthRequest = 24;
-        iconLabel.HeightRequest = 24;
+        var iconLabel = AppIcons.CreateLabel(iconGlyph, AppColors.Dark, 18);
+        iconLabel.VerticalOptions = LayoutOptions.Center;
+        iconLabel.HorizontalOptions = LayoutOptions.Center;
 
         var iconFrame = new Border
         {
-            BackgroundColor = Color.FromArgb("#f0f5e0"),
+            BackgroundColor = AppColors.NavIconBg,
             StrokeShape = new RoundRectangle { CornerRadius = 12 },
             Stroke = Colors.Transparent,
             StrokeThickness = 0,
@@ -26,7 +26,7 @@ public static class NavigationCardBuilder
             VerticalOptions = LayoutOptions.Center
         };
 
-        var chevron = AppIcons.CreateLabel(AppIcons.GlyphChevronRight, AppColors.Muted, 20);
+        var chevron = AppIcons.CreateLabel(AppIcons.GlyphChevronRight, AppColors.Muted, 16);
         chevron.VerticalOptions = LayoutOptions.Center;
 
         var titleLabel = new Label

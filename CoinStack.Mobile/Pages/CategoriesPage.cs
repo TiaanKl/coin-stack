@@ -14,7 +14,6 @@ public sealed class CategoriesPage : ContentPage
     {
         _financeService = financeService;
         Title = "Categories";
-        BackgroundColor = AppColors.Background;
 
         _categoryList = new VerticalStackLayout { Spacing = 8 };
 
@@ -39,8 +38,8 @@ public sealed class CategoriesPage : ContentPage
                 Spacing = 16,
                 Children =
                 {
-                    new Label { Text = "Categories", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark },
-                    new Label { Text = "Manage transaction categories for expenses and income.", FontSize = 14, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
+                    new Label { Text = "Categories", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark },
+                    new Label { Text = "Manage transaction categories for expenses and income.", FontSize = 14, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
                     addButton,
                     _categoryList
                 }
@@ -63,7 +62,7 @@ public sealed class CategoriesPage : ContentPage
 
             if (categories.Count == 0)
             {
-                _categoryList.Children.Add(new Label { Text = "No categories yet.", FontFamily = "SpaceGroteskRegular", FontSize = 14, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center });
+                _categoryList.Children.Add(new Label { Text = "No categories yet.", FontFamily = "InterRegular", FontSize = 14, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center });
                 return;
             }
 
@@ -78,8 +77,8 @@ public sealed class CategoriesPage : ContentPage
                     VerticalOptions = LayoutOptions.Center
                 };
 
-                var nameLabel = new Label { Text = cat.Name, FontFamily = "SpaceGroteskBold", FontSize = 15, TextColor = AppColors.Dark, VerticalOptions = LayoutOptions.Center };
-                var scopeLabel = new Label { Text = cat.Scope.ToString(), FontSize = 12, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular", VerticalOptions = LayoutOptions.Center };
+                var nameLabel = new Label { Text = cat.Name, FontFamily = "InterBold", FontSize = 15, TextColor = AppColors.Dark, VerticalOptions = LayoutOptions.Center };
+                var scopeLabel = new Label { Text = cat.Scope.ToString(), FontSize = 12, TextColor = AppColors.Muted, FontFamily = "InterRegular", VerticalOptions = LayoutOptions.Center };
 
                 var deleteBtn = new Label
                 {

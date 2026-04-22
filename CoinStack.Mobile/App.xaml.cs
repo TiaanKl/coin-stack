@@ -1,4 +1,5 @@
-﻿using CoinStack.Mobile.Services;
+﻿using CoinStack.Mobile.Helpers;
+using CoinStack.Mobile.Services;
 
 namespace CoinStack.Mobile;
 
@@ -10,6 +11,10 @@ public partial class App : Application
 	{
 		_databaseInitializationService = databaseInitializationService;
 		InitializeComponent();
+
+		// Apply saved theme (Light / Dark / System) before any UI is created
+		AppThemeManager.ApplyTheme();
+
 		_ = InitializeDatabaseAsync();
 	}
 

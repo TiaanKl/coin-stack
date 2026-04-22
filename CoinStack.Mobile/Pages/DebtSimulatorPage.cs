@@ -22,20 +22,19 @@ public sealed class DebtSimulatorPage : ContentPage
     {
         _financeService = financeService;
         Title = "Debt Simulator";
-        BackgroundColor = AppColors.Background;
 
-        _debtPicker = new Picker { Title = "Select a debt", FontFamily = "SpaceGroteskRegular" };
+        _debtPicker = new Picker { Title = "Select a debt", FontFamily = "InterRegular" };
         _debtPicker.SelectedIndexChanged += OnDebtSelected;
 
         _paymentSlider = new Slider { Minimum = 0, Maximum = 5000, Value = 0, MinimumTrackColor = AppColors.Accent, ThumbColor = AppColors.Dark };
         _paymentSlider.ValueChanged += OnSliderChanged;
 
-        _paymentLabel = new Label { Text = "$0.00", FontFamily = "SpaceGroteskBold", FontSize = 22, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center };
-        _payoffDateLabel = new Label { Text = "--", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Success };
-        _totalInterestLabel = new Label { Text = "--", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Danger };
-        _currentBalanceLabel = new Label { Text = "--", FontFamily = "SpaceGroteskRegular", FontSize = 14, TextColor = AppColors.Muted };
-        _interestRateLabel = new Label { Text = "--", FontFamily = "SpaceGroteskRegular", FontSize = 14, TextColor = AppColors.Muted };
-        _currentPaymentLabel = new Label { Text = "--", FontFamily = "SpaceGroteskRegular", FontSize = 14, TextColor = AppColors.Muted };
+        _paymentLabel = new Label { Text = "$0.00", FontFamily = "InterBold", FontSize = 22, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center };
+        _payoffDateLabel = new Label { Text = "--", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Success };
+        _totalInterestLabel = new Label { Text = "--", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Danger };
+        _currentBalanceLabel = new Label { Text = "--", FontFamily = "InterRegular", FontSize = 14, TextColor = AppColors.Muted };
+        _interestRateLabel = new Label { Text = "--", FontFamily = "InterRegular", FontSize = 14, TextColor = AppColors.Muted };
+        _currentPaymentLabel = new Label { Text = "--", FontFamily = "InterRegular", FontSize = 14, TextColor = AppColors.Muted };
 
         var debtInfoCard = new Border
         {
@@ -68,7 +67,7 @@ public sealed class DebtSimulatorPage : ContentPage
                 Spacing = 12,
                 Children =
                 {
-                    new Label { Text = "Adjust Monthly Payment", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
+                    new Label { Text = "Adjust Monthly Payment", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
                     _paymentLabel,
                     _paymentSlider,
                     new BoxView { HeightRequest = 1, Color = AppColors.Border },
@@ -86,8 +85,8 @@ public sealed class DebtSimulatorPage : ContentPage
                 Spacing = 16,
                 Children =
                 {
-                    new Label { Text = "Debt Payoff Simulator", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark },
-                    new Label { Text = "Adjust payments to see how they affect your payoff timeline.", FontSize = 14, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
+                    new Label { Text = "Debt Payoff Simulator", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark },
+                    new Label { Text = "Adjust payments to see how they affect your payoff timeline.", FontSize = 14, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
                     _debtPicker,
                     debtInfoCard,
                     simulatorCard
@@ -187,7 +186,7 @@ public sealed class DebtSimulatorPage : ContentPage
         {
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
         };
-        var lbl = new Label { Text = label, FontSize = 14, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular", VerticalOptions = LayoutOptions.Center };
+        var lbl = new Label { Text = label, FontSize = 14, TextColor = AppColors.Muted, FontFamily = "InterRegular", VerticalOptions = LayoutOptions.Center };
         Grid.SetColumn(lbl, 0);
         Grid.SetColumn(valueLabel, 1);
         grid.Children.Add(lbl);

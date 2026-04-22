@@ -14,7 +14,6 @@ public sealed class AchievementsPage : ContentPage
     {
         _financeService = financeService;
         Title = "Achievements";
-        BackgroundColor = AppColors.Background;
 
         _content = new VerticalStackLayout
         {
@@ -40,7 +39,7 @@ public sealed class AchievementsPage : ContentPage
 
             _content.Children.Clear();
 
-            _content.Children.Add(new Label { Text = "Achievements", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark });
+            _content.Children.Add(new Label { Text = "Achievements", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark });
 
             // Level card
             var xpProgress = levelInfo.XpForNextLevel > 0 ? (double)levelInfo.CurrentXp / levelInfo.XpForNextLevel : 0;
@@ -63,7 +62,7 @@ public sealed class AchievementsPage : ContentPage
                             {
                                 new Border
                                 {
-                                    BackgroundColor = Color.FromArgb("#6577F3"),
+                                    BackgroundColor = AppColors.AccentIndigo,
                                     StrokeShape = new RoundRectangle { CornerRadius = 12 },
                                     Stroke = Colors.Transparent,
                                     WidthRequest = 48,
@@ -73,8 +72,8 @@ public sealed class AchievementsPage : ContentPage
                                     {
                                         Text = levelInfo.Level.ToString(),
                                         FontSize = 20,
-                                        FontFamily = "SpaceGroteskBold",
-                                        TextColor = Colors.White,
+                                        FontFamily = "InterBold",
+                                        TextColor = AppColors.TextOnDark,
                                         HorizontalTextAlignment = TextAlignment.Center,
                                         VerticalTextAlignment = TextAlignment.Center
                                     }
@@ -85,13 +84,13 @@ public sealed class AchievementsPage : ContentPage
                                     VerticalOptions = LayoutOptions.Center,
                                     Children =
                                     {
-                                        new Label { Text = levelInfo.LevelName, FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
-                                        new Label { Text = $"{levelInfo.CurrentXp} / {levelInfo.XpForNextLevel} XP to Level {levelInfo.Level + 1}", FontSize = 12, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" }
+                                        new Label { Text = levelInfo.LevelName, FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                                        new Label { Text = $"{levelInfo.CurrentXp} / {levelInfo.XpForNextLevel} XP to Level {levelInfo.Level + 1}", FontSize = 12, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                                     }
                                 }
                             }
                         },
-                        new ProgressBar { Progress = xpProgress, ProgressColor = Color.FromArgb("#6577F3") }
+                        new ProgressBar { Progress = xpProgress, ProgressColor = AppColors.AccentIndigo }
                     }
                 }
             };
@@ -106,7 +105,7 @@ public sealed class AchievementsPage : ContentPage
                 {
                     Text = categoryName,
                     FontSize = 12,
-                    FontFamily = "SpaceGroteskBold",
+                    FontFamily = "InterBold",
                     TextColor = AppColors.Muted,
                     Margin = new Thickness(0, 8, 0, 0)
                 });
@@ -117,7 +116,7 @@ public sealed class AchievementsPage : ContentPage
 
                     var iconContent = new Border
                     {
-                        BackgroundColor = unlocked ? Color.FromArgb("#DDE0FA") : AppColors.Background,
+                        BackgroundColor = unlocked ? AppColors.BgUnlocked : AppColors.Background,
                         StrokeShape = new RoundRectangle { CornerRadius = 10 },
                         Stroke = Colors.Transparent,
                         WidthRequest = 40,
@@ -130,7 +129,7 @@ public sealed class AchievementsPage : ContentPage
                             FontSize = 16,
                             HorizontalTextAlignment = TextAlignment.Center,
                             VerticalTextAlignment = TextAlignment.Center,
-                            TextColor = unlocked ? Color.FromArgb("#6577F3") : AppColors.Muted
+                            TextColor = unlocked ? AppColors.AccentIndigo : AppColors.Muted
                         }
                     };
 
@@ -138,8 +137,8 @@ public sealed class AchievementsPage : ContentPage
                     {
                         Text = $"+{achievement.XpReward}XP",
                         FontSize = 12,
-                        FontFamily = "SpaceGroteskBold",
-                        TextColor = unlocked ? Color.FromArgb("#6577F3") : AppColors.Muted,
+                        FontFamily = "InterBold",
+                        TextColor = unlocked ? AppColors.AccentIndigo : AppColors.Muted,
                         VerticalOptions = LayoutOptions.Center,
                         HorizontalOptions = LayoutOptions.End
                     };
@@ -161,14 +160,14 @@ public sealed class AchievementsPage : ContentPage
                         VerticalOptions = LayoutOptions.Center,
                         Children =
                         {
-                            new Label { Text = achievement.Title, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark },
-                            new Label { Text = achievement.Description, FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" }
+                            new Label { Text = achievement.Title, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark },
+                            new Label { Text = achievement.Description, FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                         }
                     };
 
                     if (unlocked && achievement.UnlockedAtUtc.HasValue)
                     {
-                        textStack.Children.Add(new Label { Text = $"Unlocked {achievement.UnlockedAtUtc.Value:dd MMM yyyy}", FontSize = 10, TextColor = Color.FromArgb("#6577F3"), FontFamily = "SpaceGroteskRegular" });
+                        textStack.Children.Add(new Label { Text = $"Unlocked {achievement.UnlockedAtUtc.Value:dd MMM yyyy}", FontSize = 10, TextColor = AppColors.AccentIndigo, FontFamily = "InterRegular" });
                     }
 
                     Grid.SetColumn(iconContent, 0);
@@ -180,9 +179,9 @@ public sealed class AchievementsPage : ContentPage
 
                     var card = new Border
                     {
-                        BackgroundColor = unlocked ? Color.FromArgb("#F0F1FE") : AppColors.Surface,
+                        BackgroundColor = unlocked ? AppColors.BgIndigo : AppColors.Surface,
                         StrokeShape = new RoundRectangle { CornerRadius = 14 },
-                        Stroke = new SolidColorBrush(unlocked ? Color.FromArgb("#6577F3") : AppColors.Border),
+                        Stroke = new SolidColorBrush(unlocked ? AppColors.AccentIndigo : AppColors.Border),
                         StrokeThickness = 1,
                         Padding = new Thickness(14),
                         Opacity = unlocked ? 1 : 0.6,
@@ -200,7 +199,7 @@ public sealed class AchievementsPage : ContentPage
                     Text = "No achievements seeded yet. Use the web app to seed default achievements.",
                     FontSize = 14,
                     TextColor = AppColors.Muted,
-                    FontFamily = "SpaceGroteskRegular",
+                    FontFamily = "InterRegular",
                     HorizontalTextAlignment = TextAlignment.Center
                 });
             }

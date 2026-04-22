@@ -73,9 +73,9 @@ public static class AppIcons
     };
 
     // ── Bottom tab icons ──
-    public static FontImageSource HomeTab => Create(GlyphHome);
-    public static FontImageSource WalletTab => Create(GlyphWallet);
-    public static FontImageSource FlagTab => Create(GlyphFlag);
-    public static FontImageSource TrophyTab => Create(GlyphTrophy);
-    public static FontImageSource MoreTab => Create(GlyphEllipsis);
+    public static FontImageSource HomeTab => Create(GlyphHome, size: 20);
+    public static FontImageSource WalletTab => Create(GlyphWallet, size: 20);
+    public static FontImageSource FlagTab => Create(GlyphFlag, size: 20);
+    public static FontImageSource TrophyTab => Create(GlyphTrophy, size: 20);
+    public static FontImageSource MoreTab => Create(GlyphEllipsis, size: 20);
 }

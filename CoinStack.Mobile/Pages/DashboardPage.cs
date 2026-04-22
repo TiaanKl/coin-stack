@@ -11,30 +11,41 @@ public sealed class DashboardPage : ContentPage
     private readonly IMobileFinanceService _financeService;
 
     // Header
-    private readonly Label _greetingLabel;
+    private Label _greetingLabel = null!;
     // Budget card
-    private readonly Label _budgetTitleLabel;
-    private readonly Label _budgetSubtitleLabel;
-    private readonly Label _plannedLabel;
-    private readonly Label _spentLabel;
-    private readonly Label _availableLabel;
-    private readonly ProgressBar _budgetProgress;
+    private Label _budgetTitleLabel = null!;
+    private Label _budgetSubtitleLabel = null!;
+    private Label _plannedLabel = null!;
+    private Label _spentLabel = null!;
+    private Label _availableLabel = null!;
+    private ProgressBar _budgetProgress = null!;
     // Reserves card
-    private readonly Label _savingsLabel;
-    private readonly Label _emergencyLabel;
-    private readonly Label _totalReservedLabel;
+    private Label _savingsLabel = null!;
+    private Label _emergencyLabel = null!;
+    private Label _totalReservedLabel = null!;
     // Lists
-    private readonly VerticalStackLayout _recentTxList;
-    private readonly VerticalStackLayout _scoreEventList;
+    private VerticalStackLayout _recentTxList = null!;
+    private VerticalStackLayout _scoreEventList = null!;
 
     public DashboardPage(IMobileFinanceService financeService)
     {
         _financeService = financeService;
+        BuildContent();
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        BuildContent();
+        await LoadAsync();
+    }
+
+    private void BuildContent()
+    {
         Title = "Dashboard";
-        BackgroundColor = AppColors.Background;
 
         // ── Header ──
-        _greetingLabel = new Label { Text = "Good morning", FontFamily = "SpaceGroteskBold", FontSize = 20, TextColor = AppColors.Dark };
+        _greetingLabel = new Label { Text = "Good morning", FontFamily = "InterBold", FontSize = 20, TextColor = AppColors.Dark };
 
         var bellIcon = new Border
         {
@@ -55,13 +66,13 @@ public sealed class DashboardPage : ContentPage
         topHeader.Add(bellIcon, 1, 0);
 
         // ── Monthly Budget Remaining card ──
-        _budgetTitleLabel = new Label { Text = "Monthly Budget Remaining", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark };
-        _budgetSubtitleLabel = new Label { FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" };
+        _budgetTitleLabel = new Label { Text = "Monthly Budget Remaining", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark };
+        _budgetSubtitleLabel = new Label { FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" };
         _budgetProgress = new ProgressBar { ProgressColor = AppColors.Accent, HeightRequest = 8 };
 
-        _plannedLabel = new Label { FontSize = 12, FontFamily = "SpaceGroteskBold" };
-        _spentLabel = new Label { FontSize = 12, FontFamily = "SpaceGroteskBold" };
-        _availableLabel = new Label { FontSize = 12, FontFamily = "SpaceGroteskBold" };
+        _plannedLabel = new Label { FontSize = 12, FontFamily = "InterBold" };
+        _spentLabel = new Label { FontSize = 12, FontFamily = "InterBold" };
+        _availableLabel = new Label { FontSize = 12, FontFamily = "InterBold" };
 
         var budgetBadges = new FlexLayout
         {
@@ -69,9 +80,9 @@ public sealed class DashboardPage : ContentPage
             JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start,
             Children =
             {
-                WrapBadge(_plannedLabel, Color.FromArgb("#F3F4F6"), AppColors.Muted),
-                WrapBadge(_spentLabel, Color.FromArgb("#FEF2F2"), AppColors.Danger),
-                WrapBadge(_availableLabel, Color.FromArgb("#ECFDF5"), AppColors.Success)
+                WrapBadge(_plannedLabel, AppColors.SurfaceContainer, AppColors.Muted),
+                WrapBadge(_spentLabel, AppColors.BgDanger, AppColors.Danger),
+                WrapBadge(_availableLabel, AppColors.BgSuccess, AppColors.Success)
             }
         };
 
@@ -86,9 +97,9 @@ public sealed class DashboardPage : ContentPage
         };
 
         // ── Reserves On Hand card ──
-        _savingsLabel = new Label { FontSize = 14, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Success };
-        _emergencyLabel = new Label { FontSize = 14, FontFamily = "SpaceGroteskBold", TextColor = Color.FromArgb("#D97706") };
-        _totalReservedLabel = new Label { FontSize = 14, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Dark };
+        _savingsLabel = new Label { FontSize = 14, FontFamily = "InterBold", TextColor = AppColors.Success };
+        _emergencyLabel = new Label { FontSize = 14, FontFamily = "InterBold", TextColor = AppColors.Warning };
+        _totalReservedLabel = new Label { FontSize = 14, FontFamily = "InterBold", TextColor = AppColors.Dark };
 
         var reservesCard = new Border
         {
@@ -102,7 +113,7 @@ public sealed class DashboardPage : ContentPage
                 Spacing = 8,
                 Children =
                 {
-                    new Label { Text = "Reserves On Hand", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
+                    new Label { Text = "Reserves On Hand", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
                     CreateReserveRow("Savings", _savingsLabel),
                     CreateReserveRow("Emergency Fund", _emergencyLabel),
                     new BoxView { HeightRequest = 1, Color = AppColors.Border },
@@ -125,7 +136,7 @@ public sealed class DashboardPage : ContentPage
                 Spacing = 10,
                 Children =
                 {
-                    new Label { Text = "Recent Transactions", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
+                    new Label { Text = "Recent Transactions", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
                     _recentTxList
                 }
             }
@@ -145,7 +156,7 @@ public sealed class DashboardPage : ContentPage
                 Spacing = 10,
                 Children =
                 {
-                    new Label { Text = "Recent Score Activity", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark },
+                    new Label { Text = "Recent Score Activity", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
                     _scoreEventList
                 }
             }
@@ -160,12 +171,6 @@ public sealed class DashboardPage : ContentPage
                 Children = { topHeader, budgetCard, reservesCard, txCard, scoreCard }
             }
         };
-    }
-
-    protected override async void OnAppearing()
-    {
-        base.OnAppearing();
-        await LoadAsync();
     }
 
     private async Task LoadAsync()
@@ -228,15 +233,15 @@ public sealed class DashboardPage : ContentPage
                     {
                         Children =
                         {
-                            new Label { Text = tx.Description, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                            new Label { Text = tx.OccurredAtUtc.ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" }
+                            new Label { Text = tx.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
+                            new Label { Text = tx.OccurredAtUtc.ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                         }
                     };
 
                     var amountLabel = new Label
                     {
                         Text = $"{prefix}{amount}",
-                        FontFamily = "SpaceGroteskBold",
+                        FontFamily = "InterBold",
                         FontSize = 14,
                         TextColor = isIncome ? AppColors.Success : AppColors.Dark,
                         VerticalOptions = LayoutOptions.Center,
@@ -248,7 +253,7 @@ public sealed class DashboardPage : ContentPage
 
                     _recentTxList.Children.Add(new Border
                     {
-                        BackgroundColor = Color.FromArgb("#F9FAFB"),
+                        BackgroundColor = AppColors.SurfaceDim,
                         StrokeShape = new RoundRectangle { CornerRadius = 10 },
                         Stroke = new SolidColorBrush(AppColors.Border),
                         StrokeThickness = 1,
@@ -280,15 +285,15 @@ public sealed class DashboardPage : ContentPage
                     {
                         Children =
                         {
-                            new Label { Text = evt.Description, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                            new Label { Text = $"{evt.Reason} \u00b7 {evt.CreatedAtUtc:dd MMM, HH:mm}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" }
+                            new Label { Text = evt.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
+                            new Label { Text = $"{evt.Reason} \u00b7 {evt.CreatedAtUtc:dd MMM, HH:mm}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                         }
                     };
 
                     var pointsLabel = new Label
                     {
                         Text = pointsText,
-                        FontFamily = "SpaceGroteskBold",
+                        FontFamily = "InterBold",
                         FontSize = 14,
                         TextColor = pointsColor,
                         VerticalOptions = LayoutOptions.Center,
@@ -300,7 +305,7 @@ public sealed class DashboardPage : ContentPage
 
                     _scoreEventList.Children.Add(new Border
                     {
-                        BackgroundColor = Color.FromArgb("#F9FAFB"),
+                        BackgroundColor = AppColors.SurfaceDim,
                         StrokeShape = new RoundRectangle { CornerRadius = 10 },
                         Stroke = new SolidColorBrush(AppColors.Border),
                         StrokeThickness = 1,
@@ -322,12 +327,12 @@ public sealed class DashboardPage : ContentPage
             ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
             Padding = new Thickness(12, 10),
         };
-        grid.Add(new Label { Text = label, FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular", VerticalOptions = LayoutOptions.Center }, 0, 0);
+        grid.Add(new Label { Text = label, FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular", VerticalOptions = LayoutOptions.Center }, 0, 0);
         grid.Add(valueLabel, 1, 0);
 
         return new Border
         {
-            BackgroundColor = Color.FromArgb("#F9FAFB"),
+            BackgroundColor = AppColors.SurfaceDim,
             StrokeShape = new RoundRectangle { CornerRadius = 10 },
             Stroke = Brush.Transparent,
             Content = grid
@@ -349,5 +354,5 @@ public sealed class DashboardPage : ContentPage
     }
 
     private static Label CreateEmptyPlaceholder(string text) =>
-        new() { Text = text, FontFamily = "SpaceGroteskRegular", TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(0, 20) };
+        new() { Text = text, FontFamily = "InterRegular", TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(0, 20) };
 }

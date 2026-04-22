@@ -14,7 +14,6 @@ public sealed class CbtJournalPage : ContentPage
     {
         _financeService = financeService;
         Title = "Mindset Journal";
-        BackgroundColor = AppColors.Background;
 
         _entryList = new VerticalStackLayout { Spacing = 10 };
 
@@ -24,7 +23,7 @@ public sealed class CbtJournalPage : ContentPage
             BackgroundColor = AppColors.Dark,
             TextColor = AppColors.Surface,
             CornerRadius = 24,
-            FontFamily = "SpaceGroteskBold",
+            FontFamily = "InterBold",
             FontSize = 14,
             HeightRequest = 48,
             Margin = new Thickness(0, 8, 0, 0)
@@ -43,7 +42,7 @@ public sealed class CbtJournalPage : ContentPage
         {
             var chip = new Border
             {
-                BackgroundColor = Color.FromArgb("#F8F9FA"),
+                BackgroundColor = AppColors.SurfaceDim,
                 StrokeShape = new RoundRectangle { CornerRadius = 16 },
                 Stroke = new SolidColorBrush(AppColors.Border),
                 StrokeThickness = 1,
@@ -53,8 +52,8 @@ public sealed class CbtJournalPage : ContentPage
                 {
                     Text = name,
                     FontSize = 12,
-                    TextColor = Color.FromArgb("#6577F3"),
-                    FontFamily = "SpaceGroteskBold"
+                    TextColor = AppColors.AccentIndigo,
+                    FontFamily = "InterBold"
                 }
             };
             exercisesLayout.Children.Add(chip);
@@ -68,12 +67,12 @@ public sealed class CbtJournalPage : ContentPage
                 Spacing = 6,
                 Children =
                 {
-                    new Label { Text = "Money Mindset Journal", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark },
-                    new Label { Text = "Challenge unhelpful financial thoughts with CBT techniques", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
+                    new Label { Text = "Money Mindset Journal", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark },
+                    new Label { Text = "Challenge unhelpful financial thoughts with CBT techniques", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
                     addButton,
-                    new Label { Text = "GUIDED EXERCISES", FontSize = 11, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Muted, Margin = new Thickness(0, 16, 0, 4) },
+                    new Label { Text = "GUIDED EXERCISES", FontSize = 11, FontFamily = "InterBold", TextColor = AppColors.Muted, Margin = new Thickness(0, 16, 0, 4) },
                     exercisesLayout,
-                    new Label { Text = "JOURNAL ENTRIES", FontSize = 11, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Muted, Margin = new Thickness(0, 12, 0, 4) },
+                    new Label { Text = "JOURNAL ENTRIES", FontSize = 11, FontFamily = "InterBold", TextColor = AppColors.Muted, Margin = new Thickness(0, 12, 0, 4) },
                     _entryList
                 }
             }
@@ -109,8 +108,8 @@ public sealed class CbtJournalPage : ContentPage
                         Children =
                         {
                             new Label { Text = AppIcons.GlyphBrain, FontFamily = "FontAwesomeSolid", FontSize = 32, HorizontalOptions = LayoutOptions.Center, TextColor = AppColors.Muted },
-                            new Label { Text = "Start Your Mindset Journal", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
-                            new Label { Text = "Record financial thoughts and challenge them with evidence-based CBT techniques.", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" }
+                            new Label { Text = "Start Your Mindset Journal", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
+                            new Label { Text = "Record financial thoughts and challenge them with evidence-based CBT techniques.", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "InterRegular" }
                         }
                     }
                 });
@@ -142,20 +141,20 @@ public sealed class CbtJournalPage : ContentPage
                                 ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
                                 Children =
                                 {
-                                    new Label { Text = entry.Situation, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                                    new Label { Text = entry.CreatedAtUtc.ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular", HorizontalOptions = LayoutOptions.End }
+                                    new Label { Text = entry.Situation, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
+                                    new Label { Text = entry.CreatedAtUtc.ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular", HorizontalOptions = LayoutOptions.End }
                                 }
                             },
-                            new Label { Text = $"Thought: {entry.AutomaticThought}", FontSize = 12, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular", LineBreakMode = LineBreakMode.TailTruncation },
-                            new Label { Text = $"Response: {entry.RationalResponse}", FontSize = 12, TextColor = AppColors.Dark, FontFamily = "SpaceGroteskRegular", LineBreakMode = LineBreakMode.TailTruncation },
+                            new Label { Text = $"Thought: {entry.AutomaticThought}", FontSize = 12, TextColor = AppColors.Muted, FontFamily = "InterRegular", LineBreakMode = LineBreakMode.TailTruncation },
+                            new Label { Text = $"Response: {entry.RationalResponse}", FontSize = 12, TextColor = AppColors.Dark, FontFamily = "InterRegular", LineBreakMode = LineBreakMode.TailTruncation },
                             new HorizontalStackLayout
                             {
                                 Spacing = 12,
                                 Children =
                                 {
-                                    new Label { Text = $"Emotion: {entry.Emotion} ({entry.EmotionIntensity}/10)", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
-                                    new Label { Text = $"Mood: {moodText}", FontSize = 11, TextColor = moodColor, FontFamily = "SpaceGroteskBold" },
-                                    new Label { Text = distortionText, FontSize = 11, TextColor = Color.FromArgb("#7C3AED"), FontFamily = "SpaceGroteskRegular" }
+                                    new Label { Text = $"Emotion: {entry.Emotion} ({entry.EmotionIntensity}/10)", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
+                                    new Label { Text = $"Mood: {moodText}", FontSize = 11, TextColor = moodColor, FontFamily = "InterBold" },
+                                    new Label { Text = distortionText, FontSize = 11, TextColor = AppColors.AccentPurple, FontFamily = "InterRegular" }
                                 }
                             }
                         }

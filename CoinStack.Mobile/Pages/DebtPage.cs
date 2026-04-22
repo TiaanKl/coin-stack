@@ -1,5 +1,7 @@
 using CoinStack.Mobile.Core;
+using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Services;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace CoinStack.Mobile.Pages;
 
@@ -32,28 +34,44 @@ public sealed class DebtPage : ContentPage
         var addButton = new Button { Text = "Add Debt" };
         addButton.Clicked += async (_, _) => await AddDebtAsync();
 
-        _list = new VerticalStackLayout { Spacing = 8 };
+        _list = new VerticalStackLayout { Spacing = 10 };
+
+        // ── Add Debt Card ──
+        var formCard = CreateCard(new VerticalStackLayout
+        {
+            Spacing = 12,
+            Children =
+            {
+                new Label { Text = "New Debt Account", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                _nameEntry,
+                _providerEntry,
+                _totalEntry,
+                _balanceEntry,
+                _monthlyPaymentEntry,
+                _interestEntry,
+                _plannedTermEntry,
+                addButton
+            }
+        });
+
+        // ── Debt Accounts Card ──
+        var listCard = CreateCard(new VerticalStackLayout
+        {
+            Spacing = 10,
+            Children =
+            {
+                new Label { Text = "Debt Accounts", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                _list
+            }
+        });
 
         Content = new ScrollView
         {
             Content = new VerticalStackLayout
             {
-                Padding = new Thickness(16),
-                Spacing = 10,
-                Children =
-                {
-                    _nameEntry,
-                    _providerEntry,
-                    _totalEntry,
-                    _balanceEntry,
-                    _monthlyPaymentEntry,
-                    _interestEntry,
-                    _plannedTermEntry,
-                    addButton,
-                    new BoxView { HeightRequest = 1 },
-                    new Label { Text = "Debt Accounts", FontSize = 18, FontAttributes = FontAttributes.Bold },
-                    _list
-                }
+                Padding = new Thickness(20),
+                Spacing = 16,
+                Children = { formCard, listCard }
             }
         };
     }
@@ -135,42 +153,57 @@ public sealed class DebtPage : ContentPage
             _list.Children.Clear();
             if (debts.Count == 0)
             {
-                _list.Children.Add(new Label { Text = "No debt accounts yet." });
+                _list.Children.Add(new Label { Text = "No debt accounts yet.", FontFamily = "InterRegular", TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, Margin = new Thickness(0, 16) });
                 return;
             }
 
             foreach (var debt in debts)
             {
-                var row = new VerticalStackLayout { Spacing = 4 };
+                var progress = debt.TotalAmount > 0 ? (double)(1 - debt.CurrentBalance / debt.TotalAmount) : 0;
+
+                var row = new VerticalStackLayout { Spacing = 6 };
                 row.Children.Add(new Label
                 {
                     Text = $"{debt.Name} ({debt.Provider ?? "No provider"})",
+                    FontFamily = "InterBold",
                     FontSize = 14,
-                    FontAttributes = FontAttributes.Bold
+                    TextColor = AppColors.Dark
                 });
+                row.Children.Add(new ProgressBar { Progress = Math.Max(0, Math.Min(progress, 1.0)), ProgressColor = AppColors.Accent, HeightRequest = 6 });
                 row.Children.Add(new Label
                 {
                     Text = $"Balance: {MoneyDisplay.Format(settings.Currency, debt.CurrentBalance)} / {MoneyDisplay.Format(settings.Currency, debt.TotalAmount)}",
-                    FontSize = 13
+                    FontSize = 13,
+                    FontFamily = "InterRegular",
+                    TextColor = AppColors.Muted
                 });
                 row.Children.Add(new Label
                 {
-                    Text = $"Monthly: {MoneyDisplay.Format(settings.Currency, debt.MonthlyPaymentAmount)} • Interest: {debt.InterestRatePercent:0.##}% • Est payoff: {(debt.EstimatedPayoffDateUtc.HasValue ? debt.EstimatedPayoffDateUtc.Value.ToString("dd MMM yyyy") : "N/A")}",
-                    FontSize = 12
+                    Text = $"Monthly: {MoneyDisplay.Format(settings.Currency, debt.MonthlyPaymentAmount)} · Interest: {debt.InterestRatePercent:0.##}% · Payoff: {(debt.EstimatedPayoffDateUtc.HasValue ? debt.EstimatedPayoffDateUtc.Value.ToString("dd MMM yyyy") : "N/A")}",
+                    FontSize = 11,
+                    FontFamily = "InterRegular",
+                    TextColor = AppColors.Muted
                 });
 
-                var actions = new HorizontalStackLayout { Spacing = 8 };
-                var payButton = new Button { Text = "Record Payment", FontSize = 12, Padding = new Thickness(10, 4) };
-                var deleteButton = new Button { Text = "Delete", FontSize = 12, Padding = new Thickness(10, 4) };
+                var actions = new HorizontalStackLayout { Spacing = 8, Margin = new Thickness(0, 4, 0, 0) };
+                var payButton = new Button { Text = "Record Payment", FontSize = 12, Padding = new Thickness(12, 6), HeightRequest = 36, CornerRadius = 18 };
+                var deleteButton = new Button { Text = "Delete", FontSize = 12, Padding = new Thickness(12, 6), HeightRequest = 36, CornerRadius = 18, BackgroundColor = AppColors.Danger };
                 var id = debt.Id;
                 payButton.Clicked += async (_, _) => await RecordPaymentAsync(id);
                 deleteButton.Clicked += async (_, _) => await DeleteAsync(id);
                 actions.Children.Add(payButton);
                 actions.Children.Add(deleteButton);
-
                 row.Children.Add(actions);
-                row.Children.Add(new BoxView { HeightRequest = 1 });
-                _list.Children.Add(row);
+
+                _list.Children.Add(new Border
+                {
+                    BackgroundColor = AppColors.SurfaceDim,
+                    StrokeShape = new RoundRectangle { CornerRadius = 12 },
+                    Stroke = new SolidColorBrush(AppColors.Border),
+                    StrokeThickness = 1,
+                    Padding = new Thickness(14, 12),
+                    Content = row
+                });
             }
         }
         catch (Exception ex)
@@ -178,4 +211,14 @@ public sealed class DebtPage : ContentPage
             await DisplayAlertAsync("Error", ex.Message, "OK");
         }
     }
+
+    private static Border CreateCard(View content) => new()
+    {
+        BackgroundColor = AppColors.Surface,
+        StrokeShape = new RoundRectangle { CornerRadius = 16 },
+        Stroke = new SolidColorBrush(AppColors.Border),
+        StrokeThickness = 1,
+        Padding = new Thickness(16),
+        Content = content
+    };
 }

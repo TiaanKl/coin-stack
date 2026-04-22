@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" ?>
+<?xml version="1.0" encoding="UTF-8" ?>
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:CoinStack.Mobile"
@@ -20,31 +20,31 @@
                         <Style TargetType="ContentPage"
                                ApplyToDerivedTypes="True">
                                 <Setter Property="BackgroundColor"
-                                        Value="{StaticResource Background}"/>
+                                        Value="{DynamicResource Background}"/>
                         </Style>
 
                         <!-- Navigation Bar Style -->
                         <Style TargetType="NavigationPage">
                                 <Setter Property="BarBackgroundColor"
-                                        Value="{StaticResource Surface}"/>
+                                        Value="{DynamicResource Surface}"/>
                                 <Setter Property="BarTextColor"
-                                        Value="{StaticResource Dark}"/>
+                                        Value="{DynamicResource Dark}"/>
                         </Style>
 
                         <!-- Typography -->
                         <Style TargetType="Label">
                                 <Setter Property="TextColor"
-                                        Value="{StaticResource Dark}"/>
+                                        Value="{DynamicResource Dark}"/>
                                 <Setter Property="FontFamily"
-                                        Value="SpaceGroteskRegular"/>
+                                        Value="InterRegular"/>
                         </Style>
 
                         <!-- Button Styles -->
                         <Style TargetType="Button">
                                 <Setter Property="BackgroundColor"
-                                        Value="{StaticResource Dark}"/>
+                                        Value="{DynamicResource Dark}"/>
                                 <Setter Property="TextColor"
-                                        Value="{StaticResource Surface}"/>
+                                        Value="{DynamicResource Surface}"/>
                                 <Setter Property="CornerRadius"
                                         Value="24"/>
                                 <Setter Property="FontAttributes"
@@ -52,7 +52,7 @@
                                 <Setter Property="Padding"
                                         Value="16,12"/>
                                 <Setter Property="FontFamily"
-                                        Value="SpaceGroteskBold"/>
+                                        Value="InterBold"/>
                                 <Setter Property="HeightRequest"
                                         Value="48"/>
                         </Style>
@@ -60,13 +60,79 @@
                         <!-- Entry Styles -->
                         <Style TargetType="Entry">
                                 <Setter Property="BackgroundColor"
-                                        Value="{StaticResource Surface}"/>
+                                        Value="{DynamicResource Surface}"/>
+                                <Setter Property="TextColor"
+                                        Value="{DynamicResource Dark}"/>
+                                <Setter Property="PlaceholderColor"
+                                        Value="{DynamicResource Muted}"/>
+                                <Setter Property="FontFamily"
+                                        Value="InterRegular"/>
+                                <Setter Property="FontSize"
+                                        Value="14"/>
+                        </Style>
+
+                        <!-- Editor Styles -->
+                        <Style TargetType="Editor">
+                                <Setter Property="BackgroundColor"
+                                        Value="{DynamicResource Surface}"/>
+                                <Setter Property="TextColor"
+                                        Value="{DynamicResource Dark}"/>
+                                <Setter Property="PlaceholderColor"
+                                        Value="{DynamicResource Muted}"/>
+                                <Setter Property="FontFamily"
+                                        Value="InterRegular"/>
+                                <Setter Property="FontSize"
+                                        Value="14"/>
+                        </Style>
+
+                        <!-- Picker Styles -->
+                        <Style TargetType="Picker">
+                                <Setter Property="TextColor"
+                                        Value="{DynamicResource Dark}"/>
+                                <Setter Property="TitleColor"
+                                        Value="{DynamicResource Muted}"/>
+                                <Setter Property="FontFamily"
+                                        Value="InterRegular"/>
+                                <Setter Property="FontSize"
+                                        Value="14"/>
+                                <Setter Property="BackgroundColor"
+                                        Value="{DynamicResource Surface}"/>
+                        </Style>
+
+                        <!-- DatePicker Styles -->
+                        <Style TargetType="DatePicker">
                                 <Setter Property="TextColor"
                                         Value="{StaticResource Dark}"/>
-                                <Setter Property="PlaceholderColor"
-                                        Value="{StaticResource Muted}"/>
                                 <Setter Property="FontFamily"
-                                        Value="SpaceGroteskRegular"/>
+                                        Value="InterRegular"/>
+                                <Setter Property="FontSize"
+                                        Value="14"/>
+                                <Setter Property="BackgroundColor"
+                                        Value="{StaticResource Surface}"/>
+                        </Style>
+
+                        <!-- Slider Styles -->
+                        <Style TargetType="Slider">
+                                <Setter Property="MinimumTrackColor"
+                                        Value="{StaticResource Dark}"/>
+                                <Setter Property="MaximumTrackColor"
+                                        Value="{StaticResource Border}"/>
+                                <Setter Property="ThumbColor"
+                                        Value="{StaticResource Dark}"/>
+                        </Style>
+
+                        <!-- Switch Styles -->
+                        <Style TargetType="Switch">
+                                <Setter Property="OnColor"
+                                        Value="{StaticResource Dark}"/>
+                                <Setter Property="ThumbColor"
+                                        Value="{StaticResource Surface}"/>
+                        </Style>
+
+                        <!-- ProgressBar Styles -->
+                        <Style TargetType="ProgressBar">
+                                <Setter Property="ProgressColor"
+                                        Value="{StaticResource Accent}"/>
                         </Style>
 
                         <!-- Card style -->

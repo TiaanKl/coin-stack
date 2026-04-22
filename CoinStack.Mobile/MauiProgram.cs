@@ -2,7 +2,6 @@
 using CoinStack.Mobile.Core;
 using CoinStack.Mobile.Pages;
 using CoinStack.Mobile.Services;
-using MauiIcons.Material;
 using Microsoft.Extensions.Logging;
 
 namespace CoinStack.Mobile;
@@ -14,16 +13,15 @@ public static class MauiProgram
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
-			.UseMaterialMauiIcons()
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 
-				// Typography - Space Grotesk
-				fonts.AddFont("SpaceGrotesk-Regular.ttf", "SpaceGroteskRegular");
-				fonts.AddFont("SpaceGrotesk-Medium.ttf", "SpaceGroteskMedium");
-				fonts.AddFont("SpaceGrotesk-Bold.ttf", "SpaceGroteskBold");
-				fonts.AddFont("SpaceGrotesk-Light.ttf", "SpaceGroteskLight");
+				// Typography - Inter
+				fonts.AddFont("Inter-Regular.ttf", "InterRegular");
+				fonts.AddFont("Inter-Medium.ttf", "InterMedium");
+				fonts.AddFont("Inter-Bold.ttf", "InterBold");
+				fonts.AddFont("Inter-Light.ttf", "InterLight");
 
 				// Icons - Font Awesome 7
 				fonts.AddFont("Font Awesome 7 Free-Regular-400.otf", "FontAwesomeRegular");

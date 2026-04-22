@@ -13,7 +13,6 @@ public sealed class FallbackHistoryPage : ContentPage
     {
         _financeService = financeService;
         Title = "Fallback History";
-        BackgroundColor = AppColors.Background;
 
         _eventsList = new VerticalStackLayout { Spacing = 8 };
 

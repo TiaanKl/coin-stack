@@ -14,7 +14,6 @@ public sealed class WaitlistPage : ContentPage
     {
         _financeService = financeService;
         Title = "Waitlist";
-        BackgroundColor = AppColors.Background;
 
         _itemsList = new VerticalStackLayout { Spacing = 10 };
 
@@ -25,7 +24,7 @@ public sealed class WaitlistPage : ContentPage
             TextColor = AppColors.Surface,
             CornerRadius = 24,
             HeightRequest = 48,
-            FontFamily = "SpaceGroteskBold",
+            FontFamily = "InterBold",
             FontSize = 14
         };
         addButton.Clicked += OnAddClicked;
@@ -38,8 +37,8 @@ public sealed class WaitlistPage : ContentPage
                 Spacing = 16,
                 Children =
                 {
-                    new Label { Text = "Impulse Waitlist", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark },
-                    new Label { Text = "Let time and your finances decide \u2014 not impulse.", FontSize = 14, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
+                    new Label { Text = "Impulse Waitlist", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark },
+                    new Label { Text = "Let time and your finances decide \u2014 not impulse.", FontSize = 14, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
                     addButton,
                     _itemsList
                 }
@@ -77,8 +76,8 @@ public sealed class WaitlistPage : ContentPage
                         Children =
                         {
                             new Label { Text = AppIcons.GlyphHourglass, FontFamily = "FontAwesomeSolid", FontSize = 32, HorizontalOptions = LayoutOptions.Center, TextColor = AppColors.Muted },
-                            new Label { Text = "No impulse items yet", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
-                            new Label { Text = "Add items you're tempted to buy and let the cool-off period help you decide.", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" }
+                            new Label { Text = "No impulse items yet", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
+                            new Label { Text = "Add items you're tempted to buy and let the cool-off period help you decide.", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "InterRegular" }
                         }
                     }
                 });
@@ -91,24 +90,24 @@ public sealed class WaitlistPage : ContentPage
                 var isUnlocked = item.CoolOffUntil <= now || item.IsUnlocked;
                 var isPurchased = item.IsPurchased;
 
-                var statusColor = isPurchased ? AppColors.Muted : isUnlocked ? AppColors.Success : Color.FromArgb("#D97706");
+                var statusColor = isPurchased ? AppColors.Muted : isUnlocked ? AppColors.Success : AppColors.Warning;
                 var statusText = isPurchased ? "Purchased" : isUnlocked ? "Unlocked" : $"Cool-off: {(item.CoolOffUntil - now).Days}d left";
 
                 var statusBadge = new Border
                 {
-                    BackgroundColor = isPurchased ? Color.FromArgb("#F3F4F6") : isUnlocked ? Color.FromArgb("#ECFDF5") : Color.FromArgb("#FFFBEB"),
+                    BackgroundColor = isPurchased ? AppColors.SurfaceContainer : isUnlocked ? AppColors.BgSuccess : AppColors.BgWarning,
                     StrokeShape = new RoundRectangle { CornerRadius = 10 },
                     Stroke = Colors.Transparent,
                     Padding = new Thickness(8, 4),
-                    Content = new Label { Text = statusText, FontSize = 11, FontFamily = "SpaceGroteskBold", TextColor = statusColor }
+                    Content = new Label { Text = statusText, FontSize = 11, FontFamily = "InterBold", TextColor = statusColor }
                 };
 
                 var nameRow = new Grid
                 {
                     ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) }
                 };
-                var nameLabel = new Label { Text = item.Name, FontFamily = "SpaceGroteskBold", FontSize = 15, TextColor = AppColors.Dark };
-                var costLabel = new Label { Text = MoneyDisplay.Format(settings.Currency, item.EstimatedCost), FontFamily = "SpaceGroteskBold", FontSize = 15, TextColor = AppColors.Dark, HorizontalOptions = LayoutOptions.End };
+                var nameLabel = new Label { Text = item.Name, FontFamily = "InterBold", FontSize = 15, TextColor = AppColors.Dark };
+                var costLabel = new Label { Text = MoneyDisplay.Format(settings.Currency, item.EstimatedCost), FontFamily = "InterBold", FontSize = 15, TextColor = AppColors.Dark, HorizontalOptions = LayoutOptions.End };
                 Grid.SetColumn(nameLabel, 0);
                 Grid.SetColumn(costLabel, 1);
                 nameRow.Children.Add(nameLabel);
@@ -122,12 +121,12 @@ public sealed class WaitlistPage : ContentPage
                     {
                         Text = "Mark Purchased",
                         BackgroundColor = AppColors.Success,
-                        TextColor = Colors.White,
+                        TextColor = AppColors.TextOnDark,
                         CornerRadius = 12,
                         HeightRequest = 32,
                         FontSize = 12,
                         Padding = new Thickness(12, 0),
-                        FontFamily = "SpaceGroteskBold"
+                        FontFamily = "InterBold"
                     };
                     var itemId = item.Id;
                     purchaseBtn.Clicked += async (_, _) =>
@@ -182,7 +181,7 @@ public sealed class WaitlistPage : ContentPage
 
                 if (!string.IsNullOrWhiteSpace(item.Description))
                 {
-                    ((VerticalStackLayout)card.Content).Children.Insert(1, new Label { Text = item.Description, FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" });
+                    ((VerticalStackLayout)card.Content).Children.Insert(1, new Label { Text = item.Description, FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" });
                 }
 
                 _itemsList.Children.Add(card);

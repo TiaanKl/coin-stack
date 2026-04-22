@@ -14,7 +14,6 @@ public sealed class ChallengesPage : ContentPage
     {
         _financeService = financeService;
         Title = "Challenges";
-        BackgroundColor = AppColors.Background;
 
         _content = new VerticalStackLayout
         {
@@ -42,8 +41,8 @@ public sealed class ChallengesPage : ContentPage
 
             _content.Children.Clear();
 
-            _content.Children.Add(new Label { Text = "Daily Challenges", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark });
-            _content.Children.Add(new Label { Text = "Complete challenges to earn XP and build healthy habits", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" });
+            _content.Children.Add(new Label { Text = "Daily Challenges", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark });
+            _content.Children.Add(new Label { Text = "Complete challenges to earn XP and build healthy habits", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" });
 
             // Level bar
             var xpProgress = levelInfo.XpForNextLevel > 0 ? (double)levelInfo.CurrentXp / levelInfo.XpForNextLevel : 0;
@@ -61,7 +60,7 @@ public sealed class ChallengesPage : ContentPage
                     {
                         new Border
                         {
-                            BackgroundColor = Color.FromArgb("#6577F3"),
+                            BackgroundColor = AppColors.AccentIndigo,
                             StrokeShape = new RoundRectangle { CornerRadius = 10 },
                             Stroke = Colors.Transparent,
                             WidthRequest = 44,
@@ -71,8 +70,8 @@ public sealed class ChallengesPage : ContentPage
                             {
                                 Text = levelInfo.Level.ToString(),
                                 FontSize = 18,
-                                FontFamily = "SpaceGroteskBold",
-                                TextColor = Colors.White,
+                                FontFamily = "InterBold",
+                                TextColor = AppColors.TextOnDark,
                                 HorizontalTextAlignment = TextAlignment.Center,
                                 VerticalTextAlignment = TextAlignment.Center
                             }
@@ -89,11 +88,11 @@ public sealed class ChallengesPage : ContentPage
                                     ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
                                     Children =
                                     {
-                                        new Label { Text = levelInfo.LevelName, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark },
-                                        new Label { Text = $"{levelInfo.CurrentXp} / {levelInfo.XpForNextLevel} XP", FontSize = 12, TextColor = AppColors.Muted, HorizontalOptions = LayoutOptions.End, FontFamily = "SpaceGroteskRegular" }
+                                        new Label { Text = levelInfo.LevelName, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark },
+                                        new Label { Text = $"{levelInfo.CurrentXp} / {levelInfo.XpForNextLevel} XP", FontSize = 12, TextColor = AppColors.Muted, HorizontalOptions = LayoutOptions.End, FontFamily = "InterRegular" }
                                     }
                                 },
-                                new ProgressBar { Progress = xpProgress, ProgressColor = Color.FromArgb("#6577F3"), HeightRequest = 6 }
+                                new ProgressBar { Progress = xpProgress, ProgressColor = AppColors.AccentIndigo, HeightRequest = 6 }
                             }
                         }
                     }
@@ -108,13 +107,13 @@ public sealed class ChallengesPage : ContentPage
                 HorizontalOptions = LayoutOptions.Center,
                 Children =
                 {
-                    CreateStatChip($"{AppIcons.GlyphCheck} {completedToday} today", Color.FromArgb("#ECFDF5"), AppColors.Success),
-                    CreateStatChip($"{AppIcons.GlyphCalendarWeek} {completedWeek} this week", Color.FromArgb("#F0F1FE"), Color.FromArgb("#6577F3"))
+                    CreateStatChip($"{AppIcons.GlyphCheck} {completedToday} today", AppColors.BgSuccess, AppColors.Success),
+                    CreateStatChip($"{AppIcons.GlyphCalendarWeek} {completedWeek} this week", AppColors.BgIndigo, AppColors.AccentIndigo)
                 }
             };
             _content.Children.Add(statsRow);
 
-            _content.Children.Add(new Label { Text = "TODAY'S CHALLENGES", FontSize = 11, FontFamily = "SpaceGroteskBold", TextColor = AppColors.Muted, Margin = new Thickness(0, 8, 0, 0) });
+            _content.Children.Add(new Label { Text = "TODAY'S CHALLENGES", FontSize = 11, FontFamily = "InterBold", TextColor = AppColors.Muted, Margin = new Thickness(0, 8, 0, 0) });
 
             if (challenges.Count == 0)
             {
@@ -132,8 +131,8 @@ public sealed class ChallengesPage : ContentPage
                         Children =
                         {
                             new Label { Text = AppIcons.GlyphBolt, FontFamily = "FontAwesomeSolid", FontSize = 32, HorizontalOptions = LayoutOptions.Center, TextColor = AppColors.Muted },
-                            new Label { Text = "No Challenges Yet", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
-                            new Label { Text = "Challenges are generated daily. Check back soon!", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" }
+                            new Label { Text = "No Challenges Yet", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
+                            new Label { Text = "Challenges are generated daily. Check back soon!", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "InterRegular" }
                         }
                     }
                 });
@@ -145,8 +144,8 @@ public sealed class ChallengesPage : ContentPage
                 var isCompleted = challenge.Status == ChallengeStatus.Completed;
                 var isExpired = challenge.Status == ChallengeStatus.Expired;
 
-                var iconBg = isCompleted ? Color.FromArgb("#ECFDF5") : Color.FromArgb("#F0F1FE");
-                var iconColor = isCompleted ? AppColors.Success : Color.FromArgb("#6577F3");
+                var iconBg = isCompleted ? AppColors.BgSuccess : AppColors.BgIndigo;
+                var iconColor = isCompleted ? AppColors.Success : AppColors.AccentIndigo;
                 var iconText = isCompleted ? AppIcons.GlyphCheck : AppIcons.GlyphBolt;
 
                 var iconFrame = new Border
@@ -171,17 +170,17 @@ public sealed class ChallengesPage : ContentPage
                 var freqLabel = challenge.Frequency == ChallengeFrequency.Daily ? "Daily" : "Weekly";
                 var freqBadge = new Border
                 {
-                    BackgroundColor = Color.FromArgb("#EDE9FE"),
+                    BackgroundColor = AppColors.BgPurple,
                     StrokeShape = new RoundRectangle { CornerRadius = 8 },
                     Stroke = Colors.Transparent,
                     Padding = new Thickness(6, 2),
-                    Content = new Label { Text = freqLabel, FontSize = 9, FontFamily = "SpaceGroteskBold", TextColor = Color.FromArgb("#7C3AED") }
+                    Content = new Label { Text = freqLabel, FontSize = 9, FontFamily = "InterBold", TextColor = AppColors.AccentPurple }
                 };
 
                 var titleRow = new HorizontalStackLayout
                 {
                     Spacing = 6,
-                    Children = { new Label { Text = challenge.Title, FontFamily = "SpaceGroteskBold", FontSize = 14, TextColor = AppColors.Dark }, freqBadge }
+                    Children = { new Label { Text = challenge.Title, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark }, freqBadge }
                 };
 
                 var infoStack = new VerticalStackLayout
@@ -189,15 +188,15 @@ public sealed class ChallengesPage : ContentPage
                     Spacing = 2,
                     VerticalOptions = LayoutOptions.Center,
                     HorizontalOptions = LayoutOptions.Fill,
-                    Children = { titleRow, new Label { Text = challenge.Description, FontSize = 11, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" } }
+                    Children = { titleRow, new Label { Text = challenge.Description, FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" } }
                 };
 
                 var xpLabel = new Label
                 {
                     Text = $"+{challenge.XpReward} XP",
                     FontSize = 13,
-                    FontFamily = "SpaceGroteskBold",
-                    TextColor = isCompleted ? AppColors.Success : Color.FromArgb("#6577F3"),
+                    FontFamily = "InterBold",
+                    TextColor = isCompleted ? AppColors.Success : AppColors.AccentIndigo,
                     VerticalOptions = LayoutOptions.Center
                 };
 
@@ -220,9 +219,9 @@ public sealed class ChallengesPage : ContentPage
 
                 var card = new Border
                 {
-                    BackgroundColor = isCompleted ? Color.FromArgb("#F0FDF9") : AppColors.Surface,
+                    BackgroundColor = isCompleted ? AppColors.BgSuccessStrong : AppColors.Surface,
                     StrokeShape = new RoundRectangle { CornerRadius = 16 },
-                    Stroke = new SolidColorBrush(isCompleted ? Color.FromArgb("#A7F3D0") : AppColors.Border),
+                    Stroke = new SolidColorBrush(isCompleted ? AppColors.BorderSuccess : AppColors.Border),
                     StrokeThickness = 1,
                     Padding = new Thickness(14),
                     Opacity = isExpired ? 0.5 : 1.0,

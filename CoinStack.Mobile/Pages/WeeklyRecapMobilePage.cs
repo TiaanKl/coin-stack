@@ -13,7 +13,6 @@ public sealed class WeeklyRecapMobilePage : ContentPage
     {
         _financeService = financeService;
         Title = "Weekly Recap";
-        BackgroundColor = AppColors.Background;
 
         _recapList = new VerticalStackLayout { Spacing = 12 };
 
@@ -25,8 +24,8 @@ public sealed class WeeklyRecapMobilePage : ContentPage
                 Spacing = 8,
                 Children =
                 {
-                    new Label { Text = "Weekly Recap", FontFamily = "SpaceGroteskBold", FontSize = 24, TextColor = AppColors.Dark },
-                    new Label { Text = "Your financial week at a glance", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "SpaceGroteskRegular" },
+                    new Label { Text = "Weekly Recap", FontFamily = "InterBold", FontSize = 24, TextColor = AppColors.Dark },
+                    new Label { Text = "Your financial week at a glance", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
                     _recapList
                 }
             }
@@ -62,8 +61,8 @@ public sealed class WeeklyRecapMobilePage : ContentPage
                         Children =
                         {
                             new Label { Text = AppIcons.GlyphCalendarWeek, FontFamily = "FontAwesomeSolid", FontSize = 32, HorizontalOptions = LayoutOptions.Center, TextColor = AppColors.Muted },
-                            new Label { Text = "No Recaps Yet", FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
-                            new Label { Text = "Weekly recaps will appear here at the end of each week.", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" }
+                            new Label { Text = "No Recaps Yet", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark, HorizontalTextAlignment = TextAlignment.Center },
+                            new Label { Text = "Weekly recaps will appear here at the end of each week.", FontSize = 13, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "InterRegular" }
                         }
                     }
                 });
@@ -109,11 +108,11 @@ public sealed class WeeklyRecapMobilePage : ContentPage
             JustifyContent = Microsoft.Maui.Layouts.FlexJustify.Start
         };
 
-        badges.Children.Add(CreateBadge($"{r.ChallengesCompleted} challenges", AppIcons.GlyphBolt, Color.FromArgb("#F0F1FE"), Color.FromArgb("#6577F3")));
-        badges.Children.Add(CreateBadge($"{r.ReflectionsCompleted} reflections", AppIcons.GlyphBookOpen, Color.FromArgb("#F5F3FF"), Color.FromArgb("#7C3AED")));
-        badges.Children.Add(CreateBadge($"{r.StreakDays} day streak", AppIcons.GlyphFire, Color.FromArgb("#FFFBEB"), Color.FromArgb("#D97706")));
+        badges.Children.Add(CreateBadge($"{r.ChallengesCompleted} challenges", AppIcons.GlyphBolt, AppColors.BgIndigo, AppColors.AccentIndigo));
+        badges.Children.Add(CreateBadge($"{r.ReflectionsCompleted} reflections", AppIcons.GlyphBookOpen, AppColors.BgPurple, AppColors.AccentPurple));
+        badges.Children.Add(CreateBadge($"{r.StreakDays} day streak", AppIcons.GlyphFire, AppColors.BgWarning, AppColors.Warning));
         if (!string.IsNullOrEmpty(r.TopCategory))
-            badges.Children.Add(CreateBadge($"Top: {r.TopCategory}", AppIcons.GlyphTags, Color.FromArgb("#F3F4F6"), Color.FromArgb("#4B5563")));
+            badges.Children.Add(CreateBadge($"Top: {r.TopCategory}", AppIcons.GlyphTags, AppColors.SurfaceContainer, AppColors.TextSecondary));
 
         var card = new VerticalStackLayout
         {
@@ -126,7 +125,7 @@ public sealed class WeeklyRecapMobilePage : ContentPage
                     Children =
                     {
                         new Label { Text = AppIcons.GlyphCalendarWeek, FontFamily = "FontAwesomeSolid", FontSize = 16, TextColor = AppColors.Accent, VerticalOptions = LayoutOptions.Center },
-                        new Label { Text = weekLabel, FontFamily = "SpaceGroteskBold", FontSize = 16, TextColor = AppColors.Dark, VerticalOptions = LayoutOptions.Center }
+                        new Label { Text = weekLabel, FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark, VerticalOptions = LayoutOptions.Center }
                     }
                 },
                 statsGrid,
@@ -138,7 +137,7 @@ public sealed class WeeklyRecapMobilePage : ContentPage
         {
             card.Children.Add(new Border
             {
-                BackgroundColor = Color.FromArgb("#F0F1FE"),
+                BackgroundColor = AppColors.BgIndigo,
                 StrokeShape = new RoundRectangle { CornerRadius = 12 },
                 Stroke = Brush.Transparent,
                 Padding = new Thickness(12),
@@ -146,8 +145,8 @@ public sealed class WeeklyRecapMobilePage : ContentPage
                 {
                     Text = r.InsightMessage,
                     FontSize = 13,
-                    TextColor = Color.FromArgb("#4338CA"),
-                    FontFamily = "SpaceGroteskRegular"
+                    TextColor = AppColors.AccentIndigo,
+                    FontFamily = "InterRegular"
                 }
             });
         }
@@ -167,7 +166,7 @@ public sealed class WeeklyRecapMobilePage : ContentPage
     {
         return new Border
         {
-            BackgroundColor = Color.FromArgb("#F8F9FA"),
+            BackgroundColor = AppColors.SurfaceDim,
             StrokeShape = new RoundRectangle { CornerRadius = 10 },
             Stroke = Brush.Transparent,
             Padding = new Thickness(8),
@@ -176,8 +175,8 @@ public sealed class WeeklyRecapMobilePage : ContentPage
                 HorizontalOptions = LayoutOptions.Center,
                 Children =
                 {
-                    new Label { Text = label, FontSize = 10, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "SpaceGroteskRegular" },
-                    new Label { Text = value, FontSize = 16, FontFamily = "SpaceGroteskBold", TextColor = valueColor, HorizontalTextAlignment = TextAlignment.Center }
+                    new Label { Text = label, FontSize = 10, TextColor = AppColors.Muted, HorizontalTextAlignment = TextAlignment.Center, FontFamily = "InterRegular" },
+                    new Label { Text = value, FontSize = 16, FontFamily = "InterBold", TextColor = valueColor, HorizontalTextAlignment = TextAlignment.Center }
                 }
             }
         };
@@ -198,7 +197,7 @@ public sealed class WeeklyRecapMobilePage : ContentPage
                 Children =
                 {
                     new Label { Text = iconGlyph, FontFamily = "FontAwesomeSolid", FontSize = 10, TextColor = textColor, VerticalOptions = LayoutOptions.Center },
-                    new Label { Text = text, FontSize = 11, FontFamily = "SpaceGroteskBold", TextColor = textColor }
+                    new Label { Text = text, FontSize = 11, FontFamily = "InterBold", TextColor = textColor }
                 }
             }
         };

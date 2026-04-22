@@ -6,8 +6,18 @@ public sealed class MoreHubPage : ContentPage
 {
     public MoreHubPage()
     {
+        BuildContent();
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        BuildContent();
+    }
+
+    private void BuildContent()
+    {
         Title = "More";
-        BackgroundColor = AppColors.Background;
 
         Content = new ScrollView
         {

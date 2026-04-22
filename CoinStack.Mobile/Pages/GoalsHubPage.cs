@@ -6,8 +6,18 @@ public sealed class GoalsHubPage : ContentPage
 {
     public GoalsHubPage()
     {
+        BuildContent();
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        BuildContent();
+    }
+
+    private void BuildContent()
+    {
         Title = "Goals";
-        BackgroundColor = AppColors.Background;
 
         Content = new ScrollView
         {

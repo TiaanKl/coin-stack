@@ -6,8 +6,18 @@ public sealed class GrowthHubPage : ContentPage
 {
     public GrowthHubPage()
     {
+        BuildContent();
+    }
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        BuildContent();
+    }
+
+    private void BuildContent()
+    {
         Title = "Growth";
-        BackgroundColor = AppColors.Background;
 
         Content = new ScrollView
         {
