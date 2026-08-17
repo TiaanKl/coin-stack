@@ -1,9 +1,15 @@
+using CoinStack.Services.Import;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
 namespace CoinStack.Services;
 
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddFinanceManagerAppServices(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<ITransactionService, TransactionService>();
         services.AddScoped<ICategoryService, CategoryService>();
@@ -26,6 +32,15 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ILevelService, LevelService>();
         services.AddScoped<IDailyChallengeService, DailyChallengeService>();
         services.AddScoped<IWeeklyRecapService, WeeklyRecapService>();
+        services.AddScoped<FnbPdfBankFeed>();
+        services.AddScoped<FnbHistoryBankFeed>();
+        services.AddScoped<IBankFeed>(sp => new CompositeBankFeed(
+        [
+            sp.GetRequiredService<FnbPdfBankFeed>(),
+            sp.GetRequiredService<FnbHistoryBankFeed>()
+        ]));
+        services.AddScoped<IBankStatementImportService, BankStatementImportService>();
+        services.AddScoped<IProjectionService, ProjectionService>();
 
         return services;
     }

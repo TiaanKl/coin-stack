@@ -8,7 +8,7 @@
 @* ===== Floating Score Toast ===== *@
 @if (_toast is not null)
 {
-    <div class="fixed top-20 right-4 z-[99999] flex flex-col gap-2 pointer-events-none">
+    <div class="fixed top-20 right-4 z-99999 flex flex-col gap-2 pointer-events-none">
         <div class="pointer-events-auto w-80 rounded-2xl shadow-theme-lg border
             @ToastBorderClass(_toast.Kind)
             @ToastBgClass(_toast.Kind)
@@ -54,24 +54,23 @@
     </div>
 }
 
-@* ===== Goal Achieved Celebration Overlay ===== *@
 @if (_celebration is not null)
 {
-    <div class="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm
-        animate-[fadeIn_0.25s_ease-out_both]" @onclick="DismissCelebration">
+    <div class="pointer-events-none fixed inset-0 z-999999 flex items-center justify-center bg-black/60 backdrop-blur-sm
+        animate-[fadeIn_0.25s_ease-out_both]">
 
         <!-- Confetti container (full width, top portion) -->
         <div id="confetti-container" class="absolute inset-x-0 top-0 h-full overflow-hidden pointer-events-none"></div>
 
         <!-- Card -->
-        <div class="relative z-10 flex flex-col items-center gap-4 rounded-3xl bg-white dark:bg-gray-900
+        <div class="pointer-events-auto relative z-10 flex flex-col items-center gap-4 rounded-3xl bg-white dark:bg-gray-900
             border border-yellow-200 dark:border-yellow-500/30
             px-10 py-8 shadow-2xl max-w-xs w-full mx-4 text-center
             animate-[celebrationIn_0.4s_cubic-bezier(0.34,1.56,0.64,1)_both]" @onclick:stopPropagation>
 
             <!-- Trophy with bounce -->
             <div class="flex h-20 w-20 items-center justify-center rounded-full
-                bg-gradient-to-br from-yellow-400 to-amber-500
+                bg-linear-to-br from-yellow-400 to-amber-500
                 shadow-lg animate-[trophyBounce_0.6s_0.3s_ease-out_both]">
                 <i class="fa-solid fa-trophy text-3xl text-white"></i>
             </div>
@@ -182,6 +181,7 @@
     private FeedbackPayload? _toast;
     private FeedbackPayload? _celebration;
     private CancellationTokenSource? _toastCts;
+    private CancellationTokenSource? _celebrationCts;
     private AppSettings _settings = new();
     private bool _disposed;
 
@@ -202,6 +202,8 @@
 
             if (payload.Kind == FeedbackKind.GoalAchieved)
             {
+                ResetCelebrationTimer();
+                var celebrationCts = _celebrationCts;
                 _celebration = payload;
                 StateHasChanged();
 
@@ -211,6 +213,11 @@
                 }
 
                 await SpawnConfettiAsync();
+
+                if (celebrationCts is not null)
+                {
+                    _ = AutoDismissCelebrationAsync(payload, celebrationCts.Token);
+                }
             }
             else if (_settings.EnableToast && payload.PointsChanged != 0)
             {
@@ -256,7 +263,11 @@
         _toast = null;
     }
 
-    private void DismissCelebration() => _celebration = null;
+    private void DismissCelebration()
+    {
+        CancelAndDisposeCelebrationTimer();
+        _celebration = null;
+    }
 
     private async Task PlaySoundAsync(string type)
     {
@@ -290,11 +301,32 @@
         }
     }
 
+    private async Task AutoDismissCelebrationAsync(FeedbackPayload payload, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(5000, cancellationToken);
+
+            if (_disposed || cancellationToken.IsCancellationRequested || !ReferenceEquals(_celebration, payload))
+            {
+                return;
+            }
+
+            _celebration = null;
+            CancelAndDisposeCelebrationTimer();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
     public void Dispose()
     {
         _disposed = true;
         FeedbackService.OnFeedback -= HandleFeedback;
         CancelAndDisposeToastTimer();
+        CancelAndDisposeCelebrationTimer();
     }
 
     private void ResetToastTimer()
@@ -313,6 +345,24 @@
         _toastCts.Cancel();
         _toastCts.Dispose();
         _toastCts = null;
+    }
+
+    private void ResetCelebrationTimer()
+    {
+        CancelAndDisposeCelebrationTimer();
+        _celebrationCts = new CancellationTokenSource();
+    }
+
+    private void CancelAndDisposeCelebrationTimer()
+    {
+        if (_celebrationCts is null)
+        {
+            return;
+        }
+
+        _celebrationCts.Cancel();
+        _celebrationCts.Dispose();
+        _celebrationCts = null;
     }
 
     private static string ToastBorderClass(FeedbackKind kind) => kind switch

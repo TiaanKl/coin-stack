@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.DashboardView"
+             x:DataType="viewModels:DashboardViewModel">
+    <StackPanel Spacing="20">
+        <TextBlock Text="Dashboard" Classes="h1" />
+        
+        <!-- Stats Row -->
+        <Grid ColumnDefinitions="*, *" RowDefinitions="Auto" ColumnSpacing="20">
+            <Border Classes="Card" Grid.Column="0">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Budget Overview" Classes="h2" />
+                    <TextBlock Text="{Binding BudgetRemaining, StringFormat='Remaining: ${0:F2}'}" />
+                    <ProgressBar Value="{Binding BudgetSpent}" Maximum="{Binding BudgetLimit}" 
+                                 Height="8" CornerRadius="4" 
+                                 Foreground="{DynamicResource PrimaryBrush}" />
+                    <TextBlock Classes="body">
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="Spent: ${0:F2} of ${1:F2}">
+                                <Binding Path="BudgetSpent" />
+                                <Binding Path="BudgetLimit" />
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+            
+            <Border Classes="Card" Grid.Column="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Reserves On Hand" Classes="h2" />
+                    <TextBlock Text="{Binding ReservesTotal, StringFormat='Total: ${0:F2}'}" />
+                    <TextBlock Text="{Binding EmergencyFund, StringFormat='Emergency: ${0:F2}'}" Classes="body" />
+                </StackPanel>
+            </Border>
+        </Grid>
+        
+        <!-- Charts Row -->
+        <Grid ColumnDefinitions="*, *" ColumnSpacing="20">
+            <Border Classes="Card" Grid.Column="0">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Daily Spending (30d)" Classes="h2" />
+                    <TextBlock Text="Chart data visualization" Classes="body" FontSize="12" FontStyle="Italic" Foreground="#9CA3AF" />
+                    <ProgressBar Value="35" Maximum="100" Height="8" CornerRadius="4" />
+                    <TextBlock Text="30 days of spending tracked" FontSize="11" Foreground="#6B7280" />
+                </StackPanel>
+            </Border>
+            
+            <Border Classes="Card" Grid.Column="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Money Trend" Classes="h2" />
+                    <TextBlock Text="Chart data visualization" Classes="body" FontSize="12" FontStyle="Italic" Foreground="#9CA3AF" />
+                    <ProgressBar Value="55" Maximum="100" Height="8" CornerRadius="4" />
+                    <TextBlock Text="Trending data over time" FontSize="11" Foreground="#6B7280" />
+                </StackPanel>
+            </Border>
+        </Grid>
+        
+        <!-- Predictive Cash Flow -->
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Predictive Cash Flow (30d)" Classes="h2" />
+                <TextBlock Text="Chart data visualization" Classes="body" FontSize="12" FontStyle="Italic" Foreground="#9CA3AF" />
+                <ProgressBar Value="45" Maximum="100" Height="8" CornerRadius="4" />
+                <TextBlock Text="Forecast for the next 30 days" FontSize="11" Foreground="#6B7280" />
+            </StackPanel>
+        </Border>
+        
+        <!-- Recent Activity Row -->
+        <Grid ColumnDefinitions="*, *" ColumnSpacing="20">
+            <Border Classes="Card" Grid.Column="0">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Recent Transactions" Classes="h2" />
+                    <ItemsControl ItemsSource="{Binding RecentTransactions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="0,8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding Description}" FontWeight="Medium" />
+                                             <TextBlock Text="{Binding Date}" Classes="body" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" 
+                                                   Text="{Binding Amount}"
+                                                   Foreground="{Binding TransactionForeground}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+            
+            <Border Classes="Card" Grid.Column="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Recent Score Activity" Classes="h2" />
+                    <ItemsControl ItemsSource="{Binding RecentScoreEvents}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="0,8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Event}" />
+                                        <TextBlock Grid.Column="1" 
+                                                   Text="{Binding Points, StringFormat='0;\\-0;0'}"
+                                                   Foreground="{Binding PointsForeground}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+</UserControl>

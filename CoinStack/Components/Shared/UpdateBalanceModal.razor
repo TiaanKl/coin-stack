@@ -1,0 +1,176 @@
+@using CoinStack.Data.Entities
+@inject ISettingsService SettingsService
+@inject IMoneyFormatter MoneyFormatter
+@inject IGameFeedbackService GameFeedbackService
+
+@if (IsOpen)
+{
+    <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5 modal-backdrop-enter">
+        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @onclick="Close"></div>
+        <div class="relative w-full max-w-[500px] rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8 modal-panel-enter shadow-xl">
+            <button @onclick="Close" type="button"
+                    class="group absolute right-3 top-3 z-999 flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-100 text-gray-500 transition-colors hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 sm:right-6 sm:top-6 sm:h-11 sm:w-11">
+                <svg class="fill-current transition-colors group-hover:text-gray-600 dark:group-hover:text-gray-200"
+                     width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path fill-rule="evenodd" clip-rule="evenodd"
+                          d="M6.04289 16.5413C5.65237 16.9318 5.65237 17.565 6.04289 17.9555C6.43342 18.346 7.06658 18.346 7.45711 17.9555L11.9987 13.4139L16.5408 17.956C16.9313 18.3466 17.5645 18.3466 17.955 17.956C18.3455 17.5655 18.3455 16.9323 17.955 16.5418L13.4129 11.9997L17.955 7.4576C18.3455 7.06707 18.3455 6.43391 17.955 6.04338C17.5645 5.65286 16.9313 5.65286 16.5408 6.04338L11.9987 10.5855L7.45711 6.0439C7.06658 5.65338 6.43342 5.65338 6.04289 6.0439C5.65237 6.43442 5.65237 7.06759 6.04289 7.45811L10.5845 11.9997L6.04289 16.5413Z" />
+                </svg>
+            </button>
+
+            <form @onsubmit="SaveBalanceAsync" @onsubmit:preventDefault="true">
+                <div class="mb-5 flex items-center gap-3">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                        <i class="fa-solid fa-building-columns text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-bold text-gray-800 dark:text-white/90">Update Bank Balance</h4>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Set your live account snapshot</p>
+                    </div>
+                </div>
+
+                @if (_currentSettings?.BankBalanceAsOfUtc is not null)
+                {
+                    <div class="mb-4 rounded-xl bg-gray-50 p-3.5 dark:bg-gray-800/50">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-gray-500 dark:text-gray-400">Last recorded snapshot:</span>
+                            <span class="font-semibold text-gray-800 dark:text-white">
+                                @MoneyFormatter.Format(_currentSettings.Currency, _currentSettings.CurrentBankBalance)
+                            </span>
+                        </div>
+                        <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                            As of @_currentSettings.BankBalanceAsOfUtc.Value.ToString("dd MMM yyyy, HH:mm UTC")
+                        </p>
+                    </div>
+                }
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                            Current Bank Balance
+                        </label>
+                        <div class="flex items-center rounded-xl border border-gray-300 bg-white overflow-hidden focus-within:border-brand-500 focus-within:ring-1 focus-within:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                            <div class="flex h-11 w-11 shrink-0 items-center justify-center border-r border-gray-300 bg-gray-50 text-sm font-semibold text-gray-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                                @MoneyFormatter.Symbol(_currentSettings?.Currency ?? "ZAR")
+                            </div>
+                            <input type="number" step="0.01" @bind="_balanceInput"
+                                   class="block w-full border-0 bg-transparent py-2.5 px-4 text-base font-semibold text-gray-900 placeholder:text-gray-400 focus:ring-0 dark:text-white dark:placeholder:text-gray-500"
+                                   placeholder="0.00" autofocus />
+                        </div>
+                        <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+                            Negatives are allowed if your account is currently overdrawn.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+                            Balance As Of Date
+                        </label>
+                        <input type="date" @bind="_asOfDateInput"
+                               class="block w-full rounded-xl border border-gray-300 bg-white py-2.5 px-4 text-sm text-gray-900 shadow-theme-xs focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white" />
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            Transactions occurring <strong>after</strong> this date will automatically adjust your effective balance without double counting.
+                        </p>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                    {
+                        <div class="rounded-xl border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+                            @_errorMessage
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-6 flex w-full items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                    <button type="button" @onclick="Close"
+                            class="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                        Cancel
+                    </button>
+                    <button type="submit" disabled="@_isSaving"
+                            class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 focus:outline-none disabled:opacity-50">
+                        @if (_isSaving)
+                        {
+                            <i class="fa-solid fa-spinner fa-spin"></i>
+                            <span>Saving…</span>
+                        }
+                        else
+                        {
+                            <i class="fa-solid fa-check"></i>
+                            <span>Save Balance</span>
+                        }
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+    [Parameter] public AppSettings? InitialSettings { get; set; }
+    [Parameter] public EventCallback<AppSettings> OnBalanceSaved { get; set; }
+
+    private AppSettings? _currentSettings;
+    private decimal _balanceInput;
+    private DateTime _asOfDateInput = DateTime.UtcNow.Date;
+    private bool _isSaving;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsOpen)
+        {
+            _errorMessage = null;
+            _currentSettings = InitialSettings ?? await SettingsService.GetAsync();
+            _balanceInput = _currentSettings.CurrentBankBalance;
+            _asOfDateInput = _currentSettings.BankBalanceAsOfUtc?.Date ?? DateTime.UtcNow.Date;
+        }
+    }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task SaveBalanceAsync()
+    {
+        _isSaving = true;
+        _errorMessage = null;
+
+        try
+        {
+            var settings = await SettingsService.GetAsync();
+            settings.CurrentBankBalance = _balanceInput;
+
+            var selectedDateUtc = DateTime.SpecifyKind(_asOfDateInput.Date, DateTimeKind.Utc);
+            if (selectedDateUtc.Date == DateTime.UtcNow.Date)
+            {
+                settings.BankBalanceAsOfUtc = DateTime.UtcNow;
+            }
+            else
+            {
+                settings.BankBalanceAsOfUtc = selectedDateUtc.AddDays(1).AddTicks(-1);
+            }
+
+            await SettingsService.SaveAsync(settings);
+            _currentSettings = settings;
+
+            GameFeedbackService.Trigger(new FeedbackPayload(
+                0,
+                $"Bank balance updated to {MoneyFormatter.Format(settings.Currency, settings.CurrentBankBalance)}",
+                FeedbackKind.Positive));
+
+            await OnBalanceSaved.InvokeAsync(settings);
+            await Close();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to save balance: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

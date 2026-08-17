@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.IncomeView"
+             x:DataType="viewModels:IncomeViewModel">
+    <StackPanel Spacing="20">
+        <TextBlock Text="Income" Classes="h1" />
+        
+        <Grid ColumnDefinitions="*, *" ColumnSpacing="20">
+            <Border Classes="Card" Grid.Column="0">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Received This Month" Classes="body" />
+                    <TextBlock Text="{Binding ReceivedThisMonth, StringFormat='${0:F2}'}" 
+                               FontSize="28" FontWeight="Bold" 
+                               Foreground="{DynamicResource SuccessBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="Card" Grid.Column="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Year To Date" Classes="body" />
+                    <TextBlock Text="{Binding YearToDate, StringFormat='${0:F2}'}" 
+                               FontSize="28" FontWeight="Bold" />
+                </StackPanel>
+            </Border>
+        </Grid>
+        
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Income Sources" Classes="h2" />
+                <ItemsControl ItemsSource="{Binding IncomeSources}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="2*, 1*, Auto" Margin="0,6">
+                                <TextBlock Grid.Column="0" Text="{Binding Category}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Amount, StringFormat='${0:F2}'}" />
+                                   <TextBlock Grid.Column="2" Text="{Binding Percentage, StringFormat='0\\%'}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+        
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Recent Deposits" Classes="h2" />
+                <ItemsControl ItemsSource="{Binding RecentDeposits}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="0,8" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="*, Auto">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Description}" />
+                                         <TextBlock Text="{Binding Date}" 
+                                                    Classes="body" FontSize="12" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" 
+                                               Text="{Binding Amount}" 
+                                               Foreground="{DynamicResource SuccessBrush}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

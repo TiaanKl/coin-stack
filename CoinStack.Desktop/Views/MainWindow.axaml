@@ -1,0 +1,127 @@
+<Window x:Name="RootWindow"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+        xmlns:views="clr-namespace:CoinStack.Desktop.Views"
+        xmlns:local="clr-namespace:CoinStack.Desktop"
+        x:Class="CoinStack.Desktop.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        x:CompileBindings="True"
+        Title="CoinStack - Personal Finance"
+        Width="1400" Height="900"
+        MinWidth="1000" MinHeight="600">
+    
+    <Design.DataContext>
+        <vm:MainViewModel />
+    </Design.DataContext>
+    
+    <Window.Resources>
+        <local:ViewLocator x:Key="ViewLocator" />
+    </Window.Resources>
+    
+    <Grid RowDefinitions="Auto, *">
+        <!-- Top Bar with Toggle -->
+        <Border Padding="12,8"
+                Background="White"
+                BorderBrush="#D0D0D0"
+                BorderThickness="0,0,0,1"
+                Grid.Row="0">
+            <Button Command="{Binding ToggleDrawerCommand}"
+                    Background="Transparent"
+                    Padding="8"
+                    CornerRadius="4"
+                    Width="40" Height="40"
+                    HorizontalAlignment="Left">
+                <TextBlock Text="&#xE700;"
+                           FontFamily="Segoe MDL2 Assets"
+                           FontSize="18"
+                           Foreground="#424242"
+                           TextAlignment="Center" />
+            </Button>
+        </Border>
+
+        <!-- Main Content Grid -->
+        <Grid ColumnDefinitions="Auto, *" Grid.Row="1">
+            <!-- Navigation Drawer -->
+            <Border Background="#F5F5F5"
+                    BorderBrush="#D0D0D0"
+                    BorderThickness="0,0,1,0">
+                <Border.Width>
+                    <Binding Path="IsDrawerExpanded" Converter="{StaticResource BoolConverter}" ConverterParameter="280|0" />
+                </Border.Width>
+                <Border.Transitions>
+                    <Transitions>
+                        <DoubleTransition Property="Width" Duration="0:0:0.3" />
+                    </Transitions>
+                </Border.Transitions>
+
+                <DockPanel>
+                    <!-- Drawer Header -->
+                    <Border DockPanel.Dock="Top"
+                            Padding="16,16"
+                            Background="#F5F5F5"
+                            BorderBrush="#D0D0D0"
+                            BorderThickness="0,0,0,1">
+                        <TextBlock Text="CoinStack"
+                                   FontSize="18"
+                                   FontWeight="Bold"
+                                   Foreground="#1976D2"
+                                   Opacity="{Binding IsDrawerExpanded, Converter={StaticResource BoolToOpacityConverter}}" />
+                    </Border>
+
+                    <!-- Navigation Items -->
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding MenuItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding DataContext.NavigateCommand, ElementName=RootWindow}"
+                                            CommandParameter="{Binding}"
+                                            Background="Transparent"
+                                            Padding="12,10"
+                                            HorizontalContentAlignment="Stretch"
+                                            VerticalContentAlignment="Center"
+                                            CornerRadius="0"
+                                            Margin="0"
+                                            Classes="navButton">
+                                        <Button.Styles>
+                                            <Style Selector="Button.navButton">
+                                                <Setter Property="Foreground" Value="#424242" />
+                                            </Style>
+                                            <Style Selector="Button.navButton:pointerover">
+                                                <Setter Property="Background" Value="#E8E8E8" />
+                                            </Style>
+                                            <Style Selector="Button.navButton:pressed">
+                                                <Setter Property="Background" Value="#DCDCDC" />
+                                            </Style>
+                                        </Button.Styles>
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <!-- Icon -->
+                                            <TextBlock Text="{Binding IconChar}"
+                                                       FontSize="16"
+                                                       FontFamily="Segoe MDL2 Assets"
+                                                       Foreground="#424242"
+                                                       VerticalAlignment="Center"
+                                                       Width="24"
+                                                       TextAlignment="Center" />
+                                            <!-- Label -->
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="13"
+                                                       Foreground="#424242"
+                                                       VerticalAlignment="Center"
+                                                       Opacity="{Binding DataContext.IsDrawerExpanded, ElementName=RootWindow, Converter={StaticResource BoolToOpacityConverter}}" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+
+            <!-- Content Area -->
+            <ScrollViewer Grid.Column="1" Padding="24" Background="White">
+                <ContentControl Content="{Binding CurrentPage}" ContentTemplate="{StaticResource ViewLocator}" />
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>

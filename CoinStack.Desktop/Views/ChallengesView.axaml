@@ -1,0 +1,57 @@
+<!-- File: CoinStack.Desktop/Views/ChallengesView.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.ChallengesView"
+             x:DataType="viewModels:ChallengesViewModel">
+    <ScrollViewer Padding="0,0,0,20">
+        <StackPanel Spacing="20">
+            <TextBlock Text="Daily Challenges" Classes="h1" TextWrapping="Wrap" />
+            
+            <Border Classes="Card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="{Binding LevelTitle}" Classes="h2" TextWrapping="Wrap" />
+                    <TextBlock Text="XP Progress" Classes="body" FontSize="12" />
+                    <ProgressBar Value="{Binding LevelProgress}" Height="8" CornerRadius="4" Foreground="{DynamicResource PrimaryBrush}" />
+                    <Grid ColumnDefinitions="*, *">
+                        <StackPanel>
+                            <TextBlock Text="Current XP" Classes="body" FontSize="11" />
+                            <TextBlock Text="{Binding CurrentXp}" FontWeight="SemiBold" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                            <TextBlock Text="Required XP" Classes="body" FontSize="11" />
+                            <TextBlock Text="{Binding RequiredXp}" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+            
+            <TextBlock Text="Today's Challenges" Classes="h2" TextWrapping="Wrap" />
+            <ScrollViewer MaxHeight="400">
+                <ItemsControl ItemsSource="{Binding Challenges}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Classes="Card" Margin="0,0,0,12">
+                                <StackPanel Spacing="8">
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Text="{Binding Name}" Classes="h2" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding XpReward, StringFormat='+{0} XP'}" Foreground="{DynamicResource PrimaryBrush}" Grid.Column="1" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding Description}" Classes="body" TextWrapping="Wrap" />
+                                    <Grid ColumnDefinitions="*, Auto">
+                                        <TextBlock Classes="body" FontSize="12" VerticalAlignment="Center">
+                                            <Run Text="Status: " /><Run Text="{Binding IsCompleted}" FontWeight="SemiBold" />
+                                        </TextBlock>
+                                        <Border Grid.Column="1" Background="{DynamicResource PrimaryBrush}" CornerRadius="12" Padding="8,4" IsVisible="{Binding IsCompleted}">
+                                            <TextBlock Text="✓ Complete" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

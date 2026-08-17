@@ -1,19 +1,25 @@
 @page "/reports"
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
-@inject CoinStack.Services.ITransactionService TransactionService
-@inject CoinStack.Services.ISettingsService SettingsService
-@inject CoinStack.Services.ISavingsService SavingsService
-@inject CoinStack.Services.IDebtService DebtService
-@inject CoinStack.Services.IBucketService BucketService
-@inject CoinStack.Services.IMoneyFormatter MoneyFormatter
+@inject ITransactionService TransactionService
+@inject ISettingsService SettingsService
+@inject ISavingsService SavingsService
+@inject IDebtService DebtService
+@inject IBucketService BucketService
+@inject IMoneyFormatter MoneyFormatter
 
 <PageTitle>Reports</PageTitle>
 
 <div class="space-y-6">
-	<div>
-		<h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Reports</h2>
-		<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Monthly snapshot of cashflow, savings, debt, and bucket performance</p>
+	<div class="flex flex-wrap items-center justify-between gap-3">
+		<div>
+			<h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Reports</h2>
+			<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Monthly snapshot of cashflow, savings, debt, and bucket performance</p>
+		</div>
+		<a href="/"
+		   class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+			← Back to Dashboard
+		</a>
 	</div>
 
 	@if (_isLoading)

@@ -5,6 +5,8 @@
 @inject IWaitlistService WaitlistService
 @inject ISettingsService SettingsService
 @inject IMoneyFormatter MoneyFormatter
+@inject IBucketService BucketService
+@inject IGameFeedbackService GameFeedbackService
 
 <PageTitle>The Waitlist</PageTitle>
 
@@ -18,12 +20,21 @@
                 Let time and your finances decide — not impulse.
             </p>
         </div>
-        <button
-            class="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600 transition-colors hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-400 dark:hover:bg-brand-500/25"
-            @onclick="OpenCreateModal"
-            title="Add item">
-            <svg class="fill-current" width="24" height="24" viewBox="0 0 24 24"><path d="M12 4C11.5858 4 11.25 4.33579 11.25 4.75V11.25H4.75C4.33579 11.25 4 11.5858 4 12C4 12.4142 4.33579 12.75 4.75 12.75H11.25V19.25C11.25 19.6642 11.5858 20 12 20C12.4142 20 12.75 19.6642 12.75 19.25V12.75H19.25C19.6642 12.75 20 12.4142 20 12C20 11.5858 19.6642 11.25 19.25 11.25H12.75V4.75C12.75 4.33579 12.4142 4 12 4Z" fill="currentColor"/></svg>
-        </button>
+        <div class="flex items-center gap-3">
+            <div class="flex h-11 items-center gap-2 rounded-full bg-success-50 px-4 dark:bg-success-500/15"
+                 title="Days resisting impulse purchases">
+                <i class="fa-solid fa-shield-halved text-success-600 dark:text-success-400"></i>
+                <span class="text-xs font-bold text-success-700 dark:text-success-400">
+                    @_noImpulseStreak resist streak
+                </span>
+            </div>
+            <button
+                class="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-600 transition-colors hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-400 dark:hover:bg-brand-500/25"
+                @onclick="OpenCreateModal"
+                title="Add item">
+                <svg class="fill-current" width="24" height="24" viewBox="0 0 24 24"><path d="M12 4C11.5858 4 11.25 4.33579 11.25 4.75V11.25H4.75C4.33579 11.25 4 11.5858 4 12C4 12.4142 4.33579 12.75 4.75 12.75H11.25V19.25C11.25 19.6642 11.5858 20 12 20C12.4142 20 12.75 19.6642 12.75 19.25V12.75H19.25C19.6642 12.75 20 12.4142 20 12C20 11.5858 19.6642 11.25 19.25 11.25H12.75V4.75C12.75 4.33579 12.4142 4 12 4Z" fill="currentColor"/></svg>
+            </button>
+        </div>
     </div>
 
     <!-- Score legend -->
@@ -96,6 +107,10 @@
                         <div>
                             <p class="text-xs text-gray-500 dark:text-gray-400">Estimated cost</p>
                             <p class="text-xl font-bold text-gray-800 dark:text-white/90">@FormatC(item.EstimatedCost)</p>
+                            @if (_costFraming.TryGetValue(item.Id, out var framing) && !string.IsNullOrWhiteSpace(framing))
+                            {
+                                <p class="mt-1 text-xs text-brand-600 dark:text-brand-400">@framing</p>
+                            }
                         </div>
                         <div class="flex flex-col items-center rounded-xl @scoreBg px-4 py-2">
                             <p class="text-2xl font-extrabold @scoreColor">@item.Score</p>
@@ -153,7 +168,7 @@
 
                     <!-- Actions -->
                     <div class="flex items-center justify-between gap-2 border-t border-gray-100 pt-3 dark:border-gray-800">
-                        <div class="flex gap-2">
+                        <div class="flex flex-wrap gap-2">
                             <button @onclick="() => RefreshScoreAsync(item.Id)"
                                     class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400"
                                     title="Recalculate score">
@@ -163,10 +178,16 @@
 
                             @if (item.IsUnlocked)
                             {
-                                <button @onclick="() => PurchaseAsync(item.Id)"
+                                <button @onclick="() => OpenPurchaseModal(item)"
                                         class="inline-flex items-center gap-1 rounded-full border border-success-300 bg-success-50 px-3 py-1.5 text-xs font-medium text-success-700 hover:bg-success-100 dark:border-success-500/40 dark:bg-success-500/10 dark:text-success-400">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                                     Purchased
+                                </button>
+                                <button @onclick="() => ResistAsync(item.Id)"
+                                        class="inline-flex items-center gap-1 rounded-full border border-brand-300 bg-white px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-500/40 dark:bg-transparent dark:text-brand-400 dark:hover:bg-brand-500/10"
+                                        title="I decided not to buy this">
+                                    <i class="fa-solid fa-shield-halved text-[10px]"></i>
+                                    Didn't buy
                                 </button>
                             }
                         </div>
@@ -179,7 +200,7 @@
                             </button>
                             <button @onclick="() => DeleteAsync(item.Id)"
                                     class="rounded-md p-1.5 text-gray-400 hover:text-error-500 dark:hover:text-error-400"
-                                    title="Delete">
+                                    title="Delete (no reward)">
                                 <svg class="fill-current" width="16" height="16" viewBox="0 0 18 18"><path d="M15.75 4.5H2.25M7.5 8.25V12.75M10.5 8.25V12.75M14.25 4.5V14.25C14.25 15.0784 13.5784 15.75 12.75 15.75H5.25C4.42157 15.75 3.75 15.0784 3.75 14.25V4.5M6 4.5V3C6 2.17157 6.67157 1.5 7.5 1.5H10.5C11.3284 1.5 12 2.17157 12 3V4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
                             </button>
                         </div>
@@ -295,13 +316,58 @@
     </div>
 }
 
+@if (_showPurchaseModal && _purchaseItem is not null)
+{
+    <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5 modal-backdrop-enter">
+        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @onclick="ClosePurchaseModal"></div>
+        <div class="relative w-full max-w-[420px] rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8 modal-panel-enter">
+            <h4 class="mb-2 text-lg font-medium text-gray-800 dark:text-white/90">Confirm purchase</h4>
+            <p class="mb-5 text-sm text-gray-500 dark:text-gray-400">
+                Logging <span class="font-medium text-gray-700 dark:text-gray-200">@_purchaseItem.Name</span>
+                (@FormatC(_purchaseItem.EstimatedCost)) as an impulse expense.
+            </p>
+
+            <div class="mb-5">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Charge to bucket</label>
+                <select value="@(_purchaseBucketId?.ToString() ?? "")"
+                        @onchange="OnPurchaseBucketChanged"
+                        class="h-11 w-full rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                    <option value="">— Select bucket —</option>
+                    @foreach (var bucket in _buckets.Where(b => !b.IsSavings))
+                    {
+                        <option value="@bucket.Id">@bucket.Name</option>
+                    }
+                </select>
+            </div>
+
+            <div class="flex w-full items-center justify-end gap-3">
+                <button @onclick="ClosePurchaseModal" type="button"
+                        class="rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 dark:border-gray-600 dark:bg-transparent dark:text-gray-300">
+                    Cancel
+                </button>
+                <button @onclick="ConfirmPurchaseAsync" type="button"
+                        class="rounded-full bg-success-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-success-600">
+                    Log purchase
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private AppSettings _settings = new();
     private readonly List<WaitlistItem> _items = [];
+    private readonly Dictionary<int, string?> _costFraming = new();
+    private List<Bucket> _buckets = [];
     private bool _isLoading = true;
+    private int _noImpulseStreak;
 
     private bool _showModal;
     private int? _editingId;
+
+    private bool _showPurchaseModal;
+    private WaitlistItem? _purchaseItem;
+    private int? _purchaseBucketId;
 
     // Form fields
     private string _formName = "";
@@ -316,6 +382,7 @@
     protected override async Task OnInitializedAsync()
     {
         _settings = await SettingsService.GetAsync();
+        _buckets = await BucketService.GetAllAsync();
         await WaitlistService.EvaluateCoolOffsAsync();
         await LoadAsync();
     }
@@ -326,6 +393,14 @@
         var items = await WaitlistService.GetAllAsync();
         _items.Clear();
         _items.AddRange(items);
+        _noImpulseStreak = await WaitlistService.GetNoImpulseBuyStreakAsync();
+
+        _costFraming.Clear();
+        foreach (var item in _items)
+        {
+            _costFraming[item.Id] = await WaitlistService.GetCostFramingMessageAsync(item.EstimatedCost);
+        }
+
         _isLoading = false;
     }
 
@@ -417,9 +492,66 @@
         await LoadAsync();
     }
 
-    private async Task PurchaseAsync(int id)
+    private void OpenPurchaseModal(WaitlistItem item)
     {
-        await WaitlistService.MarkPurchasedAsync(id);
+        _purchaseItem = item;
+        _purchaseBucketId = _buckets.FirstOrDefault(b => !b.IsSavings)?.Id;
+        _showPurchaseModal = true;
+    }
+
+    private void OnPurchaseBucketChanged(ChangeEventArgs args)
+    {
+        if (args.Value is null || string.IsNullOrWhiteSpace(args.Value.ToString()))
+        {
+            _purchaseBucketId = null;
+            return;
+        }
+
+        if (int.TryParse(args.Value.ToString(), out var bucketId))
+        {
+            _purchaseBucketId = bucketId;
+        }
+    }
+
+    private void ClosePurchaseModal()
+    {
+        _showPurchaseModal = false;
+        _purchaseItem = null;
+        _purchaseBucketId = null;
+    }
+
+    private async Task ConfirmPurchaseAsync()
+    {
+        if (_purchaseItem is null || !_purchaseBucketId.HasValue)
+        {
+            return;
+        }
+
+        var bucket = _buckets.FirstOrDefault(b => b.Id == _purchaseBucketId.Value);
+        var (_, gameResult) = await WaitlistService.MarkPurchasedAsync(
+            _purchaseItem.Id,
+            _purchaseBucketId,
+            bucket?.CategoryId);
+
+        if (gameResult is not null && gameResult.Kind != FeedbackKind.Normal)
+        {
+            GameFeedbackService.Trigger(new FeedbackPayload(
+                gameResult.PointsChanged,
+                gameResult.Message ?? "Impulse purchase logged",
+                gameResult.Kind));
+        }
+
+        ClosePurchaseModal();
+        await LoadAsync();
+    }
+
+    private async Task ResistAsync(int id)
+    {
+        await WaitlistService.MarkResistedAsync(id);
+        GameFeedbackService.Trigger(new FeedbackPayload(
+            8,
+            "Impulse resisted — well done!",
+            FeedbackKind.Positive));
         await LoadAsync();
     }
 

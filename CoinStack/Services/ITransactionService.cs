@@ -40,5 +40,5 @@ public interface ITransactionService
         CancellationToken cancellationToken = default);
 
     Task ApplyAutoDeductionsForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default);
-    Task ApplyAutoIncomeForBudgetPeriodAsync(int monthStartDay, decimal monthlyIncome, DateTime utcNow, CancellationToken cancellationToken = default);
+    Task<int> RemoveSyntheticMonthlyIncomeAsync(CancellationToken cancellationToken = default);
 }

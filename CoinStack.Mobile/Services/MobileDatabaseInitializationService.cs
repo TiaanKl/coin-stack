@@ -42,7 +42,7 @@ public sealed class MobileDatabaseInitializationService : IMobileDatabaseInitial
             {
                 Currency = "USD",
                 MonthStartDay = 1,
-                MonthlyIncome = 5000m,
+                MonthlyIncome = 0m,
                 EnableReflections = true,
                 EnableScoring = true,
                 EnableStreaks = true,

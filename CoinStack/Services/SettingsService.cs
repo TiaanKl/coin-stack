@@ -8,6 +8,8 @@ public sealed class SettingsService : ISettingsService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
+    public event Action? SettingsChanged;
+
     public SettingsService(IDbContextFactory<CoinStackDbContext> dbFactory)
     {
         _dbFactory = dbFactory;
@@ -16,8 +18,11 @@ public sealed class SettingsService : ISettingsService
     public async Task<AppSettings> GetAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
-               ?? new AppSettings();
+        var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
+                       ?? new AppSettings();
+
+
+        return settings;
     }
 
     public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
@@ -34,6 +39,8 @@ public sealed class SettingsService : ISettingsService
             existing.Currency = settings.Currency;
             existing.MonthStartDay = settings.MonthStartDay;
             existing.MonthlyIncome = settings.MonthlyIncome;
+            existing.CurrentBankBalance = settings.CurrentBankBalance;
+            existing.BankBalanceAsOfUtc = settings.BankBalanceAsOfUtc;
             existing.EnableScoring = settings.EnableScoring;
             existing.EnableStreaks = settings.EnableStreaks;
             existing.EnableToast = settings.EnableToast;
@@ -50,5 +57,6 @@ public sealed class SettingsService : ISettingsService
         }
 
         await db.SaveChangesAsync(cancellationToken);
+        SettingsChanged?.Invoke();
     }
 }

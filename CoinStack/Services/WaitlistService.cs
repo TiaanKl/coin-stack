@@ -6,15 +6,23 @@ namespace CoinStack.Services;
 
 public sealed class WaitlistService : IWaitlistService
 {
+    private const int ImpulseResistedPoints = 8;
+
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
     private readonly ISettingsService _settingsService;
+    private readonly IScoringService _scoringService;
+    private readonly ITransactionService _transactionService;
 
     public WaitlistService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
-        ISettingsService settingsService)
+        ISettingsService settingsService,
+        IScoringService scoringService,
+        ITransactionService transactionService)
     {
         _dbFactory = dbFactory;
         _settingsService = settingsService;
+        _scoringService = scoringService;
+        _transactionService = transactionService;
     }
 
     public async Task<List<WaitlistItem>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -80,18 +88,69 @@ public sealed class WaitlistService : IWaitlistService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task MarkPurchasedAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<(WaitlistItem? Item, GameTransactionResult? Result)> MarkPurchasedAsync(
+        int id,
+        int? bucketId = null,
+        int? categoryId = null,
+        CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var existing = await db.WaitlistItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (existing is null)
+        if (existing is null || existing.IsPurchased)
         {
-            return;
+            return (null, null);
         }
 
         existing.IsPurchased = true;
         existing.PurchasedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
+
+        var transaction = new Transaction
+        {
+            Description = existing.Name,
+            Amount = existing.EstimatedCost,
+            Type = TransactionType.Expense,
+            Notes = existing.ReflectionNote,
+            BucketId = bucketId,
+            CategoryId = categoryId,
+            ExpenseKind = ExpenseKind.Discretionary,
+            IsImpulse = true,
+            OccurredAtUtc = DateTime.UtcNow,
+        };
+
+        var (_, gameResult) = await _transactionService.CreateWithGameLoopAsync(transaction, 0, cancellationToken);
+        // NoImpulseBuy streak is reset inside ScoringService when IsImpulse is scored.
+
+        return (existing, gameResult);
+    }
+
+    public async Task MarkResistedAsync(int id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var existing = await db.WaitlistItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        if (existing is null || existing.IsPurchased)
+        {
+            return;
+        }
+
+        var itemName = existing.Name;
+        db.WaitlistItems.Remove(existing);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var settings = await _settingsService.GetAsync(cancellationToken);
+        if (settings.EnableScoring)
+        {
+            await _scoringService.AddScoreEventAsync(
+                ImpulseResistedPoints,
+                ScoreChangeReason.ImpulseResisted,
+                $"Resisted impulse: {itemName}",
+                cancellationToken: cancellationToken);
+        }
+
+        if (settings.EnableStreaks)
+        {
+            await IncrementNoImpulseBuyStreakAsync(cancellationToken);
+        }
     }
 
     public async Task EvaluateCoolOffsAsync(CancellationToken cancellationToken = default)
@@ -127,8 +186,8 @@ public sealed class WaitlistService : IWaitlistService
         }
 
         var now = DateTime.UtcNow;
-    var settings = await _settingsService.GetAsync(cancellationToken);
-    var (periodStartUtc, periodEndUtc) = GetBudgetPeriodBoundsUtc(settings.MonthStartDay, now);
+        var settings = await _settingsService.GetAsync(cancellationToken);
+        var (periodStartUtc, periodEndUtc) = GetBudgetPeriodBoundsUtc(settings.MonthStartDay, now);
 
         var buckets = await db.Buckets
             .AsNoTracking()
@@ -273,6 +332,87 @@ public sealed class WaitlistService : IWaitlistService
         await db.SaveChangesAsync(cancellationToken);
 
         return total;
+    }
+
+    public async Task<string?> GetCostFramingMessageAsync(decimal estimatedCost, CancellationToken cancellationToken = default)
+    {
+        if (estimatedCost <= 0m)
+        {
+            return null;
+        }
+
+        var settings = await _settingsService.GetAsync(cancellationToken);
+        var monthlyContribution = settings.SavingsIsPercent
+            ? settings.MonthlyIncome * (settings.MonthlySavingsPercent / 100m)
+            : settings.MonthlySavingsAmount;
+
+        if (monthlyContribution > 0m)
+        {
+            var daysOfSavings = (int)Math.Ceiling((double)(estimatedCost / monthlyContribution * 30m));
+            if (daysOfSavings < 1)
+            {
+                daysOfSavings = 1;
+            }
+
+            return $"This is about {daysOfSavings} day{(daysOfSavings == 1 ? "" : "s")} of your savings contributions.";
+        }
+
+        if (settings.MonthlyIncome > 0m)
+        {
+            var pctOfIncome = FinancialEngine.RoundCurrency(estimatedCost / settings.MonthlyIncome * 100m);
+            return $"This is {pctOfIncome}% of your monthly income.";
+        }
+
+        return null;
+    }
+
+    public async Task<int> GetNoImpulseBuyStreakAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var streak = await db.Streaks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Type == StreakType.NoImpulseBuy, cancellationToken);
+        return streak?.CurrentCount ?? 0;
+    }
+
+    public async Task ResetNoImpulseBuyStreakAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var streak = await db.Streaks.FirstOrDefaultAsync(x => x.Type == StreakType.NoImpulseBuy, cancellationToken);
+        if (streak is null)
+        {
+            return;
+        }
+
+        streak.CurrentCount = 0;
+        streak.LastIncrementedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task IncrementNoImpulseBuyStreakAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var now = DateTime.UtcNow;
+        var streak = await db.Streaks.FirstOrDefaultAsync(x => x.Type == StreakType.NoImpulseBuy, cancellationToken);
+
+        if (streak is null)
+        {
+            db.Streaks.Add(new Streak
+            {
+                Type = StreakType.NoImpulseBuy,
+                CurrentCount = 1,
+                BestCount = 1,
+                LastIncrementedAtUtc = now,
+            });
+        }
+        else
+        {
+            streak.CurrentCount++;
+            streak.BestCount = Math.Max(streak.BestCount, streak.CurrentCount);
+            streak.LastIncrementedAtUtc = now;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private static TimeSpan CoolOffDuration(CoolOffPeriod period) => period switch

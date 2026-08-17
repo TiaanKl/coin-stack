@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.AchievementsView"
+             x:DataType="viewModels:AchievementsViewModel">
+    <StackPanel Spacing="20">
+        <Grid ColumnDefinitions="*, Auto">
+            <TextBlock Grid.Column="0" Text="Achievements" Classes="h1" />
+            <TextBlock Grid.Column="1" Text="{Binding AchievementsUnlocked}" Classes="body" VerticalAlignment="Center" />
+        </Grid>
+        
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="{Binding LevelTitle}" Classes="h2" />
+                <TextBlock Text="Level Progress" Classes="body" />
+                <ProgressBar Value="{Binding LevelProgress}" Height="8" CornerRadius="4" Foreground="{DynamicResource PrimaryBrush}" />
+                <Grid ColumnDefinitions="*, Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding TotalXp}" Classes="body" />
+                    <TextBlock Grid.Column="1" Text="{Binding XpToNext}" Classes="body" />
+                </Grid>
+            </StackPanel>
+        </Border>
+        
+        <ItemsControl ItemsSource="{Binding Achievements}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Classes="Card" Margin="0,0,0,12">
+                        <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="*, Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="h2" />
+                                <TextBlock Grid.Column="1" Text="{Binding XpReward}" Foreground="{DynamicResource PrimaryBrush}" />
+                            </Grid>
+                            <TextBlock Text="{Binding Description}" Classes="body" />
+                            <TextBlock Text="{Binding UnlockStatusText}" Foreground="{Binding UnlockStatusForeground}" />
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

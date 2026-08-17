@@ -80,7 +80,7 @@ public sealed class WeeklyRecapMobilePage : ContentPage
         }
     }
 
-    private static Border BuildRecapCard(CoinStack.Data.Entities.WeeklyRecap r)
+    private static Border BuildRecapCard(Data.Entities.WeeklyRecap r)
     {
         var weekLabel = $"Week {r.WeekNumber}, {r.Year}";
 

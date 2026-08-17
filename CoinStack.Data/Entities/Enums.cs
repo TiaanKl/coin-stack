@@ -22,6 +22,13 @@ public enum ExpenseKind
     ForceMajeure = 2
 }
 
+public enum StatementImportStatus
+{
+    Parsed = 0,
+    Imported = 1,
+    Reverted = 2
+}
+
 public enum SubscriptionCycle
 {
     Weekly = 0,
@@ -43,6 +50,7 @@ public enum GoalStatus
     Completed = 1,
     Abandoned = 2
 }
+
 
 public enum ScoreChangeReason
 {

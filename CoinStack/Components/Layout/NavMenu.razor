@@ -12,14 +12,14 @@
             </div>
 
             <img class="@(SidebarToggle ? "xl:block" : "hidden") hidden shrink-0"
-                 src="/tailadmin/src/images/logo/logo.png"       alt="CoinStack" />
+                 src="/tailadmin/src/images/logo/logo.png" alt="CoinStack" />
         </a>
     </div>
     <div class="no-scrollbar flex flex-col overflow-y-auto duration-300 ease-linear">
         <nav>
             <div>
-                <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
-                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">MENU</span>
+                <h3 class="mb-4 text-xs leading-5 text-gray-400 uppercase">
+                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">Overview</span>
                 </h3>
 
                 <ul class="mb-6 flex flex-col gap-1">
@@ -32,26 +32,48 @@
                     </li>
 
                     <li>
-                        <NavLink href="/budgets" class="menu-item group menu-item-inactive"
+                        <NavLink href="/reports" class="menu-item group menu-item-inactive"
                                  ActiveClass="menu-item-active">
-                            <i class="menu-item-icon-inactive fa-solid fa-wallet fa-fw text-xl"></i>
-                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Buckets</span>
+                            <i class="menu-item-icon-inactive fa-solid fa-chart-line fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Reports</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/goals" class="menu-item group menu-item-inactive"
+                        <NavLink href="/ai-chat" class="menu-item group menu-item-inactive"
                                  ActiveClass="menu-item-active">
-                            <i class="menu-item-icon-inactive fa-solid fa-bullseye fa-fw text-xl"></i>
-                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Goals</span>
+                            <i class="menu-item-icon-inactive fa-solid fa-comments fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">AI Assistant</span>
                         </NavLink>
                     </li>
+                </ul>
 
+                <h3 class="mb-4 text-xs leading-5 text-gray-400 uppercase">
+                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">Money In &amp; Out</span>
+                </h3>
+
+                <ul class="mb-6 flex flex-col gap-1">
                     <li>
                         <NavLink href="/transactions" class="menu-item group menu-item-inactive"
                                  ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-arrow-right-arrow-left fa-fw text-xl"></i>
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Transactions</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
+                        <NavLink href="/bank-import" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-file-invoice fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Bank Import</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
+                        <NavLink href="/income" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-money-bill-trend-up fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Income</span>
                         </NavLink>
                     </li>
 
@@ -70,27 +92,26 @@
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Subscriptions</span>
                         </NavLink>
                     </li>
+                </ul>
 
+                <h3 class="mb-4 text-xs leading-5 text-gray-400 uppercase">
+                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">Planning</span>
+                </h3>
+
+                <ul class="mb-6 flex flex-col gap-1">
                     <li>
-                        <NavLink href="/debt" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
-                            <i class="menu-item-icon-inactive fa-solid fa-credit-card fa-fw text-xl"></i>
-                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Debts</span>
+                        <NavLink href="/budgets" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-wallet fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Buckets</span>
                         </NavLink>
                     </li>
 
                     <li>
-                        <NavLink href="/debt-simulator" class="menu-item group menu-item-inactive"
+                        <NavLink href="/goals" class="menu-item group menu-item-inactive"
                                  ActiveClass="menu-item-active">
-                            <i class="menu-item-icon-inactive fa-solid fa-calculator fa-fw text-xl"></i>
-                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Simulator</span>
-                        </NavLink>
-                    </li>
-
-                    <li>
-                        <NavLink href="/waitlist" class="menu-item group menu-item-inactive"
-                                 ActiveClass="menu-item-active">
-                            <i class="menu-item-icon-inactive fa-solid fa-clock-rotate-left fa-fw text-xl"></i>
-                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Waitlist</span>
+                            <i class="menu-item-icon-inactive fa-solid fa-bullseye fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Goals</span>
                         </NavLink>
                     </li>
 
@@ -101,18 +122,45 @@
                             <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Savings</span>
                         </NavLink>
                     </li>
+                </ul>
+
+                <h3 class="mb-4 text-xs leading-5 text-gray-400 uppercase">
+                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">Debt</span>
+                </h3>
+
+                <ul class="mb-6 flex flex-col gap-1">
+                    <li>
+                        <NavLink href="/debt" class="menu-item group menu-item-inactive" ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-credit-card fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Debt Accounts</span>
+                        </NavLink>
+                    </li>
 
                     <li>
-                        <NavLink href="/reports" class="menu-item group menu-item-inactive"
+                        <NavLink href="/debt-simulator" class="menu-item group menu-item-inactive"
                                  ActiveClass="menu-item-active">
-                            <i class="menu-item-icon-inactive fa-solid fa-chart-line fa-fw text-xl"></i>
-                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Reports</span>
+                            <i class="menu-item-icon-inactive fa-solid fa-calculator fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Payoff Planner</span>
                         </NavLink>
                     </li>
                 </ul>
 
-                <h3 class="mb-4 text-xs leading-[20px] text-gray-400 uppercase">
-                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">MINDSET & GROWTH</span>
+                <h3 class="mb-4 text-xs leading-5 text-gray-400 uppercase">
+                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">Impulse Control</span>
+                </h3>
+
+                <ul class="mb-6 flex flex-col gap-1">
+                    <li>
+                        <NavLink href="/waitlist" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-clock-rotate-left fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Waitlist</span>
+                        </NavLink>
+                    </li>
+                </ul>
+
+                <h3 class="mb-4 text-xs leading-5 text-gray-400 uppercase">
+                    <span class="@(SidebarToggle ? "xl:hidden" : "") menu-group-title">Mindset &amp; Growth</span>
                 </h3>
 
                 <ul class="mb-6 flex flex-col gap-1">

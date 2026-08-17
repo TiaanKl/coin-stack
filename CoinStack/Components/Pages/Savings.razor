@@ -11,8 +11,8 @@
 <div class="space-y-6">
     <div class="flex items-center justify-between">
         <div>
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Savings</h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400">Active savings and emergency funds tracked with fallback coverage</p>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Savings plan</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">A CoinStack target you choose to fund — not your FNB current-account balance. Import a statement or set the bank balance on Settings for cash on hand.</p>
         </div>
         <button @onclick="RecalculateAsync"
                 disabled="@_calculating"
@@ -23,6 +23,14 @@
             @(_calculating ? "Calculating..." : "Apply This Month")
         </button>
     </div>
+
+    @if (_settings.BankBalanceAsOfUtc is not null && _settings.CurrentBankBalance < 0)
+    {
+        <div class="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+            Your FNB current account is overdrawn (@FormatC(_settings.CurrentBankBalance)). "Apply This Month" will not add planned savings on top of that.
+            <a href="/" class="ml-1 font-medium underline">See bank balance on the dashboard</a>
+        </div>
+    }
 
     @if (!string.IsNullOrEmpty(_toast))
     {
@@ -206,7 +214,30 @@
                                  YValue="@(x => x.Projected)"
                                  SeriesType="SeriesType.Area"
                                  Color="#3C50E0" />
+                @if (_projectionIncludeInterest)
+                {
+                    <ApexPointSeries TItem="SavingsProjectionPoint"
+                                     Items="_projections"
+                                     Name="Contributions"
+                                     XValue="@(x => x.Month)"
+                                     YValue="@(x => x.Contributions)"
+                                     SeriesType="SeriesType.Line"
+                                     Color="#9CA3AF" />
+                }
             </ApexChart>
+            @if (_projectionIncludeInterest && _projections.Count > 0)
+            {
+                <div class="mt-3 flex flex-wrap gap-4 text-sm">
+                    <p class="text-gray-500 dark:text-gray-400">
+                        Interest earned by @_projections[^1].Month:
+                        <span class="font-semibold text-gray-800 dark:text-white/90">@FormatC(_projections[^1].InterestEarned)</span>
+                    </p>
+                    <p class="text-gray-500 dark:text-gray-400">
+                        Total contributions:
+                        <span class="font-semibold text-gray-800 dark:text-white/90">@FormatC(_projections[^1].Contributions)</span>
+                    </p>
+                </div>
+            }
         }
     </div>
 
@@ -313,6 +344,13 @@
         _calculating = true;
         _toast = "";
         StateHasChanged();
+
+        if (_settings.BankBalanceAsOfUtc is not null && _settings.CurrentBankBalance < 0)
+        {
+            _toast = "Skipped — your current account is overdrawn, so planned savings were not added.";
+            _calculating = false;
+            return;
+        }
 
         var result = await SavingsService.CalculateMonthAsync();
         await LoadAllAsync();

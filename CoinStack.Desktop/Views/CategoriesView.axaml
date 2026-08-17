@@ -1,0 +1,42 @@
+<!-- File: CoinStack.Desktop/Views/CategoriesView.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.CategoriesView"
+             x:DataType="viewModels:CategoriesViewModel">
+    <ScrollViewer Padding="0,0,0,20">
+        <StackPanel Spacing="20">
+            <Grid ColumnDefinitions="*, Auto">
+                <TextBlock Text="Categories" Classes="h1" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button Classes="primary" Grid.Column="1" VerticalAlignment="Center">+ Add Category</Button>
+            </Grid>
+            
+            <Border Classes="Card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Category List" Classes="h2" TextWrapping="Wrap" />
+                    
+                    <!-- Categories Grid -->
+                    <ItemsControl ItemsSource="{Binding Categories}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Margin="0,0,12,12" CornerRadius="8" Padding="12" Width="180" 
+                                        BorderBrush="#E5E7EB" BorderThickness="1"
+                                        Background="#1976D2">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="White" />
+                                        <TextBlock Text="{Binding Scope}" FontSize="12" Foreground="#CCFFFFFF" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

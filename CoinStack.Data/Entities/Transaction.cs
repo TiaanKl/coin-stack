@@ -30,4 +30,11 @@ public sealed class Transaction : EntityBase
     public int? AutoDeductTemplateId { get; set; }
 
     public bool IsImpulse { get; set; }
+
+    public string Source { get; set; } = "Manual";
+
+    public string? ImportFingerprint { get; set; }
+
+    public int? StatementImportId { get; set; }
+    public StatementImport? StatementImport { get; set; }
 }

@@ -16,7 +16,7 @@
 
         <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
             <div class="xl:col-span-5">
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                     <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Input Parameters</h3>
 
                     <form class="space-y-4" @onsubmit="CalculateAsync">
@@ -159,7 +159,7 @@
                                                         </div>
 
                                                         <div class="xl:col-span-7">
-                                                            <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                                                            <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                                                                 <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Calculation Output</h3>
 
                                                                 @if (_result is null)
@@ -175,9 +175,9 @@
                                                                         <p class="text-sm text-error-700 dark:text-error-400">Please correct the validation errors and
                                                                             calculate again.</p>
                                                                         </div>
-                                                                    }
-                else
-                                                                    {
+                                                                }
+                                                                else
+                                                                {
                                                                         <div class="space-y-4">
                                                                             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                                                                 <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
@@ -265,13 +265,19 @@
                                                                             </div>
                                                                         </div>
 
-                                                                        <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                                                                        <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                                                                             <div class="mb-4 flex items-center justify-between gap-3">
                                                                                 <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Saved Debt Cards</h3>
-                                                                                <button type="button" @onclick="OpenCreateDebtModal"
-                                                                                        class="inline-flex items-center justify-center rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
-                                                                                    + Add Debt
-                                                                                </button>
+                                                                                <div class="flex flex-wrap items-center gap-2">
+                                                                                    <a href="/debt-simulator"
+                                                                                       class="inline-flex items-center justify-center rounded-full border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 shadow-theme-xs hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400">
+                                                                                        Simulate Payoff →
+                                                                                    </a>
+                                                                                    <button type="button" @onclick="OpenCreateDebtModal"
+                                                                                            class="inline-flex items-center justify-center rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                                                                                        + Add Debt
+                                                                                    </button>
+                                                                                </div>
                                                                             </div>
 
                                                                             @if (_isDebtLoading)
@@ -335,7 +341,7 @@
                                                                                         }
                                                                                     </div>
 
-                                                                                    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                                                                                    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                                                                                         <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Debt Type Examples</h3>
 
                                                                                         <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -375,7 +381,7 @@
                                                                                 @if (_showDebtModal)
                                                                                 {
                                                                                     <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5">
-                                                                                        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[4px]" @onclick="CloseDebtModal"></div>
+                                                                                        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-xs" @onclick="CloseDebtModal"></div>
                                                                                         <div class="relative w-full max-w-[480px] rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8">
                                                                                             <button @onclick="CloseDebtModal" type="button"
                                                                                                     class="group absolute right-3 top-3 z-999 flex h-9.5 w-9.5 items-center justify-center rounded-full bg-gray-200 text-gray-500 transition-colors hover:bg-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 sm:right-6 sm:top-6 sm:h-11 sm:w-11">

@@ -35,6 +35,7 @@ It combines budgeting features with gamified feedback (score/streaks/reflections
 ## Features
 
 ### Core modules
+
 - Dashboard
 - Transactions
 - Buckets/Budgets
@@ -48,6 +49,7 @@ It combines budgeting features with gamified feedback (score/streaks/reflections
 - Settings
 
 ### Behavior layer
+
 - Daily check-ins and streak progression
 - Score event tracking for budget behaviors
 - Reflection prompts for key triggers (over-budget, impulse spend, savings dip)
@@ -66,17 +68,20 @@ It combines budgeting features with gamified feedback (score/streaks/reflections
 ## Roadmap
 
 ### Product roadmap
+
 - Deeper analytics and richer report filters
 - Reminder/notification workflows
 - More automation around goals/savings/debt planning
 - Continued mobile UX and parity polish
 
 ### Platform/infra roadmap
+
 - Shared backend API for Blazor + MAUI
 - Server-hosted central database for sync-enabled users
 - Dual data mode:
-	1. Local-only (offline-first)
-	2. Synced (API + server DB)
+
+ 1. Local-only (offline-first)
+ 2. Synced (API + server DB)
 
 This allows users to choose between privacy/local control and cross-device sync convenience.
 
@@ -92,23 +97,24 @@ This allows users to choose between privacy/local control and cross-device sync 
 ## Getting Started
 
 ### Prerequisites
+
 - Git
 - .NET 10 SDK
 - Visual Studio 2022 (17.10+ recommended) with:
-	- .NET Multi-platform App UI development workload
-	- ASP.NET and web development workload
-	- (Optional) Desktop development with C++ if you need Android emulator acceleration support
+- .NET Multi-platform App UI development workload
+- ASP.NET and web development workload
+- (Optional) Desktop development with C++ if you need Android emulator acceleration support
 
 ### Mobile platform requirements
 
 - **Windows desktop target**
-	- Windows 10 (19041+) or Windows 11
-	- Windows App SDK dependencies installed by Visual Studio workloads
+- Windows 10 (19041+) or Windows 11
+- Windows App SDK dependencies installed by Visual Studio workloads
 
 - **Android target**
-	- Android SDK + platform tools (installed via Visual Studio)
-	- At least one Android Emulator image (or a physical device with USB debugging enabled)
-	- Java SDK (managed by Visual Studio/Android tooling)
+- Android SDK + platform tools (installed via Visual Studio)
+- At least one Android Emulator image (or a physical device with USB debugging enabled)
+- Java SDK (managed by Visual Studio/Android tooling)
 
 ### One-time setup
 

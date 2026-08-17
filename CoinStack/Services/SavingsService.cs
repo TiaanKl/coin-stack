@@ -49,6 +49,11 @@ public sealed class SavingsService : ISavingsService
             return null;
         }
 
+        if (settings.BankBalanceAsOfUtc is not null && settings.CurrentBankBalance < 0m)
+        {
+            return null;
+        }
+
         decimal income = settings.MonthlyIncome;
         decimal baseSavings = settings.SavingsIsPercent
             ? income * (settings.MonthlySavingsPercent / 100m)
@@ -59,9 +64,11 @@ public sealed class SavingsService : ISavingsService
         decimal interest = 0m;
         if (settings.SavingsInterestRate.HasValue && settings.SavingsInterestRate.Value > 0)
         {
-            var apr = settings.SavingsInterestRate.Value;
-            var monthlyRate = settings.SavingsInterestIsYearly ? apr / 12m : apr;
-            interest = (currentTotal + baseSavings) * (monthlyRate / 100m);
+            // Rate is stored as a fraction (0.07 = 7%); one month of the annual nominal rate accrues
+            // on the balance including this month's deposit.
+            var annualRate = GetAnnualRateFraction(settings, includeInterest: true);
+            var monthlyRate = annualRate / 12m;
+            interest = FinancialEngine.RoundCurrency((currentTotal + baseSavings) * monthlyRate);
         }
 
         var totalAdded = baseSavings + interest;
@@ -300,26 +307,50 @@ public sealed class SavingsService : ISavingsService
             ? income * (settings.MonthlySavingsPercent / 100m)
             : settings.MonthlySavingsAmount;
 
-        decimal apr = settings.SavingsInterestRate ?? 0m;
-        decimal monthlyRate = (includeInterest && apr > 0)
-            ? (settings.SavingsInterestIsYearly ? apr / 12m / 100m : apr / 100m)
-            : 0m;
+        // SavingsInterestRate is persisted as a fraction (0.07 = 7%). Convert a monthly-quoted
+        // rate to its annual nominal equivalent so the engine always receives an annual fraction.
+        var annualRate = GetAnnualRateFraction(settings, includeInterest);
 
         var result = new List<SavingsProjectionPoint>(months);
-        var running = state.Total;
+        var openingBalance = state.Total;
         var now = DateTime.UtcNow;
 
         for (var i = 1; i <= months; i++)
         {
-            var projectedMonth = now.AddMonths(i);
-            var label = projectedMonth.ToString("yyyy-MM");
+            var label = now.AddMonths(i).ToString("yyyy-MM");
 
-            var interest = (running + baseMonthly) * monthlyRate;
-            running += baseMonthly + interest;
+            var projection = FinancialEngine.CalculateSavingsProjection(
+                openingBalance,
+                baseMonthly,
+                annualRate,
+                i);
 
-            result.Add(new SavingsProjectionPoint(label, Math.Round(running, 2)));
+            result.Add(new SavingsProjectionPoint(
+                label,
+                projection.FutureValue,
+                projection.TotalContributions,
+                projection.TotalInterestEarned));
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Resolves the configured savings interest rate to an annual nominal fraction suitable for
+    /// <see cref="FinancialEngine"/>.
+    /// </summary>
+    /// <param name="settings">The persisted application settings.</param>
+    /// <param name="includeInterest">When <see langword="false"/> the rate is forced to zero.</param>
+    /// <returns>The annual nominal rate as a fraction, or zero when interest is disabled.</returns>
+    private static decimal GetAnnualRateFraction(AppSettings settings, bool includeInterest)
+    {
+        var rate = settings.SavingsInterestRate ?? 0m;
+
+        if (!includeInterest || rate <= 0m)
+        {
+            return 0m;
+        }
+
+        return settings.SavingsInterestIsYearly ? rate : rate * 12m;
     }
 }

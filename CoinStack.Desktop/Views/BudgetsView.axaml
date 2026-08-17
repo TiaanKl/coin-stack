@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.BudgetsView"
+             x:DataType="viewModels:BudgetsViewModel">
+    <StackPanel Spacing="20">
+        <Grid ColumnDefinitions="*, Auto">
+            <TextBlock Text="Budgets" Classes="h1" />
+            <Button Classes="primary" Grid.Column="1">+ Add Bucket</Button>
+        </Grid>
+
+        <ItemsControl ItemsSource="{Binding Buckets}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <Border Classes="Card" Width="280" Margin="8">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="{Binding Name}" Classes="h2" />
+                            <ProgressBar Value="{Binding Spent}" Maximum="{Binding Planned}" Height="6"
+                                         CornerRadius="3">
+                                <ProgressBar.Foreground>
+                                    <SolidColorBrush Color="{Binding Color}" />
+                                </ProgressBar.Foreground>
+                            </ProgressBar>
+                            <Grid ColumnDefinitions="*, *">
+                                <TextBlock Classes="body" Text="{Binding Spent, StringFormat='Spent: ${0:F2}'}" />
+                                <TextBlock Classes="body" Grid.Column="1"
+                                           Text="{Binding Remaining, StringFormat='Remaining: ${0:F2}'}"
+                                           HorizontalAlignment="Right" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

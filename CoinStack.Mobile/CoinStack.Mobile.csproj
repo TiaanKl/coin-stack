@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+        <TargetFrameworks>net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
         <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
         <!-- Note for MacCatalyst:
@@ -66,16 +66,6 @@
       <ApplicationTitle>CoinStack</ApplicationTitle>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-android|AnyCPU'">
-      <ApplicationTitle>CoinStack</ApplicationTitle>
-      <PublishTrimmed>True</PublishTrimmed>
-      <RunAOTCompilation>True</RunAOTCompilation>
-      <EnableLLVM>true</EnableLLVM>
-      <AndroidLinkTool>r8</AndroidLinkTool>
-      <DebugSymbols>false</DebugSymbols>
-      <DebugType>none</DebugType>
-    </PropertyGroup>
-
     <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net10.0-ios|AnyCPU'">
       <ApplicationTitle>CoinStack</ApplicationTitle>
     </PropertyGroup>
@@ -106,8 +96,6 @@
     </ItemGroup>
 
     <ItemGroup>
-
-        <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
     </ItemGroup>
 

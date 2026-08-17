@@ -66,4 +66,5 @@ app.MapRazorComponents<App>()
 
 app.MapGroup("/auth").MapIdentityApi<ApplicationUser>();
 
+
 app.Run();

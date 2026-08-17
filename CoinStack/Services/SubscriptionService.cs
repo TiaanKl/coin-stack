@@ -55,6 +55,7 @@ public sealed class SubscriptionService : ISubscriptionService
         existing.Status = subscription.Status;
         existing.ColorHex = subscription.ColorHex;
         existing.CustomHexColor = subscription.CustomHexColor;
+        existing.DebitOrderDay = subscription.DebitOrderDay;
 
         await db.SaveChangesAsync(cancellationToken);
     }

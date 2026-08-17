@@ -7,6 +7,8 @@ internal sealed class FakeSettingsService : ISettingsService
 {
     private AppSettings _settings;
 
+    public event Action? SettingsChanged;
+
     public FakeSettingsService(AppSettings settings)
     {
         _settings = settings;
@@ -20,6 +22,7 @@ internal sealed class FakeSettingsService : ISettingsService
     public Task SaveAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         _settings = settings;
+        SettingsChanged?.Invoke();
         return Task.CompletedTask;
     }
 }
@@ -209,4 +212,81 @@ internal sealed class FakeLevelService : ILevelService
     public int GetXpRequiredForLevel(int level) => 50;
     public string GetTitleForLevel(int level) => "Novice";
     public Task<bool> CheckLevelUpAsync(CancellationToken ct = default) => Task.FromResult(false);
+}
+
+internal sealed class FakeTransactionService : ITransactionService
+{
+    public int CreateWithGameLoopCalls { get; private set; }
+
+    public Task<List<Transaction>> GetAllAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<List<Transaction>>([]);
+
+    public Task<List<Transaction>> GetRecentAsync(int count, CancellationToken cancellationToken = default)
+        => Task.FromResult<List<Transaction>>([]);
+
+    public Task<List<Transaction>> GetFromDateAsync(DateTime fromUtc, CancellationToken cancellationToken = default)
+        => Task.FromResult<List<Transaction>>([]);
+
+    public Task<Transaction?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        => Task.FromResult<Transaction?>(null);
+
+    public Task<Transaction> CreateAsync(Transaction transaction, CancellationToken cancellationToken = default)
+    {
+        transaction.Id = 1;
+        return Task.FromResult(transaction);
+    }
+
+    public Task<(Transaction Transaction, GameTransactionResult Result)> CreateWithGameLoopAsync(
+        Transaction transaction,
+        int userTimezoneOffsetHours,
+        CancellationToken cancellationToken = default)
+    {
+        CreateWithGameLoopCalls++;
+        transaction.Id = 1;
+        return Task.FromResult((transaction, new GameTransactionResult
+        {
+            PointsChanged = -5,
+            Message = "Impulse purchase recorded",
+            Kind = FeedbackKind.Negative,
+        }));
+    }
+
+    public Task UpdateAsync(Transaction transaction, int userTimezoneOffsetHours = 0, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task DeleteAsync(int id, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task<decimal> GetExpenseTotalForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default)
+        => Task.FromResult(0m);
+
+    public Task<(decimal TotalIncome, decimal TotalExpense)> GetLifetimeTotalsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult((0m, 0m));
+
+    public Task<decimal> GetNetBalanceBeforeAsync(DateTime beforeUtc, CancellationToken cancellationToken = default)
+        => Task.FromResult(0m);
+
+    public Task<(decimal Income, decimal Expense)> GetIncomeExpenseForPeriodAsync(
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult((0m, 0m));
+
+    public Task<List<BucketSpendSummary>> GetBucketSpendingForPeriodAsync(
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<List<BucketSpendSummary>>([]);
+
+    public Task<List<DailyNetSummary>> GetDailyNetForRangeAsync(
+        DateTime startUtc,
+        DateTime endUtc,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<List<DailyNetSummary>>([]);
+
+    public Task ApplyAutoDeductionsForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default)
+        => Task.CompletedTask;
+
+    public Task<int> RemoveSyntheticMonthlyIncomeAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(0);
 }

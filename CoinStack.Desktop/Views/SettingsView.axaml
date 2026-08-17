@@ -1,0 +1,35 @@
+<!-- File: CoinStack.Desktop/Views/SettingsView.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.SettingsView"
+             x:DataType="viewModels:SettingsViewModel">
+    <StackPanel Spacing="20">
+        <TextBlock Text="Settings" Classes="h1" />
+        
+        <Border Classes="Card">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Budget Preferences" Classes="h2" />
+                
+                <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto" ColumnSpacing="12">
+                    <TextBlock Text="Currency" VerticalAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding Currencies}" SelectedItem="{Binding SelectedCurrency}" Grid.Column="1" />
+                    
+                    <TextBlock Text="Monthly Start Day" Grid.Row="1" VerticalAlignment="Center" />
+                    <ComboBox ItemsSource="{Binding StartDays}" SelectedItem="{Binding MonthlyStartDay}" Grid.Row="1" Grid.Column="1" />
+                    
+                    <TextBlock Text="Monthly Net Income" Grid.Row="2" VerticalAlignment="Center" />
+                    <TextBox Text="{Binding MonthlyNetIncome}" Grid.Row="2" Grid.Column="1" />
+                    
+                    <TextBlock Text="Reserve-aware budget" Grid.Row="3" VerticalAlignment="Center" />
+                    <CheckBox IsChecked="{Binding ReserveAwareBudget}" Grid.Row="3" Grid.Column="1" />
+                    
+                    <TextBlock Text="Emergency fund fallback" Grid.Row="4" VerticalAlignment="Center" />
+                    <CheckBox IsChecked="{Binding EmergencyFundFallback}" Grid.Row="4" Grid.Column="1" />
+                </Grid>
+            </StackPanel>
+        </Border>
+        
+        <Button Classes="primary" HorizontalAlignment="Left">Save Changes</Button>
+    </StackPanel>
+</UserControl>

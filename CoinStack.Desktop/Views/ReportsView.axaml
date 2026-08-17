@@ -1,0 +1,43 @@
+<!-- File: CoinStack.Desktop/Views/ReportsView.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.ReportsView"
+             x:DataType="viewModels:ReportsViewModel">
+    <ScrollViewer Padding="0,0,0,20">
+        <StackPanel Spacing="20">
+            <TextBlock Text="Monthly Report" Classes="h1" TextWrapping="Wrap" />
+            
+            <Grid ColumnDefinitions="*, *" ColumnSpacing="20" RowSpacing="20">
+                <Border Classes="Card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Income" Classes="body" FontSize="12" Foreground="#6B7280" />
+                        <TextBlock Text="{Binding IncomeThisMonth, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" />
+                        <TextBlock Text="This Month" Classes="body" FontSize="11" Foreground="#9CA3AF" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="Card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Expenses" Classes="body" FontSize="12" Foreground="#6B7280" />
+                        <TextBlock Text="{Binding ExpensesThisMonth, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource ErrorBrush}" />
+                        <TextBlock Text="This Month" Classes="body" FontSize="11" Foreground="#9CA3AF" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="Card" Grid.Row="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Net Cashflow" Classes="body" FontSize="12" Foreground="#6B7280" />
+                        <TextBlock Text="{Binding NetCashflow, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="#3B82F6" />
+                        <TextBlock Text="Income - Expenses" Classes="body" FontSize="11" Foreground="#9CA3AF" />
+                    </StackPanel>
+                </Border>
+                <Border Classes="Card" Grid.Row="1" Grid.Column="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Savings Available" Classes="body" FontSize="12" Foreground="#6B7280" />
+                        <TextBlock Text="{Binding SavingsAvailable, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="#10B981" />
+                        <TextBlock Text="Ready to Save" Classes="body" FontSize="11" Foreground="#9CA3AF" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

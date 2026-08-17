@@ -6,33 +6,39 @@
 @inject ISettingsService SettingsService
 @inject IMoneyFormatter MoneyFormatter
 
-<PageTitle>Debt Payoff Simulator</PageTitle>
+<PageTitle>Debt Payoff Planner</PageTitle>
 
 <div class="space-y-6">
-    <div class="mb-2">
-        <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Debt Payoff Simulator</h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Pick a debt and adjust the monthly payment to instantly see how it changes your payoff date and total interest.</p>
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Debt Payoff Planner</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Pick a debt and adjust the monthly payment to instantly see how it changes your payoff date and total interest.</p>
+        </div>
+        <a href="/debt"
+           class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+            ← Debt Accounts
+        </a>
     </div>
 
     @if (_loading)
     {
-        <div class="flex min-h-[300px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="flex min-h-[300px] items-center justify-center rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
             <p class="text-sm text-gray-500 dark:text-gray-400">Loading debts...</p>
         </div>
     }
     else if (_debts.Count == 0)
     {
-        <div class="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div class="flex min-h-[300px] flex-col items-center justify-center gap-4 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
             <svg class="text-gray-300 dark:text-gray-600" width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M4.5 9.75C4.5 9.33579 4.83579 9 5.25 9H18.75C19.1642 9 19.5 9.33579 19.5 9.75V19.5C19.5 20.3284 18.8284 21 18 21H6C5.17157 21 4.5 20.3284 4.5 19.5V9.75Z" fill="currentColor" />
                 <path d="M12 2.25C9.51472 2.25 7.5 4.26472 7.5 6.75V7.5H9V6.75C9 5.09315 10.3431 3.75 12 3.75C13.6569 3.75 15 5.09315 15 6.75V7.5H16.5V6.75C16.5 4.26472 14.4853 2.25 12 2.25Z" fill="currentColor" />
             </svg>
             <div class="text-center">
                 <p class="font-medium text-gray-700 dark:text-gray-300">No debts found</p>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Add a debt on the Debt Calculator page first.</p>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Add a debt on the Debt Accounts page first.</p>
             </div>
             <a href="/debt" class="inline-flex items-center justify-center rounded-full bg-brand-500 px-5 py-2.5 mb-4 text-sm font-medium text-white hover:bg-brand-600">
-                Go to Debt Calculator
+                Go to Debt Accounts
             </a>
         </div>
     }
@@ -44,7 +50,7 @@
             <div class="space-y-4 xl:col-span-5">
 
                 <!-- Debt selector -->
-                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                     <h3 class="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Select Debt</h3>
 
                     <select value="@_selectedDebtIdStr"
@@ -82,7 +88,7 @@
                 <!-- Payment simulator -->
                 @if (_selectedDebt is not null)
                 {
-                    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                         <h3 class="mb-1 text-base font-semibold text-gray-800 dark:text-white/90">Simulated Monthly Payment</h3>
                         <p class="mb-5 text-xs text-gray-500 dark:text-gray-400">Drag the slider or type an amount to instantly recalculate.</p>
 
@@ -155,7 +161,7 @@
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
                         <!-- Current plan -->
-                        <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                        <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/3">
                             <p class="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">Current Plan</p>
                             <p class="mb-4 text-xl font-bold text-gray-800 dark:text-white/90">
                                 @FormatC(_selectedDebt.MonthlyPaymentAmount)
@@ -278,7 +284,7 @@
         <!-- Amortization schedule -->
         @if (_selectedDebt is not null && _simResult is not null && !_simResult.IsUnpayable && _simResult.Schedule.Count > 0)
         {
-            <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
                 <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
                     <div>
                         <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Amortization Schedule</h3>
@@ -454,35 +460,37 @@
         if (balance <= 0)
             return new SimResult(0, 0m, 0m, DateTime.Today, []);
 
-        var monthlyRate = annualRatePercent / 100m / 12m;
-        var minViable = monthlyRate > 0 ? balance * monthlyRate : 0m;
-
-        if (monthlyPayment <= minViable && monthlyRate > 0)
+        if (monthlyPayment <= 0)
             return new SimResult(null, 0m, 0m, null, []) with { IsUnpayable = true };
 
-        var rows = new List<SimRow>();
-        var current = balance;
-        var date = DateTime.Today;
-        var totalInterest = 0m;
+        var schedule = FinancialEngine.BuildAmortisationSchedule(
+            balance,
+            FinancialEngine.PercentToFraction(annualRatePercent),
+            monthlyPayment);
 
-        while (current > 0.005m && rows.Count < 600)
+        if (schedule.IsUnpayable)
+            return new SimResult(null, schedule.TotalPaid, schedule.TotalInterest, null, []) with { IsUnpayable = true };
+
+        var startDate = DateTime.Today;
+        var rows = new List<SimRow>(schedule.Instalments.Count);
+
+        foreach (var instalment in schedule.Instalments)
         {
-            var interest = monthlyRate > 0 ? decimal.Round(current * monthlyRate, 2) : 0m;
-            var payment = Math.Min(monthlyPayment, current + interest);
-            var principal = decimal.Round(payment - interest, 2);
-
-            if (principal <= 0) break;
-
-            current = decimal.Round(Math.Max(0m, current - principal), 2);
-            date = date.AddMonths(1);
-            totalInterest = decimal.Round(totalInterest + interest, 2);
-            rows.Add(new SimRow(rows.Count + 1, date, decimal.Round(payment, 2), principal, interest, current));
+            rows.Add(new SimRow(
+                instalment.PaymentNumber,
+                startDate.AddMonths(instalment.PaymentNumber),
+                instalment.Payment,
+                instalment.PrincipalPortion,
+                instalment.InterestPortion,
+                instalment.ClosingBalance));
         }
 
-        var hitCap = current > 0.005m;
-        return hitCap
-            ? new SimResult(null, decimal.Round(rows.Sum(r => r.Payment), 2), totalInterest, null, rows) with { IsUnpayable = true }
-            : new SimResult(rows.Count, decimal.Round(rows.Sum(r => r.Payment), 2), totalInterest, rows.LastOrDefault()?.Date, rows);
+        return new SimResult(
+            schedule.MonthsToPayoff,
+            schedule.TotalPaid,
+            schedule.TotalInterest,
+            rows.Count > 0 ? rows[^1].Date : startDate,
+            rows);
     }
 
     // ── Presets ──────────────────────────────────────────────────────────
@@ -503,7 +511,8 @@
     // ── Helpers ──────────────────────────────────────────────────────────
     private static decimal GetMonthlyInterest(DebtAccount debt)
         => debt.InterestRatePercent > 0
-            ? decimal.Round(debt.CurrentBalance * (debt.InterestRatePercent / 100m / 12m), 2)
+            ? FinancialEngine.RoundCurrency(
+                debt.CurrentBalance * (FinancialEngine.PercentToFraction(debt.InterestRatePercent) / 12m))
             : 0m;
 
     private static string FormatTerm(SimResult result)

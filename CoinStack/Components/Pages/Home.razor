@@ -2,25 +2,85 @@
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
 @using CoinStack.Services
+@using CoinStack.Services.Import
 @inject ITransactionService TransactionService
 @inject IGameLoopService GameLoop
 @inject ISettingsService SettingsService
 @inject ISavingsService SavingsService
 @inject ISubscriptionService SubscriptionService
 @inject IBucketService BucketService
+@inject IBankStatementImportService ImportService
 @inject IMoneyFormatter MoneyFormatter
 
 <PageTitle>CoinStack</PageTitle>
 
+<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Dashboard</h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Your live money overview</p>
+    </div>
+    <a href="/reports"
+       class="inline-flex items-center justify-center rounded-full border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 shadow-theme-xs hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400">
+        View full report →
+    </a>
+</div>
+
 <div class="grid grid-cols-12 gap-4 md:gap-6">
+    <div class="col-span-12">
+        <div class="rounded-2xl border @(_effectiveBankBalance < 0 ? "border-error-200 bg-error-50 dark:border-error-500/30 dark:bg-error-500/10" : "border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]") p-6 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-medium uppercase tracking-wide @(_effectiveBankBalance < 0 ? "text-error-600 dark:text-error-400" : "text-gray-500 dark:text-gray-400")">Current account</p>
+                    <p class="mt-1 text-3xl font-bold @(_effectiveBankBalance < 0 ? "text-error-600 dark:text-error-400" : "text-gray-800 dark:text-white/90")">
+                        @FormatC(_effectiveBankBalance)
+                    </p>
+                    <p class="mt-1 text-sm @(_effectiveBankBalance < 0 ? "text-error-600/80 dark:text-error-400/80" : "text-gray-500 dark:text-gray-400")">
+                        @if (_settings.BankBalanceAsOfUtc is not null)
+                        {
+                            var daysSince = (DateTime.UtcNow - _settings.BankBalanceAsOfUtc.Value).TotalDays;
+                            <text>As of @_settings.BankBalanceAsOfUtc.Value.ToString("dd MMM yyyy") · from your bank statement</text>
+                            @if (daysSince > 21)
+                            {
+                                <span class="ml-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+                                    (@((int)daysSince) days ago — import FNB transaction history CSV for the missing weeks)
+                                </span>
+                            }
+                            else if (daysSince > 7)
+                            {
+                                <span class="ml-1 text-xs font-medium text-amber-600 dark:text-amber-400">(@((int)daysSince) days ago)</span>
+                            }
+                        }
+                        else
+                        {
+                            <text>Import an FNB statement to set cash. Expected pay is not added to your account.</text>
+                        }
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <a href="/bank-import" class="inline-flex items-center rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300">Import statement</a>
+                    <button type="button" @onclick="() => _showUpdateBalanceModal = true" class="inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-4 py-2 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                        Update balance
+                    </button>
+                </div>
+            </div>
+            @if (_effectiveBankBalance < 0)
+            {
+                <p class="mt-4 text-sm text-error-700 dark:text-error-400">
+                    This account is overdrawn. The savings figures below are a CoinStack plan, not cash sitting in FNB.
+                </p>
+            }
+        </div>
+    </div>
+
     <div class="col-span-12 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div
             class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
             <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
                 <div class="text-center sm:text-left">
-                    <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">Monthly Budget Remaining</h3>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">Cash vs spending this period</h3>
                     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        @FormatC(MonthlyBudgetSpent) spent of @FormatC(MonthlyBudgetLimit)
+                        @FormatC(MonthlyBudgetSpent) spent · @FormatC(MonthlyBudgetRemaining) in the bank
                     </p>
                     <div class="mt-3 flex flex-wrap gap-2">
                         <span
@@ -36,7 +96,7 @@
                         <span
                             class="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-3 py-1 text-xs font-medium text-success-600 dark:bg-success-500/15 dark:text-success-400">
                             <span class="inline-block h-2 w-2 rounded-full bg-success-500"></span>
-                            Available: @FormatC(MonthlyBudgetRemaining)
+                            Cash left: @FormatC(MonthlyBudgetRemaining)
                         </span>
                     </div>
                 </div>
@@ -47,7 +107,8 @@
 
         <div
             class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">Reserves On Hand</h3>
+            <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">Savings plan</h3>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">A CoinStack target — not your FNB balance</p>
             <div class="mt-4 space-y-3">
                 <div class="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 dark:bg-gray-800">
                     <span class="text-sm text-gray-600 dark:text-gray-300">Savings</span>
@@ -99,13 +160,28 @@
 
     <div class="col-span-12">
         <div class="h-full rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <h3 class="font-bold text-gray-800 dark:text-white/90">Predictive Cash Flow (30 days)</h3>
-                <span
-                    class="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">Income:
-                    @FormatC(_projectedIncomeIn30Days) · Expense: @FormatC(_projectedExpenseIn30Days) · Net:
-                    @FormatC(_projectedBalanceIn30Days)</span>
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="font-bold text-gray-800 dark:text-white/90">Predictive Cash Flow (30 days)</h3>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Starting from @FormatC(_effectiveBankBalance) · Payday day @_settings.MonthStartDay
+                    </p>
                 </div>
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="rounded-lg bg-success-50 px-2.5 py-1 font-medium text-success-700 dark:bg-success-500/10 dark:text-success-400">
+                        Income: +@FormatC(_projectedIncomeIn30Days)
+                    </span>
+                    <span class="rounded-lg bg-error-50 px-2.5 py-1 font-medium text-error-700 dark:bg-error-500/10 dark:text-error-400">
+                        Expense: -@FormatC(_projectedExpenseIn30Days)
+                    </span>
+                    <span class="rounded-lg @(_projectedNetIn30Days >= 0 ? "bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-400" : "bg-warning-50 text-warning-700 dark:bg-warning-500/10 dark:text-warning-400") px-2.5 py-1 font-medium">
+                        Net: @(_projectedNetIn30Days >= 0 ? "+" : "")@FormatC(_projectedNetIn30Days)
+                    </span>
+                    <span class="rounded-lg bg-gray-100 px-2.5 py-1 font-semibold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                        Est. Balance: @FormatC(_projectedBalanceIn30Days)
+                    </span>
+                </div>
+            </div>
                 <ApexChart TItem="ForecastData" Height="260" Title="" Options="_forecastChartOptions">
                     <ApexPointSeries TItem="ForecastData" Items="_forecastData" Name="Projected Net"
                                      XValue="@(x => x.Date.ToShortDateString())" YValue="@(x => x.ProjectedNetBalance)"
@@ -191,6 +267,8 @@
                 </div>
             </div>
 
+<UpdateBalanceModal @bind-IsOpen="_showUpdateBalanceModal" InitialSettings="_settings" OnBalanceSaved="OnBalanceSavedAsync" />
+
 @code
 {
     private GameState _state = new();
@@ -200,11 +278,11 @@
     private decimal _budgetSpent;
     private decimal _totalPlanned;
 
-    private decimal MonthlyBudgetLimit => _settings.MonthlyIncome;
+    private decimal MonthlyBudgetLimit => MonthlyBudgetSpent + Math.Max(0m, _effectiveBankBalance);
 
     private decimal MonthlyBudgetSpent => _budgetSpent;
 
-    private decimal MonthlyBudgetRemaining => MonthlyBudgetLimit - MonthlyBudgetSpent;
+    private decimal MonthlyBudgetRemaining => _effectiveBankBalance;
 
     private decimal ReservesOnHand => _savingsState.Available + _savingsState.EmergencyAvailable;
 
@@ -212,6 +290,7 @@
 
     private readonly List<Transaction> _transactions = [];
     private readonly List<Transaction> _recentTransactions = [];
+    private readonly List<Subscription> _subscriptions = [];
     private readonly List<DailyData> _spendingData = [];
     private readonly List<DailyData> _moneyTrendData = [];
     private readonly List<ForecastData> _forecastData = [];
@@ -219,20 +298,23 @@
     private readonly ApexChartOptions<DailyData> _moneyTrendChartOptions = BuildDailyChartOptions();
     private readonly ApexChartOptions<ForecastData> _forecastChartOptions = BuildForecastChartOptions();
 
+    private decimal _effectiveBankBalance;
     private decimal _projectedBalanceIn30Days;
+    private decimal _projectedNetIn30Days;
     private decimal _projectedIncomeIn30Days;
     private decimal _projectedExpenseIn30Days;
     private bool _spendingIsPlaceholder;
     private bool _moneyTrendIsPlaceholder;
     private bool _forecastIsPlaceholder;
+    private bool _showUpdateBalanceModal;
 
     protected override async Task OnInitializedAsync()
     {
+        await ImportService.ReconcileAppWithBankDataAsync();
         _settings = await SettingsService.GetAsync();
         CurrencyFormatting.ApplyCurrency(_settings.Currency);
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
-        await TransactionService.ApplyAutoIncomeForBudgetPeriodAsync(_settings.MonthStartDay, _settings.MonthlyIncome,
-DateTime.UtcNow);
+        await TransactionService.RemoveSyntheticMonthlyIncomeAsync();
         _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
         _savingsState = await SavingsService.GetStateAsync();
 
@@ -244,10 +326,13 @@ DateTime.UtcNow);
         _state = await GameLoop.GetCurrentStateAsync();
 
         var now = DateTime.UtcNow;
-        var transactions = await TransactionService.GetFromDateAsync(now.AddDays(-120));
+        var transactions = await TransactionService.GetFromDateAsync(now.AddDays(-400));
+        var subscriptions = await SubscriptionService.GetAllAsync();
 
         _transactions.Clear();
         _transactions.AddRange(transactions);
+        _subscriptions.Clear();
+        _subscriptions.AddRange(subscriptions.Where(s => s.Status == SubscriptionStatus.Active));
 
         PrepareChartData();
     }
@@ -262,25 +347,12 @@ DateTime.UtcNow);
         _forecastIsPlaceholder = false;
 
         var now = DateTime.UtcNow.Date;
-
-        if (_transactions.Count == 0)
-        {
-            _projectedIncomeIn30Days = 0;
-            _projectedExpenseIn30Days = 0;
-            _projectedBalanceIn30Days = 0;
-            SeedDailyAxes(now, _spendingData, 30);
-            SeedDailyAxes(now, _moneyTrendData, 30);
-            SeedForecastAxes(now);
-            _spendingIsPlaceholder = true;
-            _moneyTrendIsPlaceholder = true;
-            _forecastIsPlaceholder = true;
-            return;
-        }
+        _effectiveBankBalance = CalculateEffectiveBankBalance(_transactions, _settings);
 
         var thirtyDaysAgo = now.AddDays(-30);
 
         _spendingData.AddRange(_transactions
-            .Where(t => t.Type == TransactionType.Expense && t.OccurredAtUtc >= thirtyDaysAgo)
+            .Where(t => t.Type == TransactionType.Expense && t.OccurredAtUtc.Date >= thirtyDaysAgo)
             .GroupBy(t => t.OccurredAtUtc.Date)
             .Select(g => new DailyData(g.Key, g.Sum(t => t.Amount)))
             .OrderBy(x => x.Date));
@@ -291,96 +363,116 @@ DateTime.UtcNow);
             _spendingIsPlaceholder = true;
         }
 
-        // Use the settings-based daily income as the floor so the trend
-        // is meaningful even when income isn't logged as transactions.
-        var settingsDailyIncome = _settings.MonthlyIncome / 30m;
+        BuildMoneyTrendBackward(now, _effectiveBankBalance);
+        BuildForecast(now, _effectiveBankBalance);
+    }
 
-        decimal runningBalance = 0m;
+    private async Task OnBalanceSavedAsync(AppSettings updatedSettings)
+    {
+        _settings = updatedSettings;
+        _effectiveBankBalance = CalculateEffectiveBankBalance(_transactions, _settings);
+        PrepareChartData();
+        await InvokeAsync(StateHasChanged);
+    }
 
-        for (var i = 30; i >= 0; i--)
+    /// <summary>
+    /// Live balance = user snapshot + net of income/expense transactions after the snapshot as-of time.
+    /// Excludes synthetic income and internal transfers to prevent double counting.
+    /// </summary>
+    private static decimal CalculateEffectiveBankBalance(IReadOnlyList<Transaction> transactions, AppSettings settings)
+    {
+        var balance = settings.CurrentBankBalance;
+        if (settings.BankBalanceAsOfUtc is null)
         {
-            var date = now.AddDays(-i).Date;
-
-            var loggedIncome = _transactions
-                .Where(t => t.Type == TransactionType.Income && t.OccurredAtUtc.Date == date)
-                .Sum(t => t.Amount);
-
-            var dailyExpense = _transactions
-                .Where(t => t.Type == TransactionType.Expense && t.OccurredAtUtc.Date == date)
-                .Sum(t => t.Amount);
-
-            var dailyIncome = Math.Max(loggedIncome, settingsDailyIncome);
-
-            runningBalance += dailyIncome - dailyExpense;
-            _moneyTrendData.Add(new DailyData(date, runningBalance));
+            return balance;
         }
 
-        _moneyTrendIsPlaceholder = _moneyTrendData.All(x => x.Amount == 0);
+        var asOf = settings.BankBalanceAsOfUtc.Value;
+        foreach (var tx in transactions.Where(t => t.OccurredAtUtc > asOf 
+                                                  && !TransactionConventions.IsSyntheticMonthlyIncome(t)
+                                                  && t.Type != TransactionType.Transfer))
+        {
+            if (tx.Type == TransactionType.Income)
+            {
+                balance += tx.Amount;
+            }
+            else if (tx.Type == TransactionType.Expense)
+            {
+                balance -= tx.Amount;
+            }
+        }
 
-        BuildForecast(now, runningBalance);
+        return balance;
+    }
+
+    /// <summary>
+    /// Walks backward from today's effective balance using actual transactions only (no synthetic income or internal transfers).
+    /// </summary>
+    private void BuildMoneyTrendBackward(DateTime today, decimal todayBalance)
+    {
+        var points = new DailyData[31];
+        var balance = todayBalance;
+        points[30] = new DailyData(today, balance);
+
+        for (var i = 29; i >= 0; i--)
+        {
+            var date = today.AddDays(-(30 - i));
+            var nextDate = date.AddDays(1);
+
+            // Reverse the next day's net change to recover this day's closing balance.
+            var nextDayIncome = _transactions
+                .Where(t => t.Type == TransactionType.Income 
+                            && !TransactionConventions.IsSyntheticMonthlyIncome(t)
+                            && t.Type != TransactionType.Transfer
+                            && t.OccurredAtUtc.Date == nextDate)
+                .Sum(t => t.Amount);
+            var nextDayExpense = _transactions
+                .Where(t => t.Type == TransactionType.Expense 
+                            && t.Type != TransactionType.Transfer
+                            && t.OccurredAtUtc.Date == nextDate)
+                .Sum(t => t.Amount);
+
+            balance -= nextDayIncome - nextDayExpense;
+            points[i] = new DailyData(date, balance);
+        }
+
+        _moneyTrendData.AddRange(points);
+        _moneyTrendIsPlaceholder = _moneyTrendData.All(x => x.Amount == 0)
+                                   && _settings.CurrentBankBalance == 0
+                                   && _settings.BankBalanceAsOfUtc is null;
     }
 
     private void BuildForecast(DateTime today, decimal currentBalance)
     {
         var periodStart = today.AddDays(-90);
-        var recent = _transactions.Where(t => t.OccurredAtUtc.Date >= periodStart && t.OccurredAtUtc.Date <= today).ToList();
+        var recentExpenses = _transactions
+            .Where(t => t.Type == TransactionType.Expense 
+                        && t.Type != TransactionType.Transfer
+                        && t.OccurredAtUtc.Date >= periodStart 
+                        && t.OccurredAtUtc.Date <= today)
+            .ToList();
 
-        // Use settings income as the reliable daily income floor so
-        // the forecast doesn't collapse to zero when income isn't
-        // logged as transactions.
-        var settingsDailyIncome = _settings.MonthlyIncome / 30m;
+        // Determine actual active date span so sparse statements are not diluted over 90 days
+        var effectiveStart = recentExpenses.Count > 0
+            ? recentExpenses.Min(t => t.OccurredAtUtc.Date)
+            : periodStart;
 
-        if (recent.Count == 0)
-        {
-            _projectedIncomeIn30Days = 0;
-            _projectedExpenseIn30Days = 0;
-            _projectedBalanceIn30Days = currentBalance;
-
-            if (settingsDailyIncome > 0)
-            {
-                var bal = currentBalance;
-                var income = 0m;
-
-                for (var day = 1; day <= 30; day++)
-                {
-                    income += settingsDailyIncome;
-                    bal += settingsDailyIncome;
-                    _forecastData.Add(new ForecastData(today.AddDays(day), income, 0m, bal));
-                }
-
-                _projectedIncomeIn30Days = income;
-                _projectedBalanceIn30Days = bal;
-            }
-            else
-            {
-                SeedForecastAxes(today);
-                _forecastIsPlaceholder = true;
-            }
-            return;
-        }
-
-        var dailyIncome = new Dictionary<DateTime, decimal>();
-        var dailyExpense = new Dictionary<DateTime, decimal>();
         var weekdayExpenseTotals = new Dictionary<DayOfWeek, decimal>();
         var weekdayDayCounts = new Dictionary<DayOfWeek, int>();
+        var dailyExpense = new Dictionary<DateTime, decimal>();
 
-        for (var date = periodStart; date <= today; date = date.AddDays(1))
+        for (var date = effectiveStart; date <= today; date = date.AddDays(1))
         {
-            dailyIncome[date] = 0m;
             dailyExpense[date] = 0m;
             weekdayExpenseTotals.TryAdd(date.DayOfWeek, 0m);
             weekdayDayCounts.TryAdd(date.DayOfWeek, 0);
             weekdayDayCounts[date.DayOfWeek]++;
         }
 
-        foreach (var tx in recent)
+        foreach (var tx in recentExpenses)
         {
             var date = tx.OccurredAtUtc.Date;
-            if (tx.Type == TransactionType.Income)
-            {
-                dailyIncome[date] += tx.Amount;
-            }
-            else if (tx.Type == TransactionType.Expense)
+            if (dailyExpense.ContainsKey(date))
             {
                 dailyExpense[date] += tx.Amount;
             }
@@ -392,15 +484,25 @@ DateTime.UtcNow);
         }
 
         var globalExpenseAvg = dailyExpense.Values.DefaultIfEmpty(0m).Average();
-
         var recent14Start = today.AddDays(-13);
-        var recent14ExpenseAvg = dailyExpense.Where(x => x.Key >= recent14Start).Select(x =>
-x.Value).DefaultIfEmpty(0m).Average();
+        var recent14ExpenseAvg = dailyExpense
+            .Where(x => x.Key >= recent14Start)
+            .Select(x => x.Value)
+            .DefaultIfEmpty(0m)
+            .Average();
 
-        // For income projection: use the max of the logged average
-        // and the settings daily rate so income is never undercounted.
-        var loggedIncomeAvg = dailyIncome.Values.DefaultIfEmpty(0m).Average();
-        var projectedDailyIncomeRate = Math.Max(loggedIncomeAvg, settingsDailyIncome);
+        // Active subscriptions / scheduled debit orders
+        var activeSubs = _subscriptions
+            .Where(s => s.Status == SubscriptionStatus.Active && s.DebitOrderDay.HasValue && s.Cost > 0)
+            .ToList();
+
+        var totalMonthlySubscriptions = activeSubs.Sum(s => s.Cost);
+        var subscriptionByDay = activeSubs
+            .GroupBy(s => Math.Clamp(s.DebitOrderDay!.Value, 1, 28))
+            .ToDictionary(g => g.Key, g => g.Sum(s => s.Cost));
+
+        var paydayConfigured = _settings.MonthStartDay is >= 1 and <= 31 ? _settings.MonthStartDay : 1;
+        var monthlyIncome = Math.Max(0m, _settings.MonthlyIncome);
 
         var projection = currentBalance;
         var projectedIncomeCum = 0m;
@@ -411,28 +513,48 @@ x.Value).DefaultIfEmpty(0m).Average();
             var forecastDate = today.AddDays(day);
             var weekday = forecastDate.DayOfWeek;
 
-            var weekdayExpenseAvg = weekdayDayCounts[weekday] > 0
+            var daysInMonth = DateTime.DaysInMonth(forecastDate.Year, forecastDate.Month);
+            var actualPayday = Math.Min(paydayConfigured, daysInMonth);
+
+            decimal dayIncome = 0m;
+            if (forecastDate.Day == actualPayday && monthlyIncome > 0m)
+            {
+                dayIncome = monthlyIncome;
+            }
+
+            var weekdayExpenseAvg = weekdayDayCounts.GetValueOrDefault(weekday) > 0
                 ? weekdayExpenseTotals[weekday] / weekdayDayCounts[weekday]
                 : globalExpenseAvg;
 
-            var projectedDailyExpense = (weekdayExpenseAvg * 0.70m) + (recent14ExpenseAvg * 0.30m);
+            var rawDailyTrend = Math.Max(0m, (weekdayExpenseAvg * 0.70m) + (recent14ExpenseAvg * 0.30m));
 
-            projectedDailyIncomeRate = Math.Max(projectedDailyIncomeRate, 0m);
-            projectedDailyExpense = Math.Max(projectedDailyExpense, 0m);
+            // Separate variable discretionary spending from fixed subscriptions so bills are charged on their day
+            var dailyDiscretionary = totalMonthlySubscriptions > 0
+                ? Math.Max(0m, rawDailyTrend - (totalMonthlySubscriptions / 30m))
+                : rawDailyTrend;
 
-            projectedIncomeCum += projectedDailyIncomeRate;
+            var daySubscriptions = subscriptionByDay.GetValueOrDefault(Math.Min(forecastDate.Day, 28), 0m);
+            var projectedDailyExpense = dailyDiscretionary + daySubscriptions;
+
+            projectedIncomeCum += dayIncome;
             projectedExpenseCum += projectedDailyExpense;
-            projection += projectedDailyIncomeRate - projectedDailyExpense;
-            _forecastData.Add(new ForecastData(forecastDate, projectedIncomeCum, projectedExpenseCum, projection));
+            projection += dayIncome - projectedDailyExpense;
+            _forecastData.Add(new ForecastData(
+                forecastDate,
+                Math.Round(projectedIncomeCum, 2),
+                Math.Round(projectedExpenseCum, 2),
+                Math.Round(projection, 2)));
         }
 
-        _projectedIncomeIn30Days = projectedIncomeCum;
-        _projectedExpenseIn30Days = projectedExpenseCum;
-        _projectedBalanceIn30Days = projection;
+        _projectedIncomeIn30Days = Math.Round(projectedIncomeCum, 2);
+        _projectedExpenseIn30Days = Math.Round(projectedExpenseCum, 2);
+        _projectedNetIn30Days = Math.Round(projectedIncomeCum - projectedExpenseCum, 2);
+        _projectedBalanceIn30Days = Math.Round(projection, 2);
         _forecastIsPlaceholder = _forecastData.All(x =>
             x.ProjectedIncomeCumulative == 0 &&
             x.ProjectedExpenseCumulative == 0 &&
-            x.ProjectedNetBalance == 0);
+            x.ProjectedNetBalance == currentBalance &&
+            currentBalance == 0);
     }
 
     private string FormatC(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _settings.Currency, 2);

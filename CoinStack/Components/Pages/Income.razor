@@ -89,10 +89,15 @@
         _settings = await SettingsService.GetAsync();
         var all = await TransactionService.GetAllAsync();
 
-        _incomeTransactions = all
+        var allIncome = all
             .Where(t => t.Type == TransactionType.Income)
             .OrderByDescending(t => t.OccurredAtUtc)
             .ToList();
+
+        var hasBankIncome = allIncome.Any(TransactionConventions.IsBankImported);
+        _incomeTransactions = hasBankIncome
+            ? allIncome.Where(t => !TransactionConventions.IsSyntheticMonthlyIncome(t)).ToList()
+            : allIncome;
 
         var now = DateTime.UtcNow;
         var thisMonth = _incomeTransactions.Where(t => t.OccurredAtUtc.Month == now.Month && t.OccurredAtUtc.Year == now.Year).Sum(t => t.Amount);

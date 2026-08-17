@@ -2,13 +2,16 @@
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
 @using CoinStack.Services
-@inject CoinStack.Services.ITransactionService TransactionService
-@inject CoinStack.Services.IBucketService BucketService
-@inject CoinStack.Services.ICategoryService CategoryService
-@inject CoinStack.Services.IDebtService DebtService
-@inject CoinStack.Services.ISettingsService SettingsService
-@inject CoinStack.Services.ISavingsService SavingsService
-@inject CoinStack.Services.IGameFeedbackService GameFeedbackService
+@inject ITransactionService TransactionService
+@inject IBucketService BucketService
+@inject ICategoryService CategoryService
+@inject IDebtService DebtService
+@inject ISettingsService SettingsService
+@inject ISavingsService SavingsService
+@inject IGameFeedbackService GameFeedbackService
+@inject IWaitlistService WaitlistService
+@inject IMoneyFormatter MoneyFormatter
+@inject NavigationManager Navigation
 
 <PageTitle>Transactions</PageTitle>
 
@@ -24,17 +27,20 @@
     </div>
 
     <!-- Game Result Toast -->
-    @if (_gameResult is not null && _gameResult.PointsChanged != 0)
+    @if (_gameResult is not null && (_gameResult.PointsChanged != 0 || !string.IsNullOrWhiteSpace(_gameResult.Message)))
     {
         <div
-            class="mb-4 rounded-2xl p-4 @(_gameResult.PointsChanged >= 0 ? "bg-success-50 border border-success-200 dark:bg-success-500/10 dark:border-success-500/30" : "bg-error-50 border border-error-200 dark:bg-error-500/10 dark:border-error-500/30")">
+            class="mb-4 rounded-2xl p-4 @(_gameResult.PointsChanged > 0 || _gameResult.Kind == FeedbackKind.Positive ? "bg-success-50 border border-success-200 dark:bg-success-500/10 dark:border-success-500/30" : _gameResult.PointsChanged < 0 ? "bg-error-50 border border-error-200 dark:bg-error-500/10 dark:border-error-500/30" : "bg-brand-50 border border-brand-200 dark:bg-brand-500/10 dark:border-brand-500/30")">
             <div class="flex items-center gap-3">
+                @if (_gameResult.PointsChanged != 0)
+                {
+                    <span
+                        class="text-lg font-bold @(_gameResult.PointsChanged >= 0 ? "text-success-600 dark:text-success-500" : "text-error-600 dark:text-error-500")">
+                        @(_gameResult.PointsChanged >= 0 ? "+" : "")@_gameResult.PointsChanged pts
+                    </span>
+                }
                 <span
-                    class="text-lg font-bold @(_gameResult.PointsChanged >= 0 ? "text-success-600 dark:text-success-500" : "text-error-600 dark:text-error-500")">
-                    @(_gameResult.PointsChanged >= 0 ? "+" : "")@_gameResult.PointsChanged pts
-                </span>
-                <span
-                    class="text-sm @(_gameResult.PointsChanged >= 0 ? "text-success-700 dark:text-success-400" : "text-error-700 dark:text-error-400")">
+                    class="text-sm @(_gameResult.PointsChanged > 0 || _gameResult.Kind == FeedbackKind.Positive ? "text-success-700 dark:text-success-400" : _gameResult.PointsChanged < 0 ? "text-error-700 dark:text-error-400" : "text-brand-700 dark:text-brand-400")">
                     @_gameResult.Message
                 </span>
                 @if (_gameResult.TriggeredReflection)
@@ -219,7 +225,75 @@
                                     </svg>
                                 </button>
 
-                                <form @onsubmit="SaveTransactionAsync">
+                                @if (_showPauseScreen)
+                                {
+                                    <div class="space-y-5">
+                                        <div class="text-center">
+                                            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-warning-50 text-warning-500 dark:bg-warning-500/15 dark:text-warning-400">
+                                                <i class="fa-solid fa-hand text-xl"></i>
+                                            </div>
+                                            <h4 class="text-lg font-medium text-gray-800 dark:text-white/90">Pause before you buy</h4>
+                                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                                Take a breath. Impulse spending is easier to resist with a cool-off.
+                                            </p>
+                                        </div>
+
+                                        <div class="rounded-2xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/30 dark:bg-warning-500/10">
+                                            <p class="text-xs font-medium uppercase tracking-wide text-warning-600 dark:text-warning-400">You're about to spend</p>
+                                            <p class="mt-1 text-2xl font-bold text-gray-800 dark:text-white/90">@FormatMoney(_formAmount)</p>
+                                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">@_formDescription</p>
+                                            @if (!string.IsNullOrWhiteSpace(_pauseCostFraming))
+                                            {
+                                                <p class="mt-3 text-sm font-medium text-warning-700 dark:text-warning-400">@_pauseCostFraming</p>
+                                            }
+                                            @if (_pauseIncomePercent > 0)
+                                            {
+                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    @_pauseIncomePercent.ToString("0.#")% of monthly income
+                                                    @if (_pauseBucketRemaining.HasValue)
+                                                    {
+                                                        <span> · @_pauseBucketRemaining.Value.ToString("0.#")% of remaining bucket</span>
+                                                    }
+                                                </p>
+                                            }
+                                        </div>
+
+                                        <div>
+                                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Cool-off period</label>
+                                            <div class="grid grid-cols-4 gap-2">
+                                                @foreach (var period in Enum.GetValues<CoolOffPeriod>())
+                                                {
+                                                    var isActive = _pauseCoolOff == period;
+                                                    <button type="button" @onclick="() => _pauseCoolOff = period"
+                                                            class="rounded-xl border py-2.5 text-xs font-medium transition-colors
+                                                                   @(isActive ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 dark:border-brand-500"
+                                                                              : "border-gray-200 bg-white text-gray-600 hover:border-brand-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400")">
+                                                        @CoolOffLabel(period)
+                                                    </button>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <div class="flex flex-col gap-3 pt-1">
+                                            <button type="button" @onclick="AddToWaitlistFromPauseAsync"
+                                                    class="flex w-full items-center justify-center gap-2 rounded-full bg-brand-500 px-6 py-3 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                                                <i class="fa-solid fa-clock-rotate-left"></i>
+                                                Add to Waitlist instead
+                                            </button>
+                                            <button type="button" @onclick="LogAnywayFromPauseAsync"
+                                                    class="flex w-full items-center justify-center rounded-full border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-600 dark:bg-transparent dark:text-gray-300 dark:hover:bg-white/[0.05]">
+                                                Log it anyway
+                                            </button>
+                                            <button type="button" @onclick="() => _showPauseScreen = false"
+                                                    class="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+                                                ← Back to edit
+                                            </button>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                <form @onsubmit="SaveTransactionAsync" @onsubmit:preventDefault>
                                     <h4 class="mb-6 text-lg font-medium text-gray-800 dark:text-white/90">@(_editingId.HasValue ? "Edit Transaction" : "Log Expense")</h4>
 
                                     <div class="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
@@ -397,6 +471,7 @@
                                                                                         </button>
                                                                                     </div>
                                                                                 </form>
+                                                                }
                                                                             </div>
                                                                         </div>
                                                                     }
@@ -410,7 +485,9 @@
     private List<DebtAccount> _debts = new();
     private bool _isLoading = true;
     private bool _showModal;
+    private bool _showPauseScreen;
     private GameTransactionResult? _gameResult;
+    private AppSettings _settings = new();
 
     private int? _editingId;
     private string _formDescription = "";
@@ -426,13 +503,18 @@
     private string _formNotes = "";
 
     private decimal _savingsAvailable;
+    private CoolOffPeriod _pauseCoolOff = CoolOffPeriod.Days7;
+    private string? _pauseCostFraming;
+    private decimal _pauseIncomePercent;
+    private decimal? _pauseBucketRemaining;
+    private Dictionary<int, decimal> _bucketSpent = new();
 
     protected override async Task OnInitializedAsync()
     {
         var now = DateTime.UtcNow;
-        var settings = await SettingsService.GetAsync();
-        await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
-        await TransactionService.ApplyAutoIncomeForBudgetPeriodAsync(settings.MonthStartDay, settings.MonthlyIncome, now);
+        _settings = await SettingsService.GetAsync();
+        await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(_settings.MonthStartDay, now);
+        await TransactionService.RemoveSyntheticMonthlyIncomeAsync();
 
         var items = await TransactionService.GetAllAsync();
         _buckets = await BucketService.GetAllAsync();
@@ -440,6 +522,7 @@
         _debts = await DebtService.GetAllAsync();
         var savingsState = await SavingsService.GetStateAsync();
         _savingsAvailable = savingsState.Available;
+        _bucketSpent = await BucketService.GetSpentAmountsForPeriodAsync(_settings.MonthStartDay, now);
         _transactions.Clear();
         _transactions.AddRange(items);
         _isLoading = false;
@@ -459,6 +542,7 @@
         _formIsImpulse = false;
         _formDrawFromSavings = true;
         _formNotes = "";
+        _showPauseScreen = false;
         EnsureCategorySelectionValid();
         _showModal = true;
     }
@@ -477,6 +561,7 @@
         _formIsImpulse = tx.IsImpulse;
         _formDrawFromSavings = false;
         _formNotes = tx.Notes ?? "";
+        _showPauseScreen = false;
         EnsureCategorySelectionValid();
         _showModal = true;
     }
@@ -487,6 +572,107 @@
         {
             return;
         }
+
+        if (_editingId.HasValue)
+        {
+            await CommitSaveAsync(forceProceed: true);
+            return;
+        }
+
+        if (_formType == TransactionType.Expense && ShouldPause())
+        {
+            await PreparePauseScreenAsync();
+            _showPauseScreen = true;
+            return;
+        }
+
+        await CommitSaveAsync(forceProceed: true);
+    }
+
+    private bool ShouldPause()
+    {
+        if (_formIsImpulse)
+        {
+            return true;
+        }
+
+        if (_settings.MonthlyIncome <= 0 || _formAmount <= 0)
+        {
+            return false;
+        }
+
+        var thresholdPercent = _settings.LargeExpenseThreshold;
+        if (thresholdPercent <= 0)
+        {
+            return false;
+        }
+
+        var amountPercentOfIncome = (_formAmount / _settings.MonthlyIncome) * 100m;
+        return amountPercentOfIncome >= thresholdPercent;
+    }
+
+    private async Task PreparePauseScreenAsync()
+    {
+        _pauseCoolOff = CoolOffPeriod.Days7;
+        _pauseCostFraming = await WaitlistService.GetCostFramingMessageAsync(_formAmount);
+        _pauseIncomePercent = _settings.MonthlyIncome > 0
+            ? FinancialEngine.RoundCurrency(_formAmount / _settings.MonthlyIncome * 100m)
+            : 0m;
+
+        _pauseBucketRemaining = null;
+        if (_formBucketId.HasValue)
+        {
+            var bucket = _buckets.FirstOrDefault(b => b.Id == _formBucketId.Value);
+            if (bucket is not null)
+            {
+                var spent = _bucketSpent.GetValueOrDefault(bucket.Id);
+                var remaining = bucket.AllocatedAmount - spent;
+                if (remaining > 0)
+                {
+                    _pauseBucketRemaining = FinancialEngine.RoundCurrency(_formAmount / remaining * 100m);
+                }
+            }
+        }
+    }
+
+    private async Task AddToWaitlistFromPauseAsync()
+    {
+        var item = new WaitlistItem
+        {
+            Name = _formDescription.Trim(),
+            Description = string.IsNullOrWhiteSpace(_formNotes) ? null : _formNotes.Trim(),
+            EstimatedCost = _formAmount,
+            Priority = WaitlistPriority.Medium,
+            CoolOffPeriod = _pauseCoolOff,
+            ReflectionNote = "Paused from transaction log — impulse cool-off.",
+        };
+
+        var created = await WaitlistService.CreateAsync(item);
+        await WaitlistService.CalculateReadinessScoreAsync(created.Id);
+
+        _showPauseScreen = false;
+        ResetFormFields();
+        _showModal = false;
+        _gameResult = new GameTransactionResult
+        {
+            PointsChanged = 0,
+            Message = "Added to Waitlist — cool-off started. No money spent yet.",
+            Kind = FeedbackKind.Positive,
+        };
+
+        Navigation.NavigateTo("/waitlist");
+    }
+
+    private async Task LogAnywayFromPauseAsync()
+    {
+        _formIsImpulse = true;
+        _showPauseScreen = false;
+        await CommitSaveAsync(forceProceed: true);
+    }
+
+    private async Task CommitSaveAsync(bool forceProceed)
+    {
+        _ = forceProceed;
 
         if (_editingId.HasValue)
         {
@@ -556,6 +742,12 @@
             }
         }
 
+        ResetFormFields();
+        _showModal = false;
+    }
+
+    private void ResetFormFields()
+    {
         _editingId = null;
         _formDescription = "";
         _formAmount = 0;
@@ -568,12 +760,16 @@
         _formIsImpulse = false;
         _formDrawFromSavings = true;
         _formNotes = "";
-        _showModal = false;
+        _showPauseScreen = false;
+        _pauseCostFraming = null;
+        _pauseIncomePercent = 0;
+        _pauseBucketRemaining = null;
     }
 
     private void CloseModal()
     {
         _showModal = false;
+        _showPauseScreen = false;
     }
 
     private async Task DeleteTransactionAsync(int id)
@@ -636,6 +832,17 @@
             _formCategoryId = null;
         }
     }
+
+    private static string CoolOffLabel(CoolOffPeriod period) => period switch
+    {
+        CoolOffPeriod.Hours24 => "24h",
+        CoolOffPeriod.Days3 => "3d",
+        CoolOffPeriod.Days7 => "7d",
+        CoolOffPeriod.Days30 => "30d",
+        _ => "7d"
+    };
+
+    private string FormatMoney(decimal amount) => MoneyFormatter.Format(_settings.Currency, amount);
 
     private string GetCategoryName(int? categoryId)
     {

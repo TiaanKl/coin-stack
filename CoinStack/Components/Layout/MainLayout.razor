@@ -66,7 +66,7 @@
 
                         <!-- Level & XP -->
                         <a href="/achievements"
-                               class="flex h-10 items-center gap-2 rounded-full bg-gradient-to-r from-brand-50 to-brand-100 px-4 hover:from-brand-100 hover:to-brand-200 transition-colors dark:from-brand-500/15 dark:to-brand-500/10 dark:hover:from-brand-500/25 dark:hover:to-brand-500/15">
+                               class="flex h-10 items-center gap-2 rounded-full bg-linear-to-r from-brand-50 to-brand-100 px-4 hover:from-brand-100 hover:to-brand-200 transition-colors dark:from-brand-500/15 dark:to-brand-500/10 dark:hover:from-brand-500/25 dark:hover:to-brand-500/15">
                             <span
                             class="flex h-6 w-6 items-center justify-center rounded-md bg-gray-800 text-[10px] font-bold text-white dark:bg-white dark:text-gray-900">@_currentLevel</span>
                             <div class="flex flex-col">
@@ -94,6 +94,16 @@
                             </div>
                             <span class="text-xs font-bold @_streakColorClass">@_streakCount Day Streak</span>
                         </div>
+
+                        <!-- Impulse Resist Streak -->
+                        @if (_noImpulseStreak > 0)
+                        {
+                            <div class="flex h-10 items-center gap-2 rounded-full bg-success-50 px-4 dark:bg-success-500/15"
+                                 title="Impulse purchases resisted">
+                                <i class="fa-solid fa-shield-halved text-success-600 dark:text-success-400"></i>
+                                <span class="text-xs font-bold text-success-700 dark:text-success-400">@_noImpulseStreak Resisted</span>
+                            </div>
+                        }
 
                         <!-- Reflection Trigger -->
                         @if (_pendingReflection != null)
@@ -124,6 +134,7 @@
             </div>
         </main>
         <!-- ===== Main Content End ===== -->
+
     </div>
     <!-- ===== Content Area End ===== -->
 </div>
@@ -133,6 +144,7 @@
 {
     private int _streakCount;
     private string _streakColorClass = "text-gray-500";
+    private int _noImpulseStreak;
     private int _totalScore;
     private Reflection? _pendingReflection;
     private bool _showReflectionModal;
@@ -200,13 +212,15 @@
             CurrencyFormatting.ApplyCurrency(_currency);
 
             var transactions = await TransactionService.GetAllAsync();
-            var totalIncome = transactions.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
+            var totalIncome = transactions.Where(t => t.Type == TransactionType.Income && !TransactionConventions.IsSyntheticMonthlyIncome(t)).Sum(t => t.Amount);
             _totalSpent = transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
             _netSaved = totalIncome - _totalSpent;
 
             var state = await GameLoop.GetCurrentStateAsync();
             var streak = state.Streaks.FirstOrDefault(s => s.Type == StreakType.DailyCheckIn);
             _streakCount = streak?.CurrentCount ?? 0;
+            var resistStreak = state.Streaks.FirstOrDefault(s => s.Type == StreakType.NoImpulseBuy);
+            _noImpulseStreak = resistStreak?.CurrentCount ?? 0;
             _totalScore = state.TotalScore;
             _pendingReflection = state.PendingReflection;
 

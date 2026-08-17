@@ -572,9 +572,11 @@ public sealed class MobileFinanceService : IMobileFinanceService
 
         if (settings.SavingsInterestRate.HasValue && settings.SavingsInterestRate.Value > 0)
         {
+            // Stored as a fraction (0.07 = 7%); no further /100 conversion is required.
             var apr = settings.SavingsInterestRate.Value;
             var monthlyRate = settings.SavingsInterestIsYearly ? apr / 12m : apr;
-            interest = (currentTotal + baseSavings) * (monthlyRate / 100m);
+            interest = decimal.Round(
+                (currentTotal + baseSavings) * monthlyRate, 2, MidpointRounding.AwayFromZero);
         }
 
         var totalAdded = baseSavings + interest;
@@ -844,9 +846,11 @@ public sealed class MobileFinanceService : IMobileFinanceService
             ? income * (settings.MonthlySavingsPercent / 100m)
             : settings.MonthlySavingsAmount;
 
+        // SavingsInterestRate is persisted as a fraction (0.07 = 7%), so it must NOT be divided by 100
+        // again here. Keep this in step with SavingsService/FinancialEngine in the web project.
         decimal apr = settings.SavingsInterestRate ?? 0m;
         decimal monthlyRate = (includeInterest && apr > 0)
-            ? (settings.SavingsInterestIsYearly ? apr / 12m / 100m : apr / 100m)
+            ? (settings.SavingsInterestIsYearly ? apr / 12m : apr)
             : 0m;
 
         var running = state.Total;

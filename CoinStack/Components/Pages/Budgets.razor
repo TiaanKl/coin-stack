@@ -1,10 +1,10 @@
 ﻿@page "/budgets"
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
-@inject CoinStack.Services.IBucketService BucketService
-@inject CoinStack.Services.ICategoryService CategoryService
-@inject CoinStack.Services.ITransactionService TransactionService
-@inject CoinStack.Services.ISettingsService SettingsService
+@inject IBucketService BucketService
+@inject ICategoryService CategoryService
+@inject ITransactionService TransactionService
+@inject ISettingsService SettingsService
 
 <PageTitle>Buckets</PageTitle>
 
@@ -30,7 +30,7 @@
     @if (!_isLoading && _buckets.Count > 0)
     {
         <div
-            class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            class="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-white/3">
             <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
                 <div class="text-center sm:text-left">
                     <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">Monthly Budget Remaining</h3>
@@ -65,7 +65,7 @@
         }
         else if (_buckets.Count == 0)
         {
-            <div class="rounded-2xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="rounded-2xl border border-gray-200 bg-white p-10 text-center dark:border-gray-800 dark:bg-white/3">
                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">No buckets yet. Create your first spending bucket!</p>
                 <button @onclick="OpenCreateModal"
                         class="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 dark:focus:ring-offset-gray-900">
@@ -84,7 +84,7 @@
                     var isOver = spent > bucket.AllocatedAmount;
 
                     <div
-                        class="rounded-2xl border border-gray-200 bg-white p-5 transition-shadow duration-200 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/[0.03]">
+                        class="rounded-2xl border border-gray-200 bg-white p-5 transition-shadow duration-200 hover:shadow-theme-md dark:border-gray-800 dark:bg-white/3">
                         <div class="flex items-center justify-between mb-4">
                             <div class="flex items-center gap-3">
                                 <div class="h-4 w-4 rounded-full"
@@ -239,7 +239,7 @@
 
                                             <div class="mt-6 flex w-full items-center justify-end gap-3">
                                                 <button @onclick="CloseModal" type="button"
-                                                        class="flex w-full justify-center rounded-full border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:border-gray-600 dark:bg-transparent dark:text-gray-300 dark:hover:bg-white/[0.05] dark:hover:text-white sm:w-auto">
+                                                        class="flex w-full justify-center rounded-full border border-gray-300 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-theme-xs transition-colors hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200 dark:border-gray-600 dark:bg-transparent dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white sm:w-auto">
                                                     Close
                                                 </button>
                                                 <button type="submit" disabled="@_isSaving"
@@ -278,9 +278,7 @@
         var now = DateTime.UtcNow;
 
         var settings = await SettingsService.GetAsync();
-        _budgetLimit = settings.MonthlyIncome;
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
-        await TransactionService.ApplyAutoIncomeForBudgetPeriodAsync(settings.MonthStartDay, settings.MonthlyIncome, now);
         _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(settings.MonthStartDay, now);
 
         var categories = await CategoryService.GetAllAsync();
@@ -290,6 +288,9 @@
             .OrderBy(c => c.Name));
 
         await ReloadBucketsAsync();
+        _budgetLimit = settings.BankBalanceAsOfUtc is not null
+            ? Math.Max(0m, settings.CurrentBankBalance)
+            : Math.Max(_totalAllocated, _budgetSpent);
         _isLoading = false;
     }
 

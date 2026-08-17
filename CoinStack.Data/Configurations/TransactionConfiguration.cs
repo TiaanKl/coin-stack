@@ -34,6 +34,14 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
         builder.Property(x => x.Notes)
             .HasMaxLength(2000);
 
+        builder.Property(x => x.Source)
+            .HasMaxLength(32)
+            .HasDefaultValue("Manual")
+            .IsRequired();
+
+        builder.Property(x => x.ImportFingerprint)
+            .HasMaxLength(64);
+
         builder.HasOne(x => x.Category)
             .WithMany(x => x.Transactions)
             .HasForeignKey(x => x.CategoryId)
@@ -54,8 +62,15 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .HasForeignKey(x => x.DebtAccountId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(x => x.StatementImport)
+            .WithMany()
+            .HasForeignKey(x => x.StatementImportId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasIndex(x => x.OccurredAtUtc);
 
         builder.HasIndex(x => x.AutoDeductTemplateId);
+
+        builder.HasIndex(x => x.ImportFingerprint);
     }
 }

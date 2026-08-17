@@ -1,0 +1,53 @@
+<!-- File: CoinStack.Desktop/Views/SubscriptionsView.axaml -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.SubscriptionsView"
+             x:DataType="viewModels:SubscriptionsViewModel">
+    <ScrollViewer Padding="0,0,0,20">
+        <StackPanel Spacing="20">
+            <Grid ColumnDefinitions="*, Auto">
+                <TextBlock Text="Subscriptions" Classes="h1" VerticalAlignment="Center" TextWrapping="Wrap" />
+                <Button Classes="primary" Grid.Column="1" VerticalAlignment="Center">+ Add New</Button>
+            </Grid>
+            
+            <Border Classes="Card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Active Subscriptions" Classes="h2" TextWrapping="Wrap" />
+                    
+                    <!-- Subscriptions List -->
+                    <ItemsControl ItemsSource="{Binding Subscriptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="12,10" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Margin="0">
+                                    <Grid ColumnDefinitions="*, Auto, Auto">
+                                        <!-- Left: Service and Category -->
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Service}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                            <TextBlock Text="{Binding Category}" FontSize="12" Foreground="#6B7280" />
+                                        </StackPanel>
+                                        
+                                        <!-- Middle: Billing Info -->
+                                        <StackPanel Grid.Column="1" Margin="24,0,0,0" Spacing="4">
+                                            <TextBlock Text="{Binding Cycle}" FontSize="12" Foreground="#6B7280" />
+                                            <TextBlock Text="{Binding DebitDay, StringFormat='Debits on day {0}'}" FontSize="11" Foreground="#9CA3AF" />
+                                        </StackPanel>
+                                        
+                                        <!-- Right: Cost -->
+                                        <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="4">
+                                            <TextBlock Text="{Binding Cost, StringFormat='${0:F2}'}" FontWeight="SemiBold" Foreground="#1976D2" />
+                                            <TextBlock FontSize="11" Foreground="#9CA3AF">
+                                                <Run Text="per " />
+                                                <Run Text="{Binding Cycle}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

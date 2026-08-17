@@ -110,6 +110,22 @@ public sealed class ScoringService : IScoringService
                 transaction.Id,
                 transaction.BucketId,
                 cancellationToken);
+
+            await ResetNoImpulseBuyStreakAsync(cancellationToken);
         }
+    }
+
+    private async Task ResetNoImpulseBuyStreakAsync(CancellationToken cancellationToken)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var streak = await db.Streaks.FirstOrDefaultAsync(x => x.Type == StreakType.NoImpulseBuy, cancellationToken);
+        if (streak is null || streak.CurrentCount == 0)
+        {
+            return;
+        }
+
+        streak.CurrentCount = 0;
+        streak.LastIncrementedAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

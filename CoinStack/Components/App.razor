@@ -21,7 +21,7 @@
 <body>
     <!-- ===== Preloader Start ===== -->
     <div id="app-preloader"
-         class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white dark:bg-black">
+         class="fixed left-0 top-0 z-999999 flex h-screen w-screen items-center justify-center bg-white transition-opacity duration-150 dark:bg-black">
         <div
             class="h-16 w-16 animate-spin rounded-full border-4 border-solid border-brand-500 border-t-transparent">
         </div>
@@ -34,7 +34,13 @@
                 function hideAppPreloader() {
                     const preloader = document.getElementById('app-preloader');
                     if (preloader) {
-                        preloader.style.display = 'none';
+                        preloader.style.pointerEvents = 'none';
+                        preloader.style.opacity = '0';
+
+                        // Remove it from layout after fade to avoid any stale click interception.
+                        setTimeout(() => {
+                            preloader.remove();
+                        }, 180);
                     }
                 }
 
@@ -47,23 +53,15 @@
                     // Ignore storage parsing/access errors.
                 }
     </script>
-    <script src="@Assets["_framework/blazor.web.js"]" autostart="false"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script>
-        const preloaderFallback = setTimeout(() => {
-        hideAppPreloader();
-        }, 8000);
-
-        Blazor.start()
-        .then(() => {
-        clearTimeout(preloaderFallback);
+        // Hide the preloader after the first paint even if SignalR needs extra time.
         requestAnimationFrame(() => {
-        hideAppPreloader();
+            hideAppPreloader();
         });
-        })
-        .catch(() => {
-        clearTimeout(preloaderFallback);
-        hideAppPreloader();
-        });
+
+        // Fallback in case the frame callback is throttled.
+        setTimeout(hideAppPreloader, 2000);
     </script>
     <script src="gamification-feedback.js"></script>
 </body>

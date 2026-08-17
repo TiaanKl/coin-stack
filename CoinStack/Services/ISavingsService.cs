@@ -56,7 +56,18 @@ public interface ISavingsService
     Task<ReserveCoverageResult> ApplyReserveFallbackAsync(decimal amount, string reason, string sourceName, bool allowEmergencyFund, CancellationToken cancellationToken = default);
 }
 
-public sealed record SavingsProjectionPoint(string Month, decimal Projected);
+/// <summary>
+/// A single month on the savings projection curve.
+/// </summary>
+/// <param name="Month">The calendar month label in <c>yyyy-MM</c> form.</param>
+/// <param name="Projected">The projected closing balance for the month.</param>
+/// <param name="Contributions">Cumulative capital paid in (opening balance plus deposits) by this month.</param>
+/// <param name="InterestEarned">Cumulative interest earned by this month.</param>
+public sealed record SavingsProjectionPoint(
+    string Month,
+    decimal Projected,
+    decimal Contributions = 0m,
+    decimal InterestEarned = 0m);
 public sealed record ReserveTransferResult(decimal SavingsAdded, decimal EmergencyAdded);
 public sealed record ReserveCoverageResult(decimal SavingsUsed, decimal EmergencyUsed)
 {

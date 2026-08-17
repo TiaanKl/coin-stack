@@ -70,7 +70,7 @@ public sealed class WaitlistServiceTests
             MonthlyIncome = 0m
         });
 
-        var service = new WaitlistService(factory, settings);
+        var service = new WaitlistService(factory, settings, new FakeScoringService(), new FakeTransactionService());
 
         await using var db = new CoinStackDbContext(options);
         var itemId = await db.WaitlistItems.Select(x => x.Id).FirstAsync();

@@ -173,7 +173,8 @@ public sealed class TransactionService : ITransactionService
 
         var income = await db.Transactions
             .AsNoTracking()
-            .Where(t => t.Type == TransactionType.Income)
+            .Where(t => t.Type == TransactionType.Income
+                        && t.Description != TransactionConventions.SyntheticMonthlyIncomeDescription)
             .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
 
         var expense = await db.Transactions
@@ -212,7 +213,8 @@ public sealed class TransactionService : ITransactionService
             .AsNoTracking()
             .Where(t => t.OccurredAtUtc >= startUtc
                         && t.OccurredAtUtc < endUtc
-                        && t.Type == TransactionType.Income)
+                        && t.Type == TransactionType.Income
+                        && t.Description != TransactionConventions.SyntheticMonthlyIncomeDescription)
             .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
 
         var expense = await db.Transactions
@@ -328,7 +330,9 @@ public sealed class TransactionService : ITransactionService
             .AsNoTracking()
             .Where(t => t.Type == TransactionType.Expense
                         && t.AutoDeduct
-                        && t.AutoDeductTemplateId == null)
+                        && t.AutoDeductTemplateId == null
+                        && t.Source != TransactionConventions.BankSource
+                        && t.SubscriptionId == null)
             .ToListAsync(cancellationToken);
 
         if (templates.Count == 0)
@@ -384,42 +388,24 @@ public sealed class TransactionService : ITransactionService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task ApplyAutoIncomeForBudgetPeriodAsync(
-        int monthStartDay,
-        decimal monthlyIncome,
-        DateTime utcNow,
-        CancellationToken cancellationToken = default)
+    public async Task<int> RemoveSyntheticMonthlyIncomeAsync(CancellationToken cancellationToken = default)
     {
-        if (monthlyIncome <= 0)
-        {
-            return;
-        }
-
-        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, utcNow);
-
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var alreadyHasIncome = await db.Transactions
-            .AsNoTracking()
-            .AnyAsync(t => t.Type == TransactionType.Income
-                           && t.Description == "Monthly Income"
-                           && t.OccurredAtUtc >= startUtc
-                           && t.OccurredAtUtc < endUtc, cancellationToken);
+        var synthetics = await db.Transactions
+            .Where(t => t.Type == TransactionType.Income
+                        && t.Description == TransactionConventions.SyntheticMonthlyIncomeDescription
+                        && t.Source != TransactionConventions.BankSource)
+            .ToListAsync(cancellationToken);
 
-        if (alreadyHasIncome)
+        if (synthetics.Count == 0)
         {
-            return;
+            return 0;
         }
 
-        db.Transactions.Add(new Transaction
-        {
-            OccurredAtUtc = startUtc,
-            Amount = monthlyIncome,
-            Type = TransactionType.Income,
-            Description = "Monthly Income",
-        });
-
+        db.Transactions.RemoveRange(synthetics);
         await db.SaveChangesAsync(cancellationToken);
+        return synthetics.Count;
     }
 
     private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)

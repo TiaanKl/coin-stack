@@ -87,11 +87,11 @@ public sealed class AppShell : Shell
         if (e.Source != ShellNavigationSource.ShellSectionChanged)
             return;
 
-        if (Shell.Current?.CurrentPage?.Navigation is { } nav && nav.NavigationStack.Count > 1)
+        if (Current?.CurrentPage?.Navigation is { } nav && nav.NavigationStack.Count > 1)
         {
             // We can't modify the stack during the Navigating event,
             // so defer until the navigation completes.
-            Shell.Current.Dispatcher.Dispatch(async () =>
+            Current.Dispatcher.Dispatch(async () =>
             {
                 while (nav.NavigationStack.Count > 1)
                     await nav.PopAsync(animated: false);
@@ -102,12 +102,12 @@ public sealed class AppShell : Shell
     /// <summary>Re-apply shell chrome colours from the current AppColors tokens.</summary>
     internal void ApplyThemeColors()
     {
-        Shell.SetTabBarBackgroundColor(this, AppColors.Surface);
-        Shell.SetTabBarUnselectedColor(this, AppColors.TabUnselected);
-        Shell.SetTabBarTitleColor(this, AppColors.Dark);
-        Shell.SetTabBarForegroundColor(this, AppColors.Dark);
-        Shell.SetNavBarHasShadow(this, false);
-        Shell.SetBackgroundColor(this, AppColors.Surface);
-        Shell.SetForegroundColor(this, AppColors.Dark);
+        SetTabBarBackgroundColor(this, AppColors.Surface);
+        SetTabBarUnselectedColor(this, AppColors.TabUnselected);
+        SetTabBarTitleColor(this, AppColors.Dark);
+        SetTabBarForegroundColor(this, AppColors.Dark);
+        SetNavBarHasShadow(this, false);
+        SetBackgroundColor(this, AppColors.Surface);
+        SetForegroundColor(this, AppColors.Dark);
     }
 }
