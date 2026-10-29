@@ -2,11 +2,13 @@
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
 @inject ITransactionService TransactionService
+@inject IDailyCatchUpService CatchUp
 @inject ISettingsService SettingsService
 @inject ISavingsService SavingsService
 @inject IDebtService DebtService
 @inject IBucketService BucketService
 @inject IMoneyFormatter MoneyFormatter
+@inject TimeProvider Clock
 
 <PageTitle>Reports</PageTitle>
 
@@ -176,8 +178,8 @@
 	{
 		_settings = await SettingsService.GetAsync();
 
-		var nowUtc = DateTime.UtcNow;
-		var (periodStartUtc, periodEndUtc) = GetBudgetPeriodBoundsUtc(_settings.MonthStartDay, nowUtc);
+		var nowUtc = Clock.GetUtcNow().UtcDateTime;
+		var (_, periodStartUtc, periodEndUtc) = BudgetPeriod.Containing(_settings.MonthStartDay, nowUtc, Clock.LocalTimeZone);
 
 		var periodTotals = await TransactionService.GetIncomeExpenseForPeriodAsync(periodStartUtc, periodEndUtc);
 		_periodIncome = periodTotals.Income;
@@ -189,7 +191,7 @@
 		_savingsAvailable = savings.Available;
 		_fallbackUsedThisMonth = await SavingsService.GetFallbackUsedThisMonthAsync();
 
-		await DebtService.AccrueInterestAsync();
+		await CatchUp.RunIfDueAsync();
 		var debts = await DebtService.GetAllAsync();
 		var openDebts = debts.Where(d => d.CurrentBalance > 0).ToList();
 		_openDebtCount = openDebts.Count;
@@ -212,8 +214,9 @@
 				.Take(6));
 
 		_dailyNet.Clear();
-		var start = nowUtc.Date.AddDays(-13);
-		var dailyRows = await TransactionService.GetDailyNetForRangeAsync(start, nowUtc.Date.AddDays(1));
+		var today = Clock.Today();
+		var start = today.AddDays(-13);
+		var dailyRows = await TransactionService.GetDailyNetForRangeAsync(Clock.StartOfDayUtc(start), Clock.StartOfDayUtc(today.AddDays(1)));
 		var dailyByDate = dailyRows.ToDictionary(x => x.Date.Date, x => x);
 
 		for (var i = 0; i < 14; i++)
@@ -231,19 +234,6 @@
 
 		_dailyNet.Reverse();
 		_isLoading = false;
-	}
-
-	private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
-	{
-		if (monthStartDay is < 1 or > 28)
-		{
-			monthStartDay = 1;
-		}
-
-		var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
-		var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
-		var endUtc = startUtc.AddMonths(1);
-		return (startUtc, endUtc);
 	}
 
 	private string FormatC(decimal amount) => MoneyFormatter.Format(_settings.Currency, amount);

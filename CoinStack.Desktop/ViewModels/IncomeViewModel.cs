@@ -40,13 +40,13 @@ public partial class IncomeViewModel : ViewModelBase, IAsyncInitializable
             var settings = await _settings.GetAsync();
             var currency = settings.Currency;
             var now = DateTime.UtcNow;
-            var (start, end) = BudgetPeriodHelper.GetBounds(settings.MonthStartDay, now);
+            var period = BudgetPeriod.Containing(settings.MonthStartDay, now);
 
             MonthlyIncomeText = _money.Format(currency, settings.MonthlyIncome);
-            PeriodLabel = $"{start.ToLocalTime():MMM dd} – {end.AddDays(-1).ToLocalTime():MMM dd}";
+            PeriodLabel = $"{period.FirstDay:MMM dd} – {period.LastDay:MMM dd}";
 
-            var period = await _transactions.GetIncomeExpenseForPeriodAsync(start, end);
-            PeriodIncomeText = _money.Format(currency, period.Income);
+            var totals = await _transactions.GetIncomeExpenseForPeriodAsync(period.StartUtc, period.EndUtc);
+            PeriodIncomeText = _money.Format(currency, totals.Income);
 
             var lifetime = await _transactions.GetLifetimeTotalsAsync();
             LifetimeIncomeText = _money.Format(currency, lifetime.TotalIncome);

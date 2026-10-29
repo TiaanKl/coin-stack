@@ -35,7 +35,7 @@ public sealed class IncomePage : ContentPage
                 Spacing = 12,
                 Children =
                 {
-                    new Label { Text = "Month to Date", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
+                    new Label { Text = "This Pay Period", FontSize = 13, TextColor = AppColors.Muted, FontFamily = "InterRegular" },
                     _mtdLabel,
                     new BoxView { HeightRequest = 1, Color = AppColors.Border },
                     CreateStatRow("Year to Date", _ytdLabel),
@@ -91,7 +91,7 @@ public sealed class IncomePage : ContentPage
             var settings = await _financeService.GetSettingsAsync();
             var snapshot = await _financeService.GetIncomeSnapshotAsync();
 
-            _mtdLabel.Text = MoneyDisplay.Format(settings.Currency, snapshot.MonthToDate);
+            _mtdLabel.Text = MoneyDisplay.Format(settings.Currency, snapshot.PeriodToDate);
             _ytdLabel.Text = MoneyDisplay.Format(settings.Currency, snapshot.YearToDate);
             _avgLabel.Text = $"{MoneyDisplay.Format(settings.Currency, snapshot.MonthlyAverage)} / month";
 
@@ -114,7 +114,7 @@ public sealed class IncomePage : ContentPage
                     Children =
                     {
                         new Label { Text = tx.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark },
-                        new Label { Text = tx.OccurredAtUtc.ToString("dd MMM yyyy"), FontSize = 12, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
+                        new Label { Text = tx.OccurredAtUtc.ToLocalTime().ToString("dd MMM yyyy"), FontSize = 12, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                     }
                 };
                 Grid.SetColumn(info, 0);

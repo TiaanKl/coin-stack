@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
 @inject IDailyChallengeService ChallengeService
+@inject IDailyCatchUpService CatchUp
 @inject ILevelService LevelService
 
 <PageTitle>Daily Challenges</PageTitle>
@@ -99,7 +100,7 @@
                                 @if (isCompleted && challenge.CompletedAtUtc.HasValue)
                                 {
                                     <p class="mt-1 text-[10px] text-success-500 dark:text-success-400">
-                                        Completed @challenge.CompletedAtUtc.Value.ToString("h:mm tt")
+                                        Completed @challenge.CompletedAtUtc.Value.ToLocalTime().ToString("h:mm tt")
                                     </p>
                                 }
                             </div>
@@ -134,7 +135,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await ChallengeService.ExpireOldChallengesAsync();
+        await CatchUp.RunIfDueAsync();
         _challenges = await ChallengeService.GetTodaysChallengesAsync();
         _completedToday = await ChallengeService.GetCompletedCountTodayAsync();
         _completedThisWeek = await ChallengeService.GetCompletedCountThisWeekAsync();

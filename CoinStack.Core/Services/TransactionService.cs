@@ -8,13 +8,16 @@ public sealed class TransactionService : ITransactionService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
     private readonly IGameLoopService _gameLoop;
+    private readonly TimeProvider _clock;
 
     public TransactionService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
-        IGameLoopService gameLoop)
+        IGameLoopService gameLoop,
+        TimeProvider? clock = null)
     {
         _dbFactory = dbFactory;
         _gameLoop = gameLoop;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task<List<Transaction>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -159,7 +162,7 @@ public sealed class TransactionService : ITransactionService
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, utcNow);
+        var (_, startUtc, endUtc) = BudgetPeriod.Containing(monthStartDay, utcNow, _clock.LocalTimeZone);
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var sum = await db.Transactions
@@ -264,58 +267,21 @@ public sealed class TransactionService : ITransactionService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var incomeRows = await db.Transactions
+        var rows = await db.Transactions
             .AsNoTracking()
             .Where(t => t.OccurredAtUtc >= startUtc
                         && t.OccurredAtUtc < endUtc
-                        && t.Type == TransactionType.Income)
-            .GroupBy(t => new { t.OccurredAtUtc.Year, t.OccurredAtUtc.Month, t.OccurredAtUtc.Day })
-            .Select(g => new
-            {
-                g.Key.Year,
-                g.Key.Month,
-                g.Key.Day,
-                Total = g.Sum(t => t.Amount)
-            })
+                        && (t.Type == TransactionType.Income || t.Type == TransactionType.Expense))
+            .Select(t => new { t.OccurredAtUtc, t.Type, t.Amount })
             .ToListAsync(cancellationToken);
 
-        var expenseRows = await db.Transactions
-            .AsNoTracking()
-            .Where(t => t.OccurredAtUtc >= startUtc
-                        && t.OccurredAtUtc < endUtc
-                        && t.Type == TransactionType.Expense)
-            .GroupBy(t => new { t.OccurredAtUtc.Year, t.OccurredAtUtc.Month, t.OccurredAtUtc.Day })
-            .Select(g => new
-            {
-                g.Key.Year,
-                g.Key.Month,
-                g.Key.Day,
-                Total = g.Sum(t => t.Amount)
-            })
-            .ToListAsync(cancellationToken);
-
-        var byDate = new Dictionary<DateTime, DailyNetSummary>();
-
-        foreach (var row in incomeRows)
-        {
-            var date = new DateTime(row.Year, row.Month, row.Day, 0, 0, 0, DateTimeKind.Utc);
-            byDate[date] = new DailyNetSummary(date, row.Total, 0m);
-        }
-
-        foreach (var row in expenseRows)
-        {
-            var date = new DateTime(row.Year, row.Month, row.Day, 0, 0, 0, DateTimeKind.Utc);
-            if (byDate.TryGetValue(date, out var existing))
-            {
-                byDate[date] = existing with { Expense = row.Total };
-            }
-            else
-            {
-                byDate[date] = new DailyNetSummary(date, 0m, row.Total);
-            }
-        }
-
-        return byDate.Values
+        // Grouped by the device's calendar day, which SQLite can't work out, so this happens in memory.
+        return rows
+            .GroupBy(t => _clock.LocalDate(t.OccurredAtUtc))
+            .Select(g => new DailyNetSummary(
+                g.Key,
+                g.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount),
+                g.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount)))
             .OrderByDescending(x => x.Date)
             .ToList();
     }
@@ -325,7 +291,7 @@ public sealed class TransactionService : ITransactionService
         DateTime utcNow,
         CancellationToken cancellationToken = default)
     {
-        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, utcNow);
+        var (_, startUtc, endUtc) = BudgetPeriod.Containing(monthStartDay, utcNow, _clock.LocalTimeZone);
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -345,8 +311,8 @@ public sealed class TransactionService : ITransactionService
 
         foreach (var template in templates)
         {
-            // If the template transaction itself falls within this period, treat it as already applied.
-            if (template.OccurredAtUtc >= startUtc && template.OccurredAtUtc < endUtc)
+            // The template covers its own period, and a period before it came before the expense existed.
+            if (template.OccurredAtUtc >= startUtc)
             {
                 continue;
             }
@@ -402,19 +368,6 @@ public sealed class TransactionService : ITransactionService
         }
 
         return removed;
-    }
-
-    private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
-    {
-        if (monthStartDay is < 1 or > 28)
-        {
-            monthStartDay = 1;
-        }
-
-        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
-        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
-        var endUtc = startUtc.AddMonths(1);
-        return (startUtc, endUtc);
     }
 
     private static decimal GetDebtPaymentImpact(Transaction transaction)

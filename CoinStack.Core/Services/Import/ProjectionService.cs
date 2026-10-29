@@ -53,13 +53,15 @@ public interface IProjectionService
 public sealed partial class ProjectionService : IProjectionService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
+    private readonly TimeProvider _clock;
 
     [GeneratedRegex(@"(?:^|\s)\d+(?:[.,]\d+)*(?=\s|$)")]
     private static partial Regex PriceTokenRegex();
 
-    public ProjectionService(IDbContextFactory<CoinStackDbContext> dbFactory)
+    public ProjectionService(IDbContextFactory<CoinStackDbContext> dbFactory, TimeProvider? clock = null)
     {
         _dbFactory = dbFactory;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task<CashFlowProjection> BuildProjectionAsync(CancellationToken cancellationToken = default)
@@ -83,7 +85,7 @@ public sealed partial class ProjectionService : IProjectionService
 
         var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
         var statementPeriods = await LoadStatementPeriodsAsync(db, cancellationToken);
-        var nowUtc = DateTime.UtcNow;
+        var nowUtc = _clock.GetUtcNow().UtcDateTime;
         var currentMonthKey = new DateTime(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
         // 1. Identify and flag pass-through transaction pairs (e.g., 50k in / 47k out to Pa on 07 Apr)

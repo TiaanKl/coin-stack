@@ -3,6 +3,7 @@
 @using CoinStack.Data.Entities
 @using CoinStack.Services
 @inject IDebtCalculatorEngine Calculator
+@inject IDailyCatchUpService CatchUp
 @inject IDebtService DebtService
 @inject ISettingsService SettingsService
 @inject ITransactionService TransactionService
@@ -784,7 +785,7 @@
     {
         _isDebtLoading = true;
 
-        await DebtService.AccrueInterestAsync();
+        await CatchUp.RunIfDueAsync();
         var debts = await DebtService.GetAllAsync();
         _savedDebts.Clear();
         _savedDebts.AddRange(debts.OrderByDescending(x => x.CreatedAtUtc));

@@ -3,6 +3,7 @@ using System.IO;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using CoinStack.Data;
 using CoinStack.Desktop.ViewModels;
 using CoinStack.Desktop.Views;
@@ -30,6 +31,16 @@ public partial class App : Application
         Services = services.BuildServiceProvider();
 
         DatabaseInitializer.InitializeAsync(Services).GetAwaiter().GetResult();
+
+        // The day's auto-deductions, interest and challenges before the first screen reads them, then an
+        // hourly look so the app catches up when it stays open past midnight.
+        var catchUp = Services.GetRequiredService<IDailyCatchUpService>();
+        catchUp.RunIfDueAsync().GetAwaiter().GetResult();
+        DispatcherTimer.Run(() =>
+        {
+            _ = catchUp.RunIfDueAsync();
+            return true;
+        }, TimeSpan.FromHours(1));
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
 @inject IWeeklyRecapService RecapService
+@inject IDailyCatchUpService CatchUp
 @inject ISettingsService SettingsService
 
 <PageTitle>Weekly Recap</PageTitle>
@@ -127,8 +128,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Fill in every finished week since the last recap, not just the first one ever.
-        await RecapService.GenerateMissingRecapsAsync();
+        // The daily catch-up fills in every finished week since the last recap.
+        await CatchUp.RunIfDueAsync();
         _recaps = await RecapService.GetAllAsync();
         _isLoading = false;
     }

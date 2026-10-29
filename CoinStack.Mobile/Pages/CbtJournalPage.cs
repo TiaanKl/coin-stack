@@ -142,7 +142,7 @@ public sealed class CbtJournalPage : ContentPage
                                 Children =
                                 {
                                     new Label { Text = entry.Situation, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                                    new Label { Text = entry.CreatedAtUtc.ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular", HorizontalOptions = LayoutOptions.End }
+                                    new Label { Text = entry.CreatedAtUtc.ToLocalTime().ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular", HorizontalOptions = LayoutOptions.End }
                                 }
                             },
                             new Label { Text = $"Thought: {entry.AutomaticThought}", FontSize = 12, TextColor = AppColors.Muted, FontFamily = "InterRegular", LineBreakMode = LineBreakMode.TailTruncation },

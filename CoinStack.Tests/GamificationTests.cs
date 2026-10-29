@@ -121,14 +121,14 @@ public sealed class GamificationTests
             var challenges = await service.GetTodaysChallengesAsync();
 
             var weekly = Assert.Single(challenges, c => c.Frequency == ChallengeFrequency.Weekly);
-            Assert.Equal(MondayOf(DateTime.UtcNow.Date), weekly.AssignedDateUtc);
+            // Monday on the device's calendar, stored as the UTC time that day starts.
+            Assert.Equal(TimeProvider.System.StartOfDayUtc(MondayOf(TimeProvider.System.Today())), weekly.AssignedDateUtc);
         }
     }
 
     private static DateTime MondayOf(DateTime date)
     {
-        var monday = date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
-        return DateTime.SpecifyKind(monday, DateTimeKind.Utc);
+        return date.Date.AddDays(-(((int)date.DayOfWeek + 6) % 7));
     }
 
     private static async Task<(SqliteConnection Connection, DbContextOptions<CoinStackDbContext> Options)> CreateDatabaseAsync()

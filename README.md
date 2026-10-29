@@ -76,14 +76,12 @@ It combines budgeting features with gamified feedback (score/streaks/reflections
 
 ### Platform/infra roadmap
 
-- Shared backend API for Blazor + MAUI
-- Server-hosted central database for sync-enabled users
-- Dual data mode:
+CoinStack is local-first: every install belongs to one person and keeps its data on that device. There are no accounts and no server, so no financial data is collected.
 
- 1. Local-only (offline-first)
- 2. Synced (API + server DB)
+- Encrypted backup and restore: one file, saved wherever the person chooses (iCloud Drive, Google Drive, OneDrive or a local folder)
+- Later, sync between devices through the person's own cloud storage, still with no server
 
-This allows users to choose between privacy/local control and cross-device sync convenience.
+See [ROADMAP.md](ROADMAP.md) for the full plan.
 
 ## Repository Structure
 
@@ -261,7 +259,7 @@ dotnet build CoinStack.slnx -c Release
 ## Known Gaps / Open Work
 
 - Reconnect UX still requires final manual scenario verification
-- Shared API/server sync mode is planned but not yet production-integrated
+- Backup and restore, and sync between devices, are planned (see ROADMAP.md)
 - Mobile parity is strong but still under active QA and UX refinement
 
 ## License

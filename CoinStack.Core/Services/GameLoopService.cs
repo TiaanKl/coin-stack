@@ -20,6 +20,7 @@ public sealed class GameLoopService : IGameLoopService
     private readonly ISavingsService _savingsService;
     private readonly ILevelService _levelService;
     private readonly IAchievementService? _achievementService;
+    private readonly TimeProvider _clock;
 
     public GameLoopService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
@@ -29,7 +30,8 @@ public sealed class GameLoopService : IGameLoopService
         ISettingsService settingsService,
         ISavingsService savingsService,
         ILevelService levelService,
-        IAchievementService? achievementService = null)
+        IAchievementService? achievementService = null,
+        TimeProvider? clock = null)
     {
         _dbFactory = dbFactory;
         _bucketService = bucketService;
@@ -39,6 +41,7 @@ public sealed class GameLoopService : IGameLoopService
         _savingsService = savingsService;
         _levelService = levelService;
         _achievementService = achievementService;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task ProcessDailyCheckInAsync(CancellationToken cancellationToken = default)
@@ -111,20 +114,20 @@ public sealed class GameLoopService : IGameLoopService
 
     private async Task ProcessDailyCheckInCoreAsync(CancellationToken cancellationToken)
     {
-        var now = DateTime.UtcNow;
+        var now = _clock.GetUtcNow().UtcDateTime;
+        var today = _clock.LocalDate(now);
         var settings = await _settingsService.GetAsync(cancellationToken);
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var streak = await db.Streaks.FirstOrDefaultAsync(x => x.Type == StreakType.DailyCheckIn, cancellationToken);
 
+        // The check-in row is kept even with streaks switched off: it is how a second visit on the same
+        // day knows the check-in was already awarded. The setting only hides the streak and its bonus.
         if (streak is null)
         {
-            if (settings.EnableStreaks)
-            {
-                streak = new Streak { Type = StreakType.DailyCheckIn, CurrentCount = 1, BestCount = 1, LastIncrementedAtUtc = now };
-                db.Streaks.Add(streak);
-                await db.SaveChangesAsync(cancellationToken);
-            }
+            streak = new Streak { Type = StreakType.DailyCheckIn, CurrentCount = 1, BestCount = 1, LastIncrementedAtUtc = now };
+            db.Streaks.Add(streak);
+            await db.SaveChangesAsync(cancellationToken);
             if (settings.EnableScoring)
             {
                 await _scoringService.AddScoreEventAsync(2, ScoreChangeReason.DailyCheckIn, "Daily check-in!", cancellationToken: cancellationToken);
@@ -133,12 +136,14 @@ public sealed class GameLoopService : IGameLoopService
             return;
         }
 
-        if (streak.LastIncrementedAtUtc.Date == now.Date)
+        // Days follow the device's calendar, so a check-in at 01:00 counts for that day.
+        var lastCheckInDay = _clock.LocalDate(streak.LastIncrementedAtUtc);
+        if (lastCheckInDay == today)
         {
             return;
         }
 
-        var daysSince = (now.Date - streak.LastIncrementedAtUtc.Date).Days;
+        var daysSince = (today - lastCheckInDay).Days;
 
         if (daysSince == 1)
         {
@@ -151,10 +156,7 @@ public sealed class GameLoopService : IGameLoopService
         }
 
         streak.LastIncrementedAtUtc = now;
-        if (settings.EnableStreaks)
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
+        await db.SaveChangesAsync(cancellationToken);
         if (settings.EnableScoring)
         {
             await _scoringService.AddScoreEventAsync(DailyCheckInPoints, ScoreChangeReason.DailyCheckIn, DailyCheckInDescription, cancellationToken: cancellationToken);
@@ -481,7 +483,7 @@ public sealed class GameLoopService : IGameLoopService
         CancellationToken cancellationToken)
     {
         var now = transaction.OccurredAtUtc;
-        var (startUtc, endUtc) = GetBudgetPeriodBoundsUtc(monthStartDay, now);
+        var (_, startUtc, endUtc) = BudgetPeriod.Containing(monthStartDay, now, _clock.LocalTimeZone);
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var totalExpenseAfter = await db.Transactions
@@ -495,18 +497,5 @@ public sealed class GameLoopService : IGameLoopService
         var shortfallBefore = Math.Max(0m, totalExpenseBefore - monthlyIncome);
         var shortfallAfter = Math.Max(0m, totalExpenseAfter - monthlyIncome);
         return shortfallAfter - shortfallBefore;
-    }
-
-    private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
-    {
-        if (monthStartDay is < 1 or > 28)
-        {
-            monthStartDay = 1;
-        }
-
-        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
-        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
-        var endUtc = startUtc.AddMonths(1);
-        return (startUtc, endUtc);
     }
 }

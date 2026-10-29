@@ -8,8 +8,13 @@ namespace CoinStack.Services;
 public sealed class WeeklyRecapService : IWeeklyRecapService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
+    private readonly TimeProvider _clock;
 
-    public WeeklyRecapService(IDbContextFactory<CoinStackDbContext> dbFactory) => _dbFactory = dbFactory;
+    public WeeklyRecapService(IDbContextFactory<CoinStackDbContext> dbFactory, TimeProvider? clock = null)
+    {
+        _dbFactory = dbFactory;
+        _clock = clock ?? TimeProvider.System;
+    }
 
     public async Task<WeeklyRecap?> GetCurrentWeekRecapAsync(CancellationToken ct = default)
     {
@@ -45,7 +50,7 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
     {
         var (week, year) = GetPreviousWeekAndYear();
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
-        return await GenerateRecapAsync(db, year, week, ct);
+        return await GenerateRecapAsync(db, year, week, _clock.LocalTimeZone, ct);
     }
 
     public async Task<int> GenerateMissingRecapsAsync(int maxWeeks = 12, CancellationToken ct = default)
@@ -70,7 +75,8 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
         var (lastWeek, lastYear) = GetPreviousWeekAndYear();
         var lastWeekStart = FirstDateOfWeek(lastYear, lastWeek);
         var oldestAllowed = lastWeekStart.AddDays(-7 * (Math.Max(1, maxWeeks) - 1));
-        var start = FirstDateOfWeek(ISOWeek.GetYear(earliest.Value), ISOWeek.GetWeekOfYear(earliest.Value));
+        var earliestDay = _clock.LocalDate(earliest.Value);
+        var start = FirstDateOfWeek(ISOWeek.GetYear(earliestDay), ISOWeek.GetWeekOfYear(earliestDay));
         if (start < oldestAllowed)
         {
             start = oldestAllowed;
@@ -92,22 +98,24 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
                 continue;
             }
 
-            await GenerateRecapAsync(db, year, week, ct);
+            await GenerateRecapAsync(db, year, week, _clock.LocalTimeZone, ct);
             created++;
         }
 
         return created;
     }
 
-    private static async Task<WeeklyRecap> GenerateRecapAsync(CoinStackDbContext db, int year, int week, CancellationToken ct)
+    /// <summary>Weeks run Monday to Monday on the device's calendar.</summary>
+    private static async Task<WeeklyRecap> GenerateRecapAsync(CoinStackDbContext db, int year, int week, TimeZoneInfo zone, CancellationToken ct)
     {
         var existing = await db.WeeklyRecaps
             .FirstOrDefaultAsync(r => r.WeekNumber == week && r.Year == year, ct);
 
         if (existing is not null) return existing;
 
-        var weekStart = FirstDateOfWeek(year, week);
-        var weekEnd = weekStart.AddDays(7);
+        var monday = FirstDateOfWeek(year, week);
+        var weekStart = LocalCalendar.StartOfDayUtc(zone, monday);
+        var weekEnd = LocalCalendar.StartOfDayUtc(zone, monday.AddDays(7));
 
         // Category is needed for the top-category figure; without it every week showed "None".
         var transactions = await db.Transactions
@@ -141,7 +149,7 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
             .Where(s => s.Reason == ScoreChangeReason.DailyCheckIn && s.CreatedAtUtc >= weekStart && s.CreatedAtUtc < weekEnd)
             .Select(s => s.CreatedAtUtc)
             .ToListAsync(ct);
-        var streak = checkInTimes.Select(t => t.Date).Distinct().Count();
+        var streak = checkInTimes.Select(t => LocalCalendar.ToLocal(zone, t).Date).Distinct().Count();
 
         var points = await db.ScoreEvents
             .Where(s => s.CreatedAtUtc >= weekStart && s.CreatedAtUtc < weekEnd)
@@ -204,17 +212,17 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
         return string.Join(" ", parts);
     }
 
-    private static (int Week, int Year) GetCurrentWeekAndYear()
+    private (int Week, int Year) GetCurrentWeekAndYear()
     {
-        var today = DateTime.UtcNow;
+        var today = _clock.Today();
         var week = ISOWeek.GetWeekOfYear(today);
         var year = ISOWeek.GetYear(today);
         return (week, year);
     }
 
-    private static (int Week, int Year) GetPreviousWeekAndYear()
+    private (int Week, int Year) GetPreviousWeekAndYear()
     {
-        var lastWeek = DateTime.UtcNow.AddDays(-7);
+        var lastWeek = _clock.Today().AddDays(-7);
         var week = ISOWeek.GetWeekOfYear(lastWeek);
         var year = ISOWeek.GetYear(lastWeek);
         return (week, year);

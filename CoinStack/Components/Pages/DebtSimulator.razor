@@ -3,6 +3,7 @@
 @using CoinStack.Data.Entities
 @using CoinStack.Services
 @inject IDebtService DebtService
+@inject IDailyCatchUpService CatchUp
 @inject ISettingsService SettingsService
 @inject IMoneyFormatter MoneyFormatter
 
@@ -388,7 +389,7 @@
         _settings = await SettingsService.GetAsync();
         _currencySymbol = MoneyFormatter.Symbol(_settings.Currency);
 
-        await DebtService.AccrueInterestAsync();
+        await CatchUp.RunIfDueAsync();
         _debts = (await DebtService.GetAllAsync())
             .Where(d => d.CurrentBalance > 0)
             .OrderBy(d => d.Name)

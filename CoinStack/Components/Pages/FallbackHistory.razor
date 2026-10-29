@@ -46,8 +46,8 @@
                         {
                             <tr class="border-b border-gray-50 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/50">
                                 <td class="py-3 pr-4 text-gray-600 dark:text-gray-300">
-                                    @evt.OccurredAtUtc.ToString("dd MMM yyyy")
-                                    <span class="ml-1 text-xs text-gray-400 dark:text-gray-500">@evt.OccurredAtUtc.ToString("HH:mm")</span>
+                                    @evt.OccurredAtUtc.ToLocalTime().ToString("dd MMM yyyy")
+                                    <span class="ml-1 text-xs text-gray-400 dark:text-gray-500">@evt.OccurredAtUtc.ToLocalTime().ToString("HH:mm")</span>
                                 </td>
                                 <td class="py-3 pr-4 font-medium text-gray-800 dark:text-white/90">@evt.SourceName</td>
                                 <td class="py-3 pr-4 text-gray-600 dark:text-gray-300">@evt.Reason</td>

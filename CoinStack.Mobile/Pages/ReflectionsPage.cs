@@ -192,7 +192,7 @@ public sealed class ReflectionsPage : ContentPage
                     ColumnDefinitions = { new ColumnDefinition(GridLength.Star), new ColumnDefinition(GridLength.Auto) },
                     Children =
                     {
-                        new Label { Text = $"{reflection.CreatedAtUtc:dd MMM} · {reflection.Trigger}", FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark },
+                        new Label { Text = $"{reflection.CreatedAtUtc.ToLocalTime():dd MMM} · {reflection.Trigger}", FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark },
                     }
                 });
 

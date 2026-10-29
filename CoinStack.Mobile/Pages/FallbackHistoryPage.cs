@@ -81,7 +81,7 @@ public sealed class FallbackHistoryPage : ContentPage
                         {
                             new Label
                             {
-                                Text = $"{evt.OccurredAtUtc:dd MMM yyyy}",
+                                Text = $"{evt.OccurredAtUtc.ToLocalTime():dd MMM yyyy}",
                                 FontSize = 14,
                                 FontAttributes = FontAttributes.Bold,
                                 TextColor = AppColors.Dark

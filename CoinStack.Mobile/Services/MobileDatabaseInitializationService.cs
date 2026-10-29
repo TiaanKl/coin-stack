@@ -1,5 +1,6 @@
 using CoinStack.Data;
 using CoinStack.Data.Entities;
+using CoinStack.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -12,22 +13,26 @@ public interface IMobileDatabaseInitializationService
 
 public sealed class MobileDatabaseInitializationService : IMobileDatabaseInitializationService
 {
+    private readonly IServiceProvider _services;
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
     private readonly ILogger<MobileDatabaseInitializationService> _logger;
 
     public MobileDatabaseInitializationService(
+        IServiceProvider services,
         IDbContextFactory<CoinStackDbContext> dbFactory,
         ILogger<MobileDatabaseInitializationService> logger)
     {
+        _services = services;
         _dbFactory = dbFactory;
         _logger = logger;
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        // The same migrations, default categories, achievements and level as the web and desktop apps.
+        await DatabaseInitializer.InitializeAsync(_services, cancellationToken);
 
-        await db.Database.MigrateAsync(cancellationToken);
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         await SeedDefaultsAsync(db, cancellationToken);
     }
 

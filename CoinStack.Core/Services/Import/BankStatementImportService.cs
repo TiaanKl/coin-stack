@@ -517,14 +517,10 @@ public sealed class BankStatementImportService : IBankStatementImportService
             ? Math.Round(salaryAmounts.Average(), 2, MidpointRounding.AwayFromZero)
             : (decimal?)null;
 
-        var payday = toImport
+        var payday = BudgetPeriod.DetectPayday(toImport
             .Concat(preview.Candidates.Where(c => c.AlreadyExists))
             .Where(c => c.Type == TransactionType.Income && TransactionConventions.LooksLikeSalary(c.RawDescription ?? c.Description))
-            .Select(c => c.DateUtc.Day)
-            .GroupBy(day => day)
-            .OrderByDescending(g => g.Count())
-            .Select(g => g.Key)
-            .FirstOrDefault();
+            .Select(c => c.DateUtc));
 
         // Without a printed period end, the closing balance applies at the last transaction date, not "now".
         var statementEnd = preview.PeriodEndUtc
@@ -643,16 +639,12 @@ public sealed class BankStatementImportService : IBankStatementImportService
             {
                 settings.MonthlyIncome = Math.Round(salaries.Average(), 2, MidpointRounding.AwayFromZero);
 
-                var payday = salaryAmounts
+                var payday = BudgetPeriod.DetectPayday(salaryAmounts
                     .Where(t => TransactionConventions.LooksLikeSalary(t.Description)
                                 || (t.Notes is not null && TransactionConventions.LooksLikeSalary(t.Notes)))
-                    .Select(t => t.OccurredAtUtc.Day)
-                    .GroupBy(day => day)
-                    .OrderByDescending(g => g.Count())
-                    .Select(g => g.Key)
-                    .FirstOrDefault();
+                    .Select(t => t.OccurredAtUtc));
 
-                if (payday is >= 1 and <= 28 && settings.MonthStartDay == 1)
+                if (payday is >= 1 and <= BudgetPeriod.LastPayday && settings.MonthStartDay == 1)
                 {
                     settings.MonthStartDay = payday;
                 }
@@ -702,7 +694,7 @@ public sealed class BankStatementImportService : IBankStatementImportService
             settings.MonthlyIncome = detectedSalary.Value;
         }
 
-        if (payday is >= 1 and <= 28)
+        if (payday is >= 1 and <= BudgetPeriod.LastPayday)
         {
             settings.MonthStartDay = payday;
         }

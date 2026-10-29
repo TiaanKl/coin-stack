@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
+        <TargetFrameworks>net10.0-android;net10.0-ios;net10.0-maccatalyst</TargetFrameworks>
         <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>
 
         <!-- Note for MacCatalyst:
@@ -100,6 +100,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\CoinStack.Core\CoinStack.Core.csproj" />
         <ProjectReference Include="..\CoinStack.Data\CoinStack.Data.csproj" />
         <ProjectReference Include="..\CoinStack.Mobile.Core\CoinStack.Mobile.Core.csproj" />
     </ItemGroup>

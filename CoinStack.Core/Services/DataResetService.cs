@@ -4,11 +4,11 @@ using Microsoft.EntityFrameworkCore;
 namespace CoinStack.Services;
 
 /// <summary>
-/// Clears every CoinStack record while keeping sign-in accounts (the ASP.NET Identity tables).
+/// Clears every CoinStack record.
 /// </summary>
 /// <remarks>
-/// This used to call <c>EnsureDeletedAsync</c>, which dropped the whole SQLite file — Identity users
-/// included — with no way back, and only re-seeded categories (achievements stayed empty until restart).
+/// This used to call <c>EnsureDeletedAsync</c>, which dropped the whole SQLite file with no way back,
+/// and only re-seeded categories (achievements stayed empty until restart).
 /// Now a copy of the database is written first, the app tables are emptied in one transaction, and the
 /// same seeding the app runs at startup is repeated.
 /// </remarks>
@@ -60,12 +60,12 @@ public sealed class DataResetService : IDataResetService
             await db.UserLevels.ExecuteDeleteAsync(cancellationToken);
             await db.DailyChallenges.ExecuteDeleteAsync(cancellationToken);
             await db.WeeklyRecaps.ExecuteDeleteAsync(cancellationToken);
+            await db.DismissedRecurringMerchants.ExecuteDeleteAsync(cancellationToken);
 
             if (db.Database.IsSqlite())
             {
-                // Restart ids at 1 for the app tables, as the old drop-and-recreate did; Identity keeps its own.
-                await db.Database.ExecuteSqlRawAsync(
-                    "DELETE FROM sqlite_sequence WHERE name NOT LIKE 'AspNet%'", cancellationToken);
+                // Restart ids at 1, as the old drop-and-recreate did.
+                await db.Database.ExecuteSqlRawAsync("DELETE FROM sqlite_sequence", cancellationToken);
             }
 
             await transaction.CommitAsync(cancellationToken);

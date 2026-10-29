@@ -113,7 +113,18 @@ public sealed class GoalsPage : ContentPage
             return;
         }
 
-        await _financeService.AddGoalContributionAsync(goalId, amount);
+        var result = await _financeService.AddGoalContributionAsync(goalId, amount);
+        if (!result.Succeeded)
+        {
+            await DisplayAlertAsync("Goal Contribution", result.Error, "OK");
+        }
+        else if (result.NotMoved > 0)
+        {
+            var currency = (await _financeService.GetSettingsAsync()).Currency;
+            await DisplayAlertAsync("Goal Contribution",
+                $"Only {MoneyDisplay.Format(currency, result.Moved)} was needed to finish this goal, so {MoneyDisplay.Format(currency, result.NotMoved)} stayed in savings.", "OK");
+        }
+
         await LoadAsync();
     }
 

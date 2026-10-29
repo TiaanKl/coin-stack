@@ -28,7 +28,7 @@
                               ItemsSource="{Binding Currencies}"
                               SelectedItem="{Binding Currency}" />
 
-                    <TextBlock Grid.Row="1" Text="Month start day" VerticalAlignment="Center" Classes="body" />
+                    <TextBlock Grid.Row="1" Text="Payday" VerticalAlignment="Center" Classes="body" />
                     <ComboBox Grid.Row="1" Grid.Column="1"
                               ItemsSource="{Binding StartDays}"
                               SelectedItem="{Binding MonthStartDay}" />

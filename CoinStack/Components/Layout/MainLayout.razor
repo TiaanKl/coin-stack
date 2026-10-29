@@ -12,6 +12,7 @@
 @inject ISettingsService SettingsService
 @inject ITransactionService TransactionService
 @inject IDataResetService DataResetService
+@inject IDailyCatchUpService CatchUp
 @inject IGameFeedbackService FeedbackBus
 @inject ILevelService LevelService
 
@@ -182,6 +183,8 @@
         Navigation.LocationChanged += HandleLocationChanged;
         DataResetService.DataResetCompleted += HandleDataResetCompleted;
         FeedbackBus.OnFeedback += HandleFeedbackReceived;
+        // Fills in anything the day needs (auto-deductions, interest, challenges) before the page reads it.
+        await CatchUp.RunIfDueAsync();
         await LoadStateAsync();
     }
 

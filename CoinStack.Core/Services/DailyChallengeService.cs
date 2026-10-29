@@ -29,15 +29,18 @@ public sealed class DailyChallengeService : IDailyChallengeService
     ];
 
     private readonly IAchievementService? _achievementService;
+    private readonly TimeProvider _clock;
 
     public DailyChallengeService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
         ILevelService levelService,
-        IAchievementService? achievementService = null)
+        IAchievementService? achievementService = null,
+        TimeProvider? clock = null)
     {
         _dbFactory = dbFactory;
         _levelService = levelService;
         _achievementService = achievementService;
+        _clock = clock ?? TimeProvider.System;
     }
 
     /// <summary>Today's daily challenges plus this week's weekly challenge, which stays visible until it expires.</summary>
@@ -46,15 +49,14 @@ public sealed class DailyChallengeService : IDailyChallengeService
         await GenerateDailyChallengesAsync(ct);
 
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
-        var today = DateTime.UtcNow.Date;
-        var weekStart = StartOfWeek(today);
+        var (dayStart, dayEnd, weekStart, weekEnd) = CurrentDayAndWeek();
 
         return await db.DailyChallenges
             .AsNoTracking()
-            .Where(c => (c.AssignedDateUtc >= today && c.AssignedDateUtc < today.AddDays(1))
+            .Where(c => (c.AssignedDateUtc >= dayStart && c.AssignedDateUtc < dayEnd)
                         || (c.Frequency == ChallengeFrequency.Weekly
                             && c.AssignedDateUtc >= weekStart
-                            && c.AssignedDateUtc < weekStart.AddDays(7)))
+                            && c.AssignedDateUtc < weekEnd))
             .OrderBy(c => c.Status)
             .ThenBy(c => c.Frequency)
             .ThenBy(c => c.CreatedAtUtc)
@@ -68,6 +70,15 @@ public sealed class DailyChallengeService : IDailyChallengeService
         return date.Date.AddDays(-daysSinceMonday);
     }
 
+    /// <summary>Today and this week (Monday to Monday) on the device's calendar, as UTC times.</summary>
+    private (DateTime DayStart, DateTime DayEnd, DateTime WeekStart, DateTime WeekEnd) CurrentDayAndWeek()
+    {
+        var today = _clock.Today();
+        var monday = StartOfWeek(today);
+        return (_clock.StartOfDayUtc(today), _clock.StartOfDayUtc(today.AddDays(1)),
+            _clock.StartOfDayUtc(monday), _clock.StartOfDayUtc(monday.AddDays(7)));
+    }
+
     public async Task<DailyChallenge?> CompleteChallengeAsync(int id, CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
@@ -75,7 +86,7 @@ public sealed class DailyChallengeService : IDailyChallengeService
         if (challenge is null || challenge.Status != ChallengeStatus.Active) return null;
 
         challenge.Status = ChallengeStatus.Completed;
-        challenge.CompletedAtUtc = DateTime.UtcNow;
+        challenge.CompletedAtUtc = _clock.GetUtcNow().UtcDateTime;
         await db.SaveChangesAsync(ct);
 
         await _levelService.AddXpAsync(challenge.XpReward, ct);
@@ -95,15 +106,15 @@ public sealed class DailyChallengeService : IDailyChallengeService
     public async Task GenerateDailyChallengesAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
-        var today = DateTime.UtcNow.Date;
-        var weekStart = StartOfWeek(today);
+        var today = _clock.Today();
+        var (dayStart, dayEnd, weekStart, weekEnd) = CurrentDayAndWeek();
 
         var hasDaily = await db.DailyChallenges
             .AnyAsync(c => c.Frequency == ChallengeFrequency.Daily
-                           && c.AssignedDateUtc >= today && c.AssignedDateUtc < today.AddDays(1), ct);
+                           && c.AssignedDateUtc >= dayStart && c.AssignedDateUtc < dayEnd, ct);
         var hasWeekly = await db.DailyChallenges
             .AnyAsync(c => c.Frequency == ChallengeFrequency.Weekly
-                           && c.AssignedDateUtc >= weekStart && c.AssignedDateUtc < weekStart.AddDays(7), ct);
+                           && c.AssignedDateUtc >= weekStart && c.AssignedDateUtc < weekEnd, ct);
 
         if (hasDaily && hasWeekly) return;
 
@@ -116,13 +127,14 @@ public sealed class DailyChallengeService : IDailyChallengeService
         if (!hasDaily)
         {
             var dailyIndices = Enumerable.Range(0, dailyPool.Length).OrderBy(_ => random.Next()).Take(3);
-            challenges.AddRange(dailyIndices.Select(i => ToChallenge(dailyPool[i], today, today.AddDays(1))));
+            challenges.AddRange(dailyIndices.Select(i => ToChallenge(dailyPool[i], dayStart, dayEnd)));
         }
 
         if (!hasWeekly && weeklyPool.Length > 0)
         {
-            var weeklyRandom = new Random(weekStart.DayOfYear + weekStart.Year);
-            challenges.Add(ToChallenge(weeklyPool[weeklyRandom.Next(weeklyPool.Length)], weekStart, weekStart.AddDays(7)));
+            var monday = StartOfWeek(today);
+            var weeklyRandom = new Random(monday.DayOfYear + monday.Year);
+            challenges.Add(ToChallenge(weeklyPool[weeklyRandom.Next(weeklyPool.Length)], weekStart, weekEnd));
         }
 
         db.DailyChallenges.AddRange(challenges);
@@ -147,7 +159,7 @@ public sealed class DailyChallengeService : IDailyChallengeService
     public async Task ExpireOldChallengesAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
-        var now = DateTime.UtcNow;
+        var now = _clock.GetUtcNow().UtcDateTime;
         var expired = await db.DailyChallenges
             .Where(c => c.Status == ChallengeStatus.Active && c.ExpiresAtUtc < now)
             .ToListAsync(ct);
@@ -162,15 +174,15 @@ public sealed class DailyChallengeService : IDailyChallengeService
     public async Task<int> GetCompletedCountTodayAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
-        var today = DateTime.UtcNow.Date;
+        var (dayStart, _, _, _) = CurrentDayAndWeek();
         return await db.DailyChallenges
-            .CountAsync(c => c.Status == ChallengeStatus.Completed && c.CompletedAtUtc >= today, ct);
+            .CountAsync(c => c.Status == ChallengeStatus.Completed && c.CompletedAtUtc >= dayStart, ct);
     }
 
     public async Task<int> GetCompletedCountThisWeekAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
-        var weekStart = DateTime.UtcNow.Date.AddDays(-(int)DateTime.UtcNow.DayOfWeek);
+        var (_, _, weekStart, _) = CurrentDayAndWeek();
         return await db.DailyChallenges
             .CountAsync(c => c.Status == ChallengeStatus.Completed && c.CompletedAtUtc >= weekStart, ct);
     }

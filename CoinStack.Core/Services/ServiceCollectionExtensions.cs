@@ -8,6 +8,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddFinanceManagerAppServices(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IDailyCatchUpService, DailyCatchUpService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<ITransactionService, TransactionService>();
         services.AddScoped<ICategoryService, CategoryService>();
@@ -39,6 +40,7 @@ public static class ServiceCollectionExtensions
         ]));
         services.AddScoped<IBankStatementImportService, BankStatementImportService>();
         services.AddScoped<IProjectionService, ProjectionService>();
+        services.AddScoped<IForecastService, ForecastService>();
 
         return services;
     }

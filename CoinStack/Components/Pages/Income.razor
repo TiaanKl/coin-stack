@@ -16,12 +16,16 @@
 
 <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:gap-6">
     <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-        <h4 class="text-lg font-semibold text-gray-500 dark:text-gray-400">Received This Month</h4>
+        <h4 class="text-lg font-semibold text-gray-500 dark:text-gray-400">Received This Pay Period</h4>
         <h2 class="mt-4 text-3xl font-bold text-success-600 dark:text-success-500">
-            @FormatC(_monthIncome)
+            @FormatC(_periodIncome)
         </h2>
         <p class="mt-2 text-sm text-gray-500">
-            @(_incomeChange >= 0 ? "+" : "")@_incomeChange.ToString("P0") vs last month
+            @_period.FirstDay.ToString("d MMM") – @_period.LastDay.ToString("d MMM")
+            @if (_hasPreviousIncome)
+            {
+                <text> · @(_incomeChange >= 0 ? "+" : "")@_incomeChange.ToString("P0") vs last period</text>
+            }
         </p>
     </div>
 
@@ -80,9 +84,11 @@
     private AppSettings _settings = new();
     private List<Transaction> _incomeTransactions = new();
     private List<IncomeData> _chartData = new();
-    private decimal _monthIncome;
+    private BudgetPeriod _period;
+    private decimal _periodIncome;
     private decimal _ytdIncome;
     private decimal _incomeChange;
+    private bool _hasPreviousIncome;
 
     protected override async Task OnInitializedAsync()
     {
@@ -99,16 +105,19 @@
             ? allIncome.Where(t => !TransactionConventions.IsSyntheticMonthlyIncome(t)).ToList()
             : allIncome;
 
+        // Same pay period as Reports and the budgets, so the pages agree.
         var now = DateTime.UtcNow;
-        var thisMonth = _incomeTransactions.Where(t => t.OccurredAtUtc.Month == now.Month && t.OccurredAtUtc.Year == now.Year).Sum(t => t.Amount);
-        var lastMonth = _incomeTransactions.Where(t => t.OccurredAtUtc.Month == now.AddMonths(-1).Month && t.OccurredAtUtc.Year == now.AddMonths(-1).Year).Sum(t => t.Amount);
+        _period = BudgetPeriod.Containing(_settings.MonthStartDay, now);
+        var previous = _period.Previous;
+        _periodIncome = _incomeTransactions.Where(t => _period.Contains(t.OccurredAtUtc)).Sum(t => t.Amount);
+        var previousIncome = _incomeTransactions.Where(t => previous.Contains(t.OccurredAtUtc)).Sum(t => t.Amount);
 
-        _monthIncome = thisMonth;
-        _ytdIncome = _incomeTransactions.Where(t => t.OccurredAtUtc.Year == now.Year).Sum(t => t.Amount);
+        _ytdIncome = _incomeTransactions.Where(t => t.OccurredAtUtc.ToLocalTime().Year == DateTime.Now.Year).Sum(t => t.Amount);
 
-        if (lastMonth > 0)
+        _hasPreviousIncome = previousIncome > 0;
+        if (_hasPreviousIncome)
         {
-            _incomeChange = (thisMonth - lastMonth) / lastMonth;
+            _incomeChange = (_periodIncome - previousIncome) / previousIncome;
         }
 
         _chartData = _incomeTransactions

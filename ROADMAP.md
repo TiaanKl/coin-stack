@@ -19,6 +19,26 @@ Decisions made along the way:
 
 Not done in Phase 1: the mobile app keeps its own copies of the services (`MobileFinanceService`). Only its savings maths and money formatting were updated; its goal, waitlist and import screens were not changed.
 
+**Direction (decided 2026-10-29): local-first, for everyone, no data collection.**
+
+- Each install belongs to one person and keeps its data on that device. There are no accounts and no server, so the unused `/auth` sign-in endpoints are removed and no per-user data is needed.
+- The desktop and mobile apps are what ships. The web app is something people run on their own machine, never a hosted site.
+- A new phone of the same kind gets its data back from the phone's own backup (iCloud Backup, Android Auto Backup). An encrypted backup file covers everything else (Part 2, item 11). Live sync comes later, through the person's own cloud storage (item 13).
+- Android goes back into the mobile app's target frameworks.
+
+**Phase 2 is done (2026-10-29):** all of the foundations below except tests, which grew with each step: 37 new tests (294 in total). The database changes are in the `RemoveSignIn` and `DailyCatchUp` migrations.
+
+- **One budget period** (`BudgetPeriod`) replaces the nine copies. Payday can be any day from 1 to 31; in a shorter month it falls on the last day. Income, Reports and the budgets now use the same period. A salary that always arrives on the month's last day is detected as payday 31.
+- **Sign-in removed**, including the unused `AspNet*` tables.
+- **Mobile on CoinStack.Core.** `MobileFinanceService` is now a thin adapter in CoinStack.Mobile.Core over the shared services, so mobile follows the same rules: goal money moves out of savings, waitlist purchases are recorded as expenses, and so on. Android builds again. The unused Blazor Hybrid leftovers (`Components/`, `wwwroot/`) are gone.
+- **Time zones.** Days, weeks, months and pay periods follow the device's calendar (`LocalCalendar` on top of `TimeProvider`). Stored times are shown in local time.
+- **Daily catch-up** (`DailyCatchUpService`) replaces the page-load jobs. It runs auto-deductions (for every pay period since the last run, up to 12), debt interest, waitlist cool-offs, challenges, weekly recaps and bank reconciliation once per local day. The web app runs it at startup, after midnight and when a page opens. Desktop runs it at startup and hourly; mobile at startup and when the app comes back to the front.
+- **One forecast** (`ForecastService`). Home's 30 days are built from the same monthly income and spending that Bank Import projects. Salary lands on payday, subscriptions on their debit day, and the rest follows the weekdays that usually cost more.
+
+Also fixed along the way, from the lists below: payday 29th–31st, Reports and Income disagreeing, Fallback History showing UTC times, and the check-in being re-awarded on every dashboard load with streaks off.
+
+Not done in Phase 2: the mobile screens still lack the web's goal withdraw/abandon, waitlist "Didn't buy" and import screens. Android only builds; it hasn't been run on a device. iOS needs a Mac to build.
+
 ## Part 1: Improve what already exists
 
 ### Calculations that are still wrong (highest priority)
@@ -95,11 +115,12 @@ Not done in Phase 1: the mobile app keeps its own copies of the services (`Mobil
 
 ### Foundations that make everything else easier
 
-- **Time zones (M).** Everything runs in UTC, so entries between 00:00 and 02:00 SAST land on the previous day. Add a user time-zone setting and use `TimeProvider`.
-- **A daily background job (M).** Today, auto-deductions, check-ins and reconciliation run on page load, and prerendering runs them twice. Move them into one hosted service.
+- **Time zones (M).** Everything runs in UTC, so entries between 00:00 and 02:00 SAST land on the previous day. Every app runs on the person's own device, so use the device's time zone through `TimeProvider`; no setting is needed.
+- **A daily catch-up (M).** Today, auto-deductions, check-ins and reconciliation run on page load, and prerendering runs them twice. A phone app can't count on running at midnight, so replace them with one catch-up that runs when the app opens (and once a day while it stays open) and handles every day missed since the last run, once.
 - **One forecast engine (M).** Home and Bank Import each calculate their own forecast, and they will disagree.
-- **One budget-period helper (S).** The same calculation is currently copied into five or more places.
-- **Decide on accounts (S to decide).** Sign-in endpoints exist but no data is scoped per user. Either remove them (single-user) or add per-user data (L).
+- **One budget-period helper (S).** The same calculation is currently copied into nine places.
+- **Accounts: decided.** Local-first with one person per install (see Progress), so the sign-in endpoints are removed.
+- **Mobile on CoinStack.Core (M–L).** The mobile app keeps its own copies of the services (`MobileFinanceService`), so every fix has to be made twice. Mobile already references CoinStack.Data and Core only builds on Data, so mobile can use Core directly. Add Android back to its targets at the same time.
 - **Small fixes (S).** The layout loads every transaction on each refresh, and the reconnect modal can't recover after a server restart.
 - **Tests (M).** Add coverage for the debt calculator, PDF parser, streaks, challenges, recap and achievements.
 
@@ -125,12 +146,12 @@ Not done in Phase 1: the mobile app keeps its own copies of the services (`Mobil
     - 13th cheque and bonus handling.
     - A "last working day" payday.
     - Debts linked to the prime rate.
-11. **Export and restore (S–M).** Reset now makes a backup, but there's no manual export or restore yet.
+11. **Encrypted backup and restore (S–M).** One file, encrypted with a password the person picks, saved through the system's save dialog or share sheet. Those already offer iCloud Drive, Google Drive, OneDrive and local folders, so no cloud-provider code is needed. Covers iPhone to Android, phone to PC, and the desktop app. Reset already makes a local backup.
 12. **Gamification v2 (M).** One reversible reward ledger, auto-checked challenges (a no-spend day verified against your transactions), a streak freeze, and celebrations.
-13. **Sync mode (L).** The shared API and server database already on your README roadmap.
+13. **Sync between devices (L).** No server. Each device writes encrypted change files to a folder in the person's own cloud storage and merges the others' changes. It needs change tracking and conflict rules, so it comes after backup and restore.
 
 ## Suggested order
 
 1. **Phase 1:** the remaining calculation bugs and the half-working features. These are small and make the existing numbers trustworthy.
-2. **Phase 2:** the foundations (time zones, background job, one forecast, one period helper).
-3. **Phase 3:** new features 1–5, in that order.
+2. **Phase 2:** the foundations, in this order: one period helper, remove sign-in, mobile on CoinStack.Core (so the rest is only done once), time zones, the daily catch-up, then one forecast.
+3. **Phase 3:** encrypted backup and restore (item 11), then new features 1–5, in that order.

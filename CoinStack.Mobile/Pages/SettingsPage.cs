@@ -1,6 +1,7 @@
 using CoinStack.Data.Entities;
 using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Services;
+using CoinStack.Services;
 using Microsoft.Maui.Controls.Shapes;
 
 namespace CoinStack.Mobile.Pages;
@@ -18,7 +19,7 @@ public sealed class SettingsPage : ContentPage
     private readonly Switch _reflectionSwitch;
 
     private static readonly List<string> SupportedCurrencies = ["USD", "EUR", "GBP", "CAD", "AUD", "ZAR"];
-    private static readonly List<int> MonthStartDays = Enumerable.Range(1, 28).ToList();
+    private static readonly List<int> MonthStartDays = Enumerable.Range(1, BudgetPeriod.LastPayday).ToList();
     private static readonly List<string> ThemeOptions = ["System", "Light", "Dark"];
 
     private AppSettings _settings = new();
@@ -30,7 +31,7 @@ public sealed class SettingsPage : ContentPage
 
         _currencyPicker = new Picker { Title = "Select currency", ItemsSource = SupportedCurrencies };
         _incomeEntry = new Entry { Placeholder = "Monthly income", Keyboard = Keyboard.Numeric };
-        _monthStartPicker = new Picker { Title = "Select start day", ItemsSource = MonthStartDays };
+        _monthStartPicker = new Picker { Title = "Select payday", ItemsSource = MonthStartDays };
         _themePicker = new Picker { Title = "Select theme", ItemsSource = ThemeOptions };
         _themePicker.SelectedIndex = (int)AppThemeManager.GetSavedTheme();
         _themePicker.SelectedIndexChanged += OnThemeChanged;
@@ -57,7 +58,7 @@ public sealed class SettingsPage : ContentPage
                 _currencyPicker,
                 new Label { Text = "Monthly Income", FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Muted },
                 _incomeEntry,
-                new Label { Text = "Month Start Day", FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Muted },
+                new Label { Text = "Payday", FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Muted },
                 _monthStartPicker
             }
         });

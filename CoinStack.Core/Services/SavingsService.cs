@@ -10,10 +10,12 @@ public sealed class SavingsService : ISavingsService
     internal const string EmergencyWithdrawalSource = "Emergency Withdrawal";
 
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
+    private readonly TimeProvider _clock;
 
-    public SavingsService(IDbContextFactory<CoinStackDbContext> dbFactory)
+    public SavingsService(IDbContextFactory<CoinStackDbContext> dbFactory, TimeProvider? clock = null)
     {
         _dbFactory = dbFactory;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task<SavingsState> GetStateAsync(CancellationToken cancellationToken = default)
@@ -30,7 +32,7 @@ public sealed class SavingsService : ISavingsService
         var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
                        ?? new AppSettings();
 
-        var currentMonth = DateTime.UtcNow.ToString("yyyy-MM");
+        var currentMonth = _clock.Today().ToString("yyyy-MM");
 
         var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
         if (state is not null && state.LastCalculatedMonth == currentMonth)
@@ -345,7 +347,8 @@ public sealed class SavingsService : ISavingsService
     public async Task<decimal> GetFallbackUsedThisMonthAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var startOfMonth = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var today = _clock.Today();
+        var startOfMonth = _clock.StartOfDayUtc(new DateTime(today.Year, today.Month, 1));
         return await db.SavingsFallbackEvents
             .AsNoTracking()
             .Where(x => x.OccurredAtUtc >= startOfMonth && x.AmountUsed > 0)
@@ -373,7 +376,7 @@ public sealed class SavingsService : ISavingsService
         var result = new List<SavingsProjectionPoint>(months);
         // Project from what is in savings now (goal money included); Total still counts withdrawals.
         var openingBalance = state.Available + state.Reserved;
-        var now = DateTime.UtcNow;
+        var now = _clock.Today();
 
         for (var i = 1; i <= months; i++)
         {

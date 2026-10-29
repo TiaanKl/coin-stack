@@ -41,13 +41,13 @@
                         <div class="relative">
                             <select @bind="_monthStartDay"
                                     class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-500">
-                                @for (var i = 1; i <= 28; i++)
+                                @for (var i = 1; i <= BudgetPeriod.LastPayday; i++)
                                 {
                                     <option value="@i">@i</option>
                                 }
                             </select>
                         </div>
-                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Budget period start and the day salary is applied in cash-flow projections.</p>
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Budget period start and the day salary is applied in cash-flow projections. In a shorter month, payday falls on its last day.</p>
                     </div>
 
                     <div class="col-span-1 sm:col-span-2">
@@ -387,7 +387,7 @@
                                                                         <div>
                                                                             <p class="text-sm font-medium text-gray-800 dark:text-white/90">Reset Data</p>
                                                                             <p class="text-xs text-gray-500 dark:text-gray-400">Clears all CoinStack data and settings.
-                                                                                A backup copy of the database is saved first; your sign-in account is kept.</p>
+                                                                                A backup copy of the database is saved first.</p>
                                                                             </div>
                                                                             @if (_confirmResetData)
                                                                             {

@@ -26,7 +26,7 @@ public sealed class WaitlistServiceTests
 
         var now = DateTime.UtcNow;
         var monthStartDay = now.Day >= 28 ? 28 : now.Day + 1;
-        var (periodStartUtc, _) = GetBudgetPeriodBoundsUtc(monthStartDay, now);
+        var (_, periodStartUtc, _) = BudgetPeriod.Containing(monthStartDay, now);
 
         await using (var seedDb = new CoinStackDbContext(options))
         {
@@ -79,19 +79,6 @@ public sealed class WaitlistServiceTests
 
         // The over-budget bucket scores 0 of 15 for budget; counted outside the period it would score 15 (60).
         Assert.Equal(45, score);
-    }
-
-    private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
-    {
-        if (monthStartDay is < 1 or > 28)
-        {
-            monthStartDay = 1;
-        }
-
-        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
-        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
-        var endUtc = startUtc.AddMonths(1);
-        return (startUtc, endUtc);
     }
 
     [Fact]

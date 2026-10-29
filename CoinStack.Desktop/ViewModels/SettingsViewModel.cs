@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using CoinStack.Data.Entities;
 using CoinStack.Services;
@@ -29,7 +30,7 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
         ["USD", "EUR", "GBP", "CAD", "AUD", "ZAR"];
 
     public ObservableCollection<int> StartDays { get; } =
-        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28];
+        [.. Enumerable.Range(1, BudgetPeriod.LastPayday)];
 
     public SettingsViewModel(ISettingsService settings)
     {
@@ -44,7 +45,7 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
         {
             var settings = await _settings.GetAsync();
             Currency = settings.Currency;
-            MonthStartDay = settings.MonthStartDay is >= 1 and <= 28 ? settings.MonthStartDay : 1;
+            MonthStartDay = BudgetPeriod.NormalizePayday(settings.MonthStartDay);
             MonthlyIncome = settings.MonthlyIncome;
             CurrentBankBalance = settings.CurrentBankBalance;
             ShowReserveAwareBudget = settings.ShowReserveAwareBudget;

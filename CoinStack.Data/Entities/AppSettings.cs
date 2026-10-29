@@ -37,4 +37,10 @@ public sealed class AppSettings : EntityBase
     public bool ShowReserveAwareBudget { get; set; } = false;
 
     public bool EnableEmergencyFallback { get; set; } = true;
+
+    /// <summary>
+    /// When the daily catch-up last ran. The next run fills in every pay period since then, so a period
+    /// the app was never opened in still gets its auto-deductions. Not a user setting.
+    /// </summary>
+    public DateTime? LastCatchUpUtc { get; set; }
 }

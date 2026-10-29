@@ -234,7 +234,7 @@ public sealed class DashboardPage : ContentPage
                         Children =
                         {
                             new Label { Text = tx.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                            new Label { Text = tx.OccurredAtUtc.ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
+                            new Label { Text = tx.OccurredAtUtc.ToLocalTime().ToString("dd MMM"), FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                         }
                     };
 
@@ -286,7 +286,7 @@ public sealed class DashboardPage : ContentPage
                         Children =
                         {
                             new Label { Text = evt.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                            new Label { Text = $"{evt.Reason} \u00b7 {evt.CreatedAtUtc:dd MMM, HH:mm}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
+                            new Label { Text = $"{evt.Reason} \u00b7 {evt.CreatedAtUtc.ToLocalTime():dd MMM, HH:mm}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                         }
                     };
 

@@ -8,10 +8,12 @@ namespace CoinStack.Services;
 public sealed class BucketService : IBucketService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
+    private readonly TimeProvider _clock;
 
-    public BucketService(IDbContextFactory<CoinStackDbContext> dbFactory)
+    public BucketService(IDbContextFactory<CoinStackDbContext> dbFactory, TimeProvider? clock = null)
     {
         _dbFactory = dbFactory;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task<List<Bucket>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -98,11 +100,7 @@ public sealed class BucketService : IBucketService
 
     public async Task<Dictionary<int, decimal>> GetSpentAmountsForPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default)
     {
-        if (monthStartDay is < 1 or > 28) monthStartDay = 1;
-
-        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
-        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
-        var endUtc = startUtc.AddMonths(1);
+        var (_, startUtc, endUtc) = BudgetPeriod.Containing(monthStartDay, utcNow, _clock.LocalTimeZone);
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 

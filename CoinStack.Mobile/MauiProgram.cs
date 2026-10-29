@@ -2,6 +2,7 @@
 using CoinStack.Mobile.Core;
 using CoinStack.Mobile.Pages;
 using CoinStack.Mobile.Services;
+using CoinStack.Services;
 using Microsoft.Extensions.Logging;
 
 namespace CoinStack.Mobile;
@@ -33,6 +34,7 @@ public static class MauiProgram
 
 		var dbPath = Path.Combine(FileSystem.AppDataDirectory, "coinstack.mobile.db");
 		builder.Services.AddFinanceManagerData($"Data Source={dbPath}");
+		builder.Services.AddFinanceManagerAppServices();
 		builder.Services.AddSingleton<IMobileDatabaseInitializationService, MobileDatabaseInitializationService>();
 		builder.Services.AddSingleton<IMobileFinanceService, MobileFinanceService>();
 

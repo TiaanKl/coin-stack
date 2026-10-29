@@ -12,17 +12,20 @@ public sealed class WaitlistService : IWaitlistService
     private readonly ISettingsService _settingsService;
     private readonly IScoringService _scoringService;
     private readonly ITransactionService _transactionService;
+    private readonly TimeProvider _clock;
 
     public WaitlistService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
         ISettingsService settingsService,
         IScoringService scoringService,
-        ITransactionService transactionService)
+        ITransactionService transactionService,
+        TimeProvider? clock = null)
     {
         _dbFactory = dbFactory;
         _settingsService = settingsService;
         _scoringService = scoringService;
         _transactionService = transactionService;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task<List<WaitlistItem>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -206,7 +209,7 @@ public sealed class WaitlistService : IWaitlistService
 
         var now = DateTime.UtcNow;
         var settings = await _settingsService.GetAsync(cancellationToken);
-        var (periodStartUtc, periodEndUtc) = GetBudgetPeriodBoundsUtc(settings.MonthStartDay, now);
+        var (_, periodStartUtc, periodEndUtc) = BudgetPeriod.Containing(settings.MonthStartDay, now, _clock.LocalTimeZone);
 
         var buckets = await db.Buckets
             .AsNoTracking()
@@ -404,19 +407,6 @@ public sealed class WaitlistService : IWaitlistService
         CoolOffPeriod.Days30 => TimeSpan.FromDays(30),
         _ => TimeSpan.FromDays(7)
     };
-
-    private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
-    {
-        if (monthStartDay is < 1 or > 28)
-        {
-            monthStartDay = 1;
-        }
-
-        var startThisMonth = new DateTime(utcNow.Year, utcNow.Month, monthStartDay, 0, 0, 0, DateTimeKind.Utc);
-        var startUtc = utcNow.Day >= monthStartDay ? startThisMonth : startThisMonth.AddMonths(-1);
-        var endUtc = startUtc.AddMonths(1);
-        return (startUtc, endUtc);
-    }
 
     public static string CoolOffLabel(CoolOffPeriod period) => period switch
     {

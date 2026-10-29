@@ -1,4 +1,5 @@
 using CoinStack.Data.Entities;
+using CoinStack.Services;
 
 namespace CoinStack.Mobile.Services;
 
@@ -15,7 +16,7 @@ public interface IMobileFinanceService
 
     Task<IReadOnlyList<Goal>> GetGoalsAsync(CancellationToken cancellationToken = default);
     Task AddGoalAsync(string name, decimal targetAmount, decimal currentAmount = 0, DateTime? targetDateUtc = null, CancellationToken cancellationToken = default);
-    Task AddGoalContributionAsync(int goalId, decimal amount, CancellationToken cancellationToken = default);
+    Task<GoalMoneyResult> AddGoalContributionAsync(int goalId, decimal amount, CancellationToken cancellationToken = default);
     Task DeleteGoalAsync(int goalId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Subscription>> GetSubscriptionsAsync(CancellationToken cancellationToken = default);
@@ -130,7 +131,8 @@ public sealed record MobileDailyNetRow(DateTime Date, decimal Income, decimal Ex
 }
 
 public sealed record MobileIncomeSnapshot(
-    decimal MonthToDate,
+    BudgetPeriod Period,
+    decimal PeriodToDate,
     decimal YearToDate,
     decimal MonthlyAverage,
     IReadOnlyList<Transaction> RecentDeposits);

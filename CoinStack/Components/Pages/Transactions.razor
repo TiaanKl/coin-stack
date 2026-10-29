@@ -3,6 +3,7 @@
 @using CoinStack.Data.Entities
 @using CoinStack.Services
 @inject ITransactionService TransactionService
+@inject IDailyCatchUpService CatchUp
 @inject IBucketService BucketService
 @inject ICategoryService CategoryService
 @inject IDebtService DebtService
@@ -92,7 +93,7 @@
                                     {
                                         <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]">
                                             <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
-                                                @tx.OccurredAtUtc.ToString("MMM dd")</td>
+                                                @tx.OccurredAtUtc.ToLocalTime().ToString("MMM dd")</td>
                                                 <td class="px-4 py-4">
                                                     <div>
                                                         <p class="text-sm font-medium text-gray-800 dark:text-white/90">@tx.Description</p>
@@ -513,7 +514,7 @@
     {
         var now = DateTime.UtcNow;
         _settings = await SettingsService.GetAsync();
-        await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(_settings.MonthStartDay, now);
+        await CatchUp.RunIfDueAsync();
 
         var items = await TransactionService.GetAllAsync();
         _buckets = await BucketService.GetAllAsync();

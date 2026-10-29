@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @using CoinStack.Data.Entities
 @inject IBucketService BucketService
+@inject IDailyCatchUpService CatchUp
 @inject ICategoryService CategoryService
 @inject ITransactionService TransactionService
 @inject ISettingsService SettingsService
@@ -307,7 +308,7 @@
         var now = DateTime.UtcNow;
 
         var settings = await SettingsService.GetAsync();
-        await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(settings.MonthStartDay, now);
+        await CatchUp.RunIfDueAsync();
         _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(settings.MonthStartDay, now);
 
         var categories = await CategoryService.GetAllAsync();

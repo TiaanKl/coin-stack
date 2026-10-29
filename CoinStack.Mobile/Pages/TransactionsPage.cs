@@ -129,7 +129,7 @@ public sealed class TransactionsPage : ContentPage
                     Children =
                     {
                         new Label { Text = tx.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                        new Label { Text = $"{tx.OccurredAtUtc:dd MMM yyyy} · {tx.Type}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
+                        new Label { Text = $"{tx.OccurredAtUtc.ToLocalTime():dd MMM yyyy} · {tx.Type}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                     }
                 };
 

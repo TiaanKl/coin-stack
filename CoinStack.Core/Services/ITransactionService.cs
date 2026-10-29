@@ -34,6 +34,7 @@ public interface ITransactionService
         DateTime startUtc,
         DateTime endUtc,
         CancellationToken cancellationToken = default);
+    /// <summary>Income and spending per day on the device's calendar, newest first.</summary>
     Task<List<DailyNetSummary>> GetDailyNetForRangeAsync(
         DateTime startUtc,
         DateTime endUtc,
