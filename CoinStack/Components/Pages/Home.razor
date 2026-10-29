@@ -214,7 +214,7 @@
                     else
                     {
                         <div class="space-y-3">
-                            @foreach (var tx in _transactions.OrderByDescending(x => x.OccurredAtUtc))
+                            @foreach (var tx in _recentTransactions)
                             {
                                 <div
                                     class="flex items-center justify-between rounded-lg border border-gray-100 p-3 dark:border-gray-800">
@@ -227,6 +227,15 @@
                                         @(tx.Type == TransactionType.Income ? "+" : "-")@FormatC(tx.Amount)
                                     </p>
                                 </div>
+                            }
+
+                            @if (_transactions.Count > _recentTransactions.Count)
+                            {
+                                <a href="/transactions"
+                                   class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-200 p-3 text-sm font-medium text-brand-500 hover:border-brand-300 hover:bg-brand-50 dark:border-gray-700 dark:text-brand-400 dark:hover:border-brand-500/40 dark:hover:bg-brand-500/10">
+                                    More...
+                                    <i class="fa-solid fa-arrow-right text-xs"></i>
+                                </a>
                             }
                         </div>
                     }
@@ -289,6 +298,8 @@
 
     private decimal ReserveAwareBudgetRemaining => MonthlyBudgetRemaining - ReservesOnHand;
 
+    private const int RecentTransactionCount = 5;
+
     private readonly List<Transaction> _transactions = [];
     private readonly List<Transaction> _recentTransactions = [];
     private readonly List<DailyData> _spendingData = [];
@@ -328,6 +339,10 @@
 
         _transactions.Clear();
         _transactions.AddRange(transactions);
+
+        // A short list; "More..." opens the full one on the Transactions page.
+        _recentTransactions.Clear();
+        _recentTransactions.AddRange(_transactions.OrderByDescending(x => x.OccurredAtUtc).Take(RecentTransactionCount));
 
         PrepareChartData();
         await LoadForecastAsync();

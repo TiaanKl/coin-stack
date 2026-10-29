@@ -69,8 +69,11 @@ body {
   font-family: var(--font-outfit, Outfit, ui-sans-serif, system-ui, sans-serif);
 }
 
-a {
-  color: inherit;
+/* In Tailwind's base layer, so a link's own colour class (text-brand-500, text-white) still wins. */
+@layer base {
+  a {
+    color: inherit;
+  }
 }
 
 /* Toast slide-down animation for Settings save confirmation */
