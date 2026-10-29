@@ -62,7 +62,9 @@ public sealed class SavingsService : ISavingsService
             ? income * (settings.MonthlySavingsPercent / 100m)
             : settings.MonthlySavingsAmount;
 
-        decimal currentTotal = state?.Total ?? 0m;
+        // Interest is earned on the money still in savings, including what is set aside for goals
+        // (Reserved). Total is everything ever paid in and never goes down, so it would overstate it.
+        decimal currentBalance = (state?.Available ?? 0m) + (state?.Reserved ?? 0m);
 
         decimal interest = 0m;
         if (settings.SavingsInterestRate.HasValue && settings.SavingsInterestRate.Value > 0)
@@ -71,18 +73,17 @@ public sealed class SavingsService : ISavingsService
             // on the balance including this month's deposit.
             var annualRate = GetAnnualRateFraction(settings, includeInterest: true);
             var monthlyRate = annualRate / 12m;
-            interest = FinancialEngine.RoundCurrency((currentTotal + baseSavings) * monthlyRate);
+            interest = FinancialEngine.RoundCurrency((currentBalance + baseSavings) * monthlyRate);
         }
 
         var totalAdded = baseSavings + interest;
-        var newRunningTotal = currentTotal + totalAdded;
 
         if (state is null)
         {
             state = new SavingsState
             {
-                Total = newRunningTotal,
-                Available = newRunningTotal,
+                Total = totalAdded,
+                Available = totalAdded,
                 Reserved = 0,
                 LastCalculatedMonth = currentMonth
             };
@@ -101,7 +102,8 @@ public sealed class SavingsService : ISavingsService
             Base = baseSavings,
             Interest = interest,
             Total = totalAdded,
-            RunningTotal = newRunningTotal
+            // The balance after this month: what is actually in savings, goal money included.
+            RunningTotal = state.Available + state.Reserved
         };
         db.SavingsMonthlySummaries.Add(summary);
 
@@ -369,7 +371,8 @@ public sealed class SavingsService : ISavingsService
         var annualRate = GetAnnualRateFraction(settings, includeInterest);
 
         var result = new List<SavingsProjectionPoint>(months);
-        var openingBalance = state.Total;
+        // Project from what is in savings now (goal money included); Total still counts withdrawals.
+        var openingBalance = state.Available + state.Reserved;
         var now = DateTime.UtcNow;
 
         for (var i = 1; i <= months; i++)

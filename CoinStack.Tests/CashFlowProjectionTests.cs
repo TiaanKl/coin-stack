@@ -313,4 +313,159 @@ public sealed class CashFlowProjectionTests
             Assert.Equal(17000m, projection.ProjectedMonthlyNet);
         }
     }
+
+    [Fact]
+    public async Task Rent_Paid_Early_In_The_Only_Month_Is_Not_Scaled_Up_Like_Daily_Spending()
+    {
+        var (connection, service, options) = await CreateServiceAsync();
+        using (connection)
+        {
+            var today = DateTime.UtcNow.Date;
+            var monthStart = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            await using (var db = new CoinStackDbContext(options))
+            {
+                db.AppSettings.Add(new AppSettings { MonthlyIncome = 30000m, Currency = "ZAR" });
+                db.Transactions.Add(Expense(monthStart.AddHours(9), 8000m, "Rent"));
+                db.Transactions.Add(Expense(monthStart.AddHours(10), 300m, "Coffee and lunch"));
+                await db.SaveChangesAsync();
+            }
+
+            var projection = await service.BuildProjectionAsync();
+
+            var daysInMonth = DateTime.DaysInMonth(today.Year, today.Month);
+            var expected = Math.Round(8000m + (300m * daysInMonth / today.Day), 2, MidpointRounding.AwayFromZero);
+            Assert.Equal(expected, projection.ProjectedMonthlyExpenses);
+        }
+    }
+
+    [Fact]
+    public async Task Months_A_Statement_Only_Partly_Covers_Do_Not_Pull_The_Expense_Estimate_Down()
+    {
+        var (connection, service, options) = await CreateServiceAsync();
+        using (connection)
+        {
+            await using (var db = new CoinStackDbContext(options))
+            {
+                var import = new StatementImport
+                {
+                    FileName = "statement.pdf",
+                    BankFormat = "FNB",
+                    PeriodStartUtc = Utc(2026, 3, 18),
+                    PeriodEndUtc = Utc(2026, 6, 18),
+                    Status = StatementImportStatus.Imported
+                };
+                db.StatementImports.Add(import);
+                await db.SaveChangesAsync();
+
+                db.Transactions.AddRange(
+                    Expense(Utc(2026, 3, 20), 3000m, "Groceries", import.Id),
+                    Expense(Utc(2026, 4, 10), 10000m, "Groceries", import.Id),
+                    Expense(Utc(2026, 5, 10), 12000m, "Groceries", import.Id),
+                    Expense(Utc(2026, 6, 10), 5000m, "Groceries", import.Id));
+                await db.SaveChangesAsync();
+            }
+
+            var projection = await service.BuildProjectionAsync();
+
+            // Only April and May are fully covered; March starts on the 18th and June stops on the 18th.
+            Assert.Equal(11000m, projection.ProjectedMonthlyExpenses);
+        }
+    }
+
+    [Fact]
+    public async Task Occasional_Extra_Income_Is_Not_Added_To_Every_Month()
+    {
+        var (connection, service, options) = await CreateServiceAsync();
+        using (connection)
+        {
+            await using (var db = new CoinStackDbContext(options))
+            {
+                for (var month = 1; month <= 6; month++)
+                {
+                    db.Transactions.Add(Income(Utc(2025, month, 25), 30000m, "Multicat Salary"));
+                    db.Transactions.Add(Expense(Utc(2025, month, 5), 10000m, "Living expenses"));
+                }
+
+                db.Transactions.Add(Income(Utc(2025, 2, 14), 5000m, "Logo design job"));
+                db.Transactions.Add(Income(Utc(2025, 5, 14), 5000m, "Logo design job"));
+                await db.SaveChangesAsync();
+            }
+
+            var projection = await service.BuildProjectionAsync();
+
+            Assert.Equal(30000m, projection.ProjectedMonthlyIncome);
+        }
+    }
+
+    [Fact]
+    public async Task Regular_Extra_Income_Is_Still_Counted()
+    {
+        var (connection, service, options) = await CreateServiceAsync();
+        using (connection)
+        {
+            await using (var db = new CoinStackDbContext(options))
+            {
+                for (var month = 1; month <= 4; month++)
+                {
+                    db.Transactions.Add(Income(Utc(2025, month, 25), 30000m, "Multicat Salary"));
+                    db.Transactions.Add(Income(Utc(2025, month, 14), 2000m, "Tutoring"));
+                }
+
+                await db.SaveChangesAsync();
+            }
+
+            var projection = await service.BuildProjectionAsync();
+
+            Assert.Equal(32000m, projection.ProjectedMonthlyIncome);
+        }
+    }
+
+    [Fact]
+    public async Task Refunds_Reduce_Spending_Instead_Of_Counting_As_Income()
+    {
+        var (connection, service, options) = await CreateServiceAsync();
+        using (connection)
+        {
+            await using (var db = new CoinStackDbContext(options))
+            {
+                db.Transactions.AddRange(
+                    Income(Utc(2025, 1, 25), 30000m, "Multicat Salary"),
+                    Expense(Utc(2025, 1, 5), 10000m, "Living expenses"),
+                    Income(Utc(2025, 1, 20), 2000m, "Refund Takealot order"),
+                    Income(Utc(2025, 2, 25), 30000m, "Multicat Salary"),
+                    Expense(Utc(2025, 2, 5), 10000m, "Living expenses"));
+                await db.SaveChangesAsync();
+            }
+
+            var projection = await service.BuildProjectionAsync();
+
+            Assert.Equal(30000m, projection.ProjectedMonthlyIncome);
+            Assert.Equal(9000m, projection.ProjectedMonthlyExpenses);
+            Assert.DoesNotContain(projection.RecurringIncome, r => r.Description.Contains("Refund"));
+
+            var january = projection.History.Single(h => h.Month.Month == 1);
+            Assert.Equal(30000m, january.Income);
+            Assert.Equal(8000m, january.Expenses);
+        }
+    }
+
+    private static DateTime Utc(int year, int month, int day) => new(year, month, day, 0, 0, 0, DateTimeKind.Utc);
+
+    private static Transaction Expense(DateTime date, decimal amount, string description, int? importId = null) => new()
+    {
+        OccurredAtUtc = date,
+        Amount = amount,
+        Type = TransactionType.Expense,
+        Description = description,
+        StatementImportId = importId
+    };
+
+    private static Transaction Income(DateTime date, decimal amount, string description) => new()
+    {
+        OccurredAtUtc = date,
+        Amount = amount,
+        Type = TransactionType.Income,
+        Description = description
+    };
 }

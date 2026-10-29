@@ -16,7 +16,7 @@ public partial class TransactionsViewModel : ViewModelBase, IAsyncInitializable
     private readonly ISettingsService _settings;
     private readonly IMoneyFormatter _money;
 
-    private string _currency = "USD";
+    private string _currency = AppSettings.DefaultCurrency;
 
     [ObservableProperty] private string _newDescription = "";
     [ObservableProperty] private decimal _newAmount;

@@ -5,6 +5,7 @@
 @inject ICategoryService CategoryService
 @inject ITransactionService TransactionService
 @inject ISettingsService SettingsService
+@inject IGoalService GoalService
 
 <PageTitle>Buckets</PageTitle>
 
@@ -229,6 +230,31 @@
                                                 }
                                             </div>
 
+                                            <div class="rounded-lg border border-gray-200 p-3 dark:border-gray-700">
+                                                <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                    <input type="checkbox" @bind="_formIsSavings" />
+                                                    This is a savings bucket
+                                                </label>
+                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    Money logged as income into a savings bucket counts as saved, not spent.
+                                                </p>
+                                                @if (_formIsSavings)
+                                                {
+                                                    <label class="mb-1.5 mt-3 block text-sm font-medium text-gray-700 dark:text-gray-400">Funds goal (optional)</label>
+                                                    <select @bind="_formGoalId"
+                                                            class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                                                        <option value="">No goal</option>
+                                                        @foreach (var goal in _goals)
+                                                        {
+                                                            <option value="@goal.Id">@goal.Name</option>
+                                                        }
+                                                    </select>
+                                                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                        Income logged into this bucket is added to the goal.
+                                                    </p>
+                                                }
+                                            </div>
+
                                             @if (!string.IsNullOrWhiteSpace(_formError))
                                             {
                                                 <div
@@ -270,6 +296,9 @@
     private string _formName = "";
     private decimal _formAllocated;
     private int? _formCategoryId;
+    private bool _formIsSavings;
+    private int? _formGoalId;
+    private readonly List<Goal> _goals = new();
     private bool _isSaving;
     private string _formError = "";
 
@@ -288,6 +317,8 @@
             .OrderBy(c => c.Name));
 
         await ReloadBucketsAsync();
+        _goals.Clear();
+        _goals.AddRange((await GoalService.GetAllAsync()).Where(g => g.Status != GoalStatus.Abandoned));
         _budgetLimit = settings.BankBalanceAsOfUtc is not null
             ? Math.Max(0m, settings.CurrentBankBalance)
             : Math.Max(_totalAllocated, _budgetSpent);
@@ -300,6 +331,8 @@
         _formName = "";
         _formAllocated = 0;
         _formCategoryId = _expenseCategories.FirstOrDefault()?.Id;
+        _formIsSavings = false;
+        _formGoalId = null;
         _formError = "";
         _showModal = true;
     }
@@ -310,6 +343,8 @@
         _formName = bucket.Name;
         _formAllocated = bucket.AllocatedAmount;
         _formCategoryId = bucket.CategoryId;
+        _formIsSavings = bucket.IsSavings;
+        _formGoalId = bucket.GoalId;
         _formError = "";
         _showModal = true;
     }
@@ -348,6 +383,8 @@
                     existing.Name = _formName.Trim();
                     existing.AllocatedAmount = _formAllocated;
                     existing.CategoryId = _formCategoryId;
+                    existing.IsSavings = _formIsSavings;
+                    existing.GoalId = _formIsSavings ? _formGoalId : null;
                     await BucketService.UpdateAsync(existing);
                 }
             }
@@ -358,6 +395,8 @@
                     Name = _formName.Trim(),
                     AllocatedAmount = _formAllocated,
                     CategoryId = _formCategoryId,
+                    IsSavings = _formIsSavings,
+                    GoalId = _formIsSavings ? _formGoalId : null,
                     SortOrder = _buckets.Count,
                 };
 

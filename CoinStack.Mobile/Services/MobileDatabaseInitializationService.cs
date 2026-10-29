@@ -40,7 +40,7 @@ public sealed class MobileDatabaseInitializationService : IMobileDatabaseInitial
         {
             db.AppSettings.Add(new AppSettings
             {
-                Currency = "USD",
+                Currency = AppSettings.DefaultCurrency,
                 MonthStartDay = 1,
                 MonthlyIncome = 0m,
                 EnableReflections = true,

@@ -45,7 +45,62 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
     {
         var (week, year) = GetPreviousWeekAndYear();
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
+        return await GenerateRecapAsync(db, year, week, ct);
+    }
 
+    public async Task<int> GenerateMissingRecapsAsync(int maxWeeks = 12, CancellationToken ct = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(ct);
+
+        var firstActivity = await db.Transactions.AsNoTracking()
+            .OrderBy(t => t.OccurredAtUtc)
+            .Select(t => (DateTime?)t.OccurredAtUtc)
+            .FirstOrDefaultAsync(ct);
+        var firstScore = await db.ScoreEvents.AsNoTracking()
+            .OrderBy(s => s.CreatedAtUtc)
+            .Select(s => (DateTime?)s.CreatedAtUtc)
+            .FirstOrDefaultAsync(ct);
+
+        var earliest = new[] { firstActivity, firstScore }.Where(d => d.HasValue).Min();
+        if (earliest is null)
+        {
+            return 0;
+        }
+
+        var (lastWeek, lastYear) = GetPreviousWeekAndYear();
+        var lastWeekStart = FirstDateOfWeek(lastYear, lastWeek);
+        var oldestAllowed = lastWeekStart.AddDays(-7 * (Math.Max(1, maxWeeks) - 1));
+        var start = FirstDateOfWeek(ISOWeek.GetYear(earliest.Value), ISOWeek.GetWeekOfYear(earliest.Value));
+        if (start < oldestAllowed)
+        {
+            start = oldestAllowed;
+        }
+
+        var existing = (await db.WeeklyRecaps.AsNoTracking()
+                .Select(r => new { r.Year, r.WeekNumber })
+                .ToListAsync(ct))
+            .Select(r => (r.Year, r.WeekNumber))
+            .ToHashSet();
+
+        var created = 0;
+        for (var weekStart = start; weekStart <= lastWeekStart; weekStart = weekStart.AddDays(7))
+        {
+            var year = ISOWeek.GetYear(weekStart);
+            var week = ISOWeek.GetWeekOfYear(weekStart);
+            if (existing.Contains((year, week)))
+            {
+                continue;
+            }
+
+            await GenerateRecapAsync(db, year, week, ct);
+            created++;
+        }
+
+        return created;
+    }
+
+    private static async Task<WeeklyRecap> GenerateRecapAsync(CoinStackDbContext db, int year, int week, CancellationToken ct)
+    {
         var existing = await db.WeeklyRecaps
             .FirstOrDefaultAsync(r => r.WeekNumber == week && r.Year == year, ct);
 
@@ -54,8 +109,10 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
         var weekStart = FirstDateOfWeek(year, week);
         var weekEnd = weekStart.AddDays(7);
 
+        // Category is needed for the top-category figure; without it every week showed "None".
         var transactions = await db.Transactions
             .AsNoTracking()
+            .Include(t => t.Category)
             .Where(t => t.OccurredAtUtc >= weekStart && t.OccurredAtUtc < weekEnd)
             .ToListAsync(ct);
 
@@ -77,11 +134,14 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
         var reflections = await db.Reflections
             .CountAsync(r => r.CreatedAtUtc >= weekStart && r.CreatedAtUtc < weekEnd, ct);
 
-        var streak = await db.Streaks
+        // Days checked in during this week. The streak rows only hold today's count (of whichever
+        // streak type changed last), which says nothing about a past week.
+        var checkInTimes = await db.ScoreEvents
             .AsNoTracking()
-            .OrderByDescending(s => s.UpdatedAtUtc)
-            .Select(s => s.CurrentCount)
-            .FirstOrDefaultAsync(ct);
+            .Where(s => s.Reason == ScoreChangeReason.DailyCheckIn && s.CreatedAtUtc >= weekStart && s.CreatedAtUtc < weekEnd)
+            .Select(s => s.CreatedAtUtc)
+            .ToListAsync(ct);
+        var streak = checkInTimes.Select(t => t.Date).Distinct().Count();
 
         var points = await db.ScoreEvents
             .Where(s => s.CreatedAtUtc >= weekStart && s.CreatedAtUtc < weekEnd)
@@ -139,7 +199,7 @@ public sealed class WeeklyRecapService : IWeeklyRecapService
             parts.Add($"You completed {challenges} challenge{(challenges > 1 ? "s" : "")}. Try for more next week!");
 
         if (streak >= 7)
-            parts.Add($"Your {streak}-day streak is on fire!");
+            parts.Add("You checked in every day this week. Keep it going!");
 
         return string.Join(" ", parts);
     }

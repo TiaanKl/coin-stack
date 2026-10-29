@@ -1,5 +1,6 @@
 using CoinStack.Data;
 using CoinStack.Data.Entities;
+using CoinStack.Services.Import;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Services;
@@ -68,6 +69,14 @@ public sealed class SubscriptionService : ISubscriptionService
         {
             return;
         }
+
+        var linkedDescriptions = await db.Transactions
+            .Where(t => t.SubscriptionId == id)
+            .Select(t => t.Description)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        await RecurringDismissals.RecordAsync(db, existing.Name, linkedDescriptions, subscription: true, bucket: false, cancellationToken);
 
         db.Subscriptions.Remove(existing);
         await db.SaveChangesAsync(cancellationToken);

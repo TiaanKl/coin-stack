@@ -9,5 +9,6 @@ public interface IAchievementService
     Task<Achievement?> TryUnlockAsync(string key, CancellationToken ct = default);
     Task SeedAchievementsAsync(CancellationToken ct = default);
     Task<int> GetUnlockedCountAsync(CancellationToken ct = default);
-    Task EvaluateAsync(CancellationToken ct = default);
+    /// <summary>Unlocks achievements whose conditions are now met, awards their XP, and returns the new ones.</summary>
+    Task<List<Achievement>> EvaluateAsync(CancellationToken ct = default);
 }

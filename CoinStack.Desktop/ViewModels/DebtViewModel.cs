@@ -16,7 +16,7 @@ public partial class DebtViewModel : ViewModelBase, IAsyncInitializable
     private readonly ISettingsService _settings;
     private readonly IMoneyFormatter _money;
 
-    private string _currency = "USD";
+    private string _currency = AppSettings.DefaultCurrency;
 
     [ObservableProperty] private string _totalOwedText = "";
     [ObservableProperty] private string _monthlyPaymentTotalText = "";
@@ -117,7 +117,7 @@ public partial class DebtViewModel : ViewModelBase, IAsyncInitializable
         var result = _calculator.Calculate(new DebtCalculationInput
         {
             Principal = CalcPrincipal,
-            InterestRate = CalcInterestRate,
+            AnnualRatePercent = CalcInterestRate,
             TermMonths = CalcTermMonths,
             InterestType = DebtInterestType.Amortizing,
             CompoundingFrequency = DebtCompoundingFrequency.Monthly,
@@ -153,7 +153,7 @@ public partial class DebtViewModel : ViewModelBase, IAsyncInitializable
         var result = _calculator.Calculate(new DebtCalculationInput
         {
             Principal = CalcPrincipal,
-            InterestRate = CalcInterestRate,
+            AnnualRatePercent = CalcInterestRate,
             TermMonths = CalcTermMonths,
             InterestType = DebtInterestType.Amortizing,
             CompoundingFrequency = DebtCompoundingFrequency.Monthly,

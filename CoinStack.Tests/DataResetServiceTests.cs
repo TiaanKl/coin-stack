@@ -31,7 +31,7 @@ public sealed class DataResetServiceTests
         var factory = new TestDbContextFactory(options);
         var reset = new DataResetService(
             factory,
-            new AchievementService(factory, new FakeScoringService()),
+            new AchievementService(factory, new FakeLevelService()),
             new LevelService(factory));
 
         var raised = false;

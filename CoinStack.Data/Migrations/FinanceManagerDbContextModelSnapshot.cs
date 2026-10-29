@@ -215,6 +215,9 @@ namespace FinanceManager.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("CreatedByStatementImportId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("GoalId")
                         .HasColumnType("INTEGER");
 
@@ -480,6 +483,37 @@ namespace FinanceManager.Data.Migrations
                     b.HasIndex("PaymentStartDateUtc");
 
                     b.ToTable("DebtAccounts", (string)null);
+                });
+
+            modelBuilder.Entity("CoinStack.Data.Entities.DismissedRecurringMerchant", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("BucketDismissed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("SubscriptionDismissed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NormalizedKey")
+                        .IsUnique();
+
+                    b.ToTable("DismissedRecurringMerchants", (string)null);
                 });
 
             modelBuilder.Entity("CoinStack.Data.Entities.Goal", b =>
@@ -860,6 +894,9 @@ namespace FinanceManager.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("CreatedByStatementImportId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("CustomHexColor")
                         .HasMaxLength(16)
                         .HasColumnType("TEXT");
@@ -1068,6 +1105,9 @@ namespace FinanceManager.Data.Migrations
 
                     b.Property<string>("ReflectionNote")
                         .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ResistedAtUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Score")

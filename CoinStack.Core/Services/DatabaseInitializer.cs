@@ -19,6 +19,7 @@ public static class DatabaseInitializer
         new() { Name = "Shopping", ColorHex = "#EC4899", Scope = CategoryScope.Expense },
         new() { Name = "Salary", ColorHex = "#10B981", Scope = CategoryScope.Income },
         new() { Name = "Freelance", ColorHex = "#14B8A6", Scope = CategoryScope.Income },
+        new() { Name = TransactionConventions.RefundsCategoryName, ColorHex = "#84CC16", Scope = CategoryScope.Income },
         new() { Name = "Debt", ColorHex = "#78716C", Scope = CategoryScope.Expense },
         new() { Name = "Savings", ColorHex = "#3B82F6", Scope = CategoryScope.Both },
         new() { Name = "Banking Fees", ColorHex = "#64748B", Scope = CategoryScope.Expense },

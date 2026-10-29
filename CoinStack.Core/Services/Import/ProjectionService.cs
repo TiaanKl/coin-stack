@@ -82,11 +82,27 @@ public sealed partial class ProjectionService : IProjectionService
         }
 
         var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var statementPeriods = await LoadStatementPeriodsAsync(db, cancellationToken);
         var nowUtc = DateTime.UtcNow;
         var currentMonthKey = new DateTime(nowUtc.Year, nowUtc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
         // 1. Identify and flag pass-through transaction pairs (e.g., 50k in / 47k out to Pa on 07 Apr)
         var passThroughIds = DetectPassThroughIds(transactions);
+
+        // Refunds give back money already spent: they reduce that month's spending instead of counting as income.
+        var refundIds = transactions.Where(TransactionConventions.IsRefund).Select(t => t.Id).ToHashSet();
+
+        decimal IncomeOf(IEnumerable<Transaction> txs) => txs
+            .Where(t => t.Type == TransactionType.Income && !refundIds.Contains(t.Id))
+            .Sum(t => t.Amount);
+
+        decimal ExpensesOf(IEnumerable<Transaction> txs)
+        {
+            var list = txs as IReadOnlyCollection<Transaction> ?? txs.ToList();
+            var spent = list.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+            var refunded = list.Where(t => refundIds.Contains(t.Id)).Sum(t => t.Amount);
+            return Math.Max(0m, spent - refunded);
+        }
 
         // 2. Build month-by-month history
         var byMonth = transactions
@@ -96,8 +112,8 @@ public sealed partial class ProjectionService : IProjectionService
 
         foreach (var monthGroup in byMonth)
         {
-            var income = monthGroup.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
-            var expenses = monthGroup.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+            var income = IncomeOf(monthGroup);
+            var expenses = ExpensesOf(monthGroup);
 
             projection.History.Add(new MonthlyActual(
                 monthGroup.Key,
@@ -118,19 +134,26 @@ public sealed partial class ProjectionService : IProjectionService
             ? Math.Round(salaryTransactions.Average(t => t.Amount), 2, MidpointRounding.AwayFromZero)
             : 0m;
 
-        // 4. Completed months vs ongoing partial month
-        var completedMonthGroups = byMonth
-            .Where(g => g.Key < currentMonthKey)
+        // 4. Completed months vs ongoing partial month. A finished month that a bank statement only
+        //    partly covers (a statement starting on the 18th) is partial too: its totals are too low.
+        var firstDataDay = transactions.Min(t => t.OccurredAtUtc).Date;
+        var coveredDaysByMonth = byMonth.ToDictionary(
+            g => g.Key,
+            g => CountCoveredDays(g.Key, g, statementPeriods, firstDataDay, nowUtc.Date));
+
+        var completeMonthGroups = byMonth
+            .Where(g => g.Key < currentMonthKey
+                        && coveredDaysByMonth[g.Key] >= DateTime.DaysInMonth(g.Key.Year, g.Key.Month) - CoverageToleranceDays)
             .ToList();
 
         var validIncomeMonths = new List<decimal>();
         var validExpenseMonths = new List<decimal>();
 
-        foreach (var monthGroup in completedMonthGroups)
+        foreach (var monthGroup in completeMonthGroups)
         {
             var nonPassThrough = monthGroup.Where(t => !passThroughIds.Contains(t.Id)).ToList();
-            var monthIncome = nonPassThrough.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
-            var monthExpense = nonPassThrough.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+            var monthIncome = IncomeOf(nonPassThrough);
+            var monthExpense = ExpensesOf(nonPassThrough);
 
             // If salary is detected, ignore statement cutoff months that have 0 income because statement ended before payday
             if (detectedSalary > 0)
@@ -157,13 +180,13 @@ public sealed partial class ProjectionService : IProjectionService
             // Lock in true detected salary as the primary income anchor
             projection.ProjectedMonthlyIncome = detectedSalary;
 
-            // If there's regular freelance / other non-salary income, add the median extra
-            var otherIncomes = completedMonthGroups
-                .Select(g => g.Where(t => t.Type == TransactionType.Income && !salaryTransactions.Contains(t) && !passThroughIds.Contains(t.Id)).Sum(t => t.Amount))
-                .Where(amt => amt > 100m)
+            // Other income (freelance, side jobs) counts at its median across every complete month,
+            // months without any included, so a once-off payment isn't assumed to arrive every month.
+            var otherIncomes = completeMonthGroups
+                .Select(g => IncomeOf(g.Where(t => !salaryTransactions.Contains(t) && !passThroughIds.Contains(t.Id))))
                 .ToList();
 
-            if (otherIncomes.Count >= 2)
+            if (otherIncomes.Count > 0)
             {
                 projection.ProjectedMonthlyIncome += RoundCurrency(Median(otherIncomes));
             }
@@ -184,23 +207,31 @@ public sealed partial class ProjectionService : IProjectionService
         }
         else if (byMonth.Count > 0)
         {
-            // Only current/single month exists. Prorate expenses to full-month equivalent.
-            var singleGroup = byMonth[0];
-            var nonPassThrough = singleGroup.Where(t => !passThroughIds.Contains(t.Id)).ToList();
-            var singleExpense = nonPassThrough.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
-            var singleIncome = nonPassThrough.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount);
+            // No complete month yet: scale up the best-covered partial month. Only day-to-day spending
+            // is scaled; rent, debit orders and other large payments happen once a month, so R8 000 rent
+            // paid on the 3rd stays R8 000 instead of becoming R80 000+.
+            var partial = byMonth
+                .OrderByDescending(g => coveredDaysByMonth[g.Key])
+                .ThenByDescending(g => g.Key)
+                .First();
 
-            var daysInMonth = DateTime.DaysInMonth(singleGroup.Key.Year, singleGroup.Key.Month);
-            var daysElapsed = Math.Clamp(nowUtc.Day, 1, daysInMonth);
+            var nonPassThrough = partial.Where(t => !passThroughIds.Contains(t.Id)).ToList();
+            var partialIncome = IncomeOf(nonPassThrough);
 
-            var proratedExpense = daysElapsed > 0 && daysElapsed < daysInMonth
-                ? (singleExpense / daysElapsed) * daysInMonth
-                : singleExpense;
+            var incomeForThreshold = projection.ProjectedMonthlyIncome > 0
+                ? projection.ProjectedMonthlyIncome
+                : settings?.MonthlyIncome ?? 0m;
 
-            projection.ProjectedMonthlyExpenses = RoundCurrency(proratedExpense);
+            projection.ProjectedMonthlyExpenses = RoundCurrency(EstimateFullMonthExpenses(
+                nonPassThrough,
+                refundIds,
+                coveredDaysByMonth[partial.Key],
+                DateTime.DaysInMonth(partial.Key.Year, partial.Key.Month),
+                incomeForThreshold));
+
             if (projection.ProjectedMonthlyIncome <= 0)
             {
-                projection.ProjectedMonthlyIncome = singleIncome > 0 ? RoundCurrency(singleIncome) : (settings?.MonthlyIncome ?? 0m);
+                projection.ProjectedMonthlyIncome = partialIncome > 0 ? RoundCurrency(partialIncome) : (settings?.MonthlyIncome ?? 0m);
             }
         }
 
@@ -221,6 +252,133 @@ public sealed partial class ProjectionService : IProjectionService
         BuildTopMerchants(transactions.Where(t => !passThroughIds.Contains(t.Id)).ToList(), byMonth.Count, projection);
 
         return projection;
+    }
+
+    /// <summary>A finished month missing at most this many days of statement coverage still counts as complete.</summary>
+    private const int CoverageToleranceDays = 2;
+
+    /// <summary>
+    /// The date ranges the imported statements cover: the printed statement period, or the first to
+    /// last transaction date when the file had none.
+    /// </summary>
+    private static async Task<List<(DateTime Start, DateTime End)>> LoadStatementPeriodsAsync(
+        CoinStackDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var imports = await db.StatementImports
+            .AsNoTracking()
+            .Where(i => i.Status == StatementImportStatus.Imported)
+            .Select(i => new { i.Id, i.PeriodStartUtc, i.PeriodEndUtc })
+            .ToListAsync(cancellationToken);
+
+        var dateRanges = await db.Transactions
+            .AsNoTracking()
+            .Where(t => t.StatementImportId != null)
+            .Select(t => new { ImportId = t.StatementImportId!.Value, t.OccurredAtUtc })
+            .ToListAsync(cancellationToken);
+
+        var rangeByImport = dateRanges
+            .GroupBy(r => r.ImportId)
+            .ToDictionary(g => g.Key, g => (First: g.Min(r => r.OccurredAtUtc), Last: g.Max(r => r.OccurredAtUtc)));
+
+        var periods = new List<(DateTime Start, DateTime End)>();
+        foreach (var import in imports)
+        {
+            rangeByImport.TryGetValue(import.Id, out var range);
+            var start = import.PeriodStartUtc ?? (range.First == default ? (DateTime?)null : range.First);
+            var end = import.PeriodEndUtc ?? (range.Last == default ? (DateTime?)null : range.Last);
+            if (start is not null && end is not null && end >= start)
+            {
+                periods.Add((start.Value.Date, end.Value.Date));
+            }
+        }
+
+        return periods;
+    }
+
+    /// <summary>
+    /// How many days of <paramref name="monthKey"/>'s month the data covers. Months of imported
+    /// statements count the days inside a statement period; a finished month of manual entries counts
+    /// as fully covered; the current month runs from the 1st (or the first entry) up to today.
+    /// </summary>
+    private static int CountCoveredDays(
+        DateTime monthKey,
+        IEnumerable<Transaction> monthTransactions,
+        List<(DateTime Start, DateTime End)> statementPeriods,
+        DateTime firstDataDay,
+        DateTime today)
+    {
+        var daysInMonth = DateTime.DaysInMonth(monthKey.Year, monthKey.Month);
+        var monthStart = monthKey.Date;
+        var monthEnd = monthStart.AddDays(daysInMonth - 1);
+        var lastDay = monthEnd < today ? monthEnd : today;
+        if (lastDay < monthStart)
+        {
+            lastDay = monthEnd;
+        }
+
+        var fromStatements = statementPeriods.Count > 0 && monthTransactions.Any(t => t.StatementImportId is not null);
+        if (fromStatements)
+        {
+            var covered = 0;
+            for (var day = monthStart; day <= lastDay; day = day.AddDays(1))
+            {
+                if (statementPeriods.Any(p => day >= p.Start && day <= p.End))
+                {
+                    covered++;
+                }
+            }
+
+            return covered;
+        }
+
+        if (monthEnd < today)
+        {
+            return daysInMonth;
+        }
+
+        var firstDay = firstDataDay > monthStart ? firstDataDay : monthStart;
+        return Math.Max(1, (lastDay - firstDay).Days + 1);
+    }
+
+    /// <summary>
+    /// Scales a partly covered month up to a full month. Day-to-day spending grows with the number of
+    /// days; payments that happen once a month (debit orders, debt and subscription payments, mandatory
+    /// expenses and anything over 5% of income) are counted once.
+    /// </summary>
+    private static decimal EstimateFullMonthExpenses(
+        IReadOnlyCollection<Transaction> transactions,
+        HashSet<int> refundIds,
+        int coveredDays,
+        int daysInMonth,
+        decimal monthlyIncome)
+    {
+        var lumpThreshold = monthlyIncome > 0m ? monthlyIncome * 0.05m : 1000m;
+
+        var oncePerMonth = 0m;
+        var dayToDay = 0m;
+        foreach (var tx in transactions.Where(t => t.Type == TransactionType.Expense))
+        {
+            var isOncePerMonth = tx.ExpenseKind == ExpenseKind.Mandatory
+                                 || tx.AutoDeduct
+                                 || tx.SubscriptionId is not null
+                                 || tx.DebtAccountId is not null
+                                 || tx.Amount >= lumpThreshold;
+
+            if (isOncePerMonth)
+            {
+                oncePerMonth += tx.Amount;
+            }
+            else
+            {
+                dayToDay += tx.Amount;
+            }
+        }
+
+        var refunded = transactions.Where(t => refundIds.Contains(t.Id)).Sum(t => t.Amount);
+        var scale = coveredDays >= daysInMonth ? 1m : (decimal)daysInMonth / Math.Max(1, coveredDays);
+
+        return Math.Max(0m, oncePerMonth + (dayToDay * scale) - refunded);
     }
 
     private static HashSet<int> DetectPassThroughIds(List<Transaction> transactions)
@@ -321,7 +479,7 @@ public sealed partial class ProjectionService : IProjectionService
         }
 
         var incomeGroups = transactions
-            .Where(t => t.Type == TransactionType.Income)
+            .Where(t => t.Type == TransactionType.Income && !TransactionConventions.IsRefund(t))
             .GroupBy(t => NormalizeForRecurring(t.Description));
 
         foreach (var group in incomeGroups)

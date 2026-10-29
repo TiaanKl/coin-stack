@@ -104,6 +104,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Catch up on anything earned elsewhere (reflections, journal entries) since the last check.
+        await AchievementService.EvaluateAsync();
         _achievements = await AchievementService.GetAllAsync();
         _unlockedCount = _achievements.Count(a => a.IsUnlocked);
         _level = await LevelService.GetCurrentLevelAsync();

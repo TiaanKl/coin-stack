@@ -21,6 +21,9 @@ public sealed class Bucket : EntityBase
     public int? GoalId { get; set; }
     public Goal? Goal { get; set; }
 
+    /// <summary>The bank import that created this bucket, so reverting that import removes it.</summary>
+    public int? CreatedByStatementImportId { get; set; }
+
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
     public ICollection<Budget> Budgets { get; set; } = new List<Budget>();
 }

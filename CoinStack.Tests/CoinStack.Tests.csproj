@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CoinStack.Core\CoinStack.Core.csproj" />
     <ProjectReference Include="..\CoinStack.Data\CoinStack.Data.csproj" />
+    <ProjectReference Include="..\CoinStack.Mobile.Core\CoinStack.Mobile.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,492 +1,512 @@
 namespace CoinStack.Services;
 
+/// <summary>
+/// Works out the missing values of a debt (payment, term, principal, total repaid) from the ones given.
+/// </summary>
+/// <remarks>
+/// Each interest type has its own maths:
+/// <list type="bullet">
+/// <item>Simple: flat interest of principal × rate × years, repaid in equal instalments.</item>
+/// <item>Amortizing and Compound: interest on the outstanding balance each month, at the monthly rate
+/// equivalent to the compounding frequency (monthly, daily for APR, or once a year).</item>
+/// <item>None: the principal split into equal instalments.</item>
+/// </list>
+/// The annual rate is always a percentage, so 1 means 1% a year, never 100%.
+/// </remarks>
 public sealed class DebtCalculatorEngine : IDebtCalculatorEngine
 {
+    public const decimal MaxAmount = 1_000_000_000_000m;
+    public const decimal MaxAnnualRatePercent = 1000m;
+    public const int MaxTermMonths = 1200;
+
+    private const decimal Cent = 0.005m;
+
+    private static readonly decimal[] VariableRateShocks = [-1m, 1m, 2m];
+
     public DebtCalculationResult Calculate(DebtCalculationInput input)
+    {
+        try
+        {
+            return CalculateCore(input);
+        }
+        catch (Exception ex) when (ex is OverflowException or ArgumentOutOfRangeException)
+        {
+            return Invalid(input, ["These numbers are too large to calculate. Check the amounts, rate, term and dates."]);
+        }
+    }
+
+    private static DebtCalculationResult CalculateCore(DebtCalculationInput input)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
         var inferences = new List<string>();
 
-        var principal = input.Principal;
-        var interestRate = NormalizeInterestRate(input.InterestRate);
-        var monthlyPayment = input.MonthlyPayment;
-        var totalOwed = input.TotalOwed;
+        ValidateBasicInput(input, errors);
+        if (errors.Count > 0)
+        {
+            return Invalid(input, errors);
+        }
+
+        var annualRate = input.AnnualRatePercent / 100m;
         var startDate = input.StartDate?.Date;
         var endDate = input.EndDate?.Date;
-        var termMonths = input.TermMonths;
-        var paymentsMade = input.PaymentsMade;
 
-        ValidateBasicInput(input, errors);
-
-        if (!termMonths.HasValue && startDate.HasValue && endDate.HasValue)
+        var terms = new LoanTerms
         {
-            termMonths = CalculateMonthSpan(startDate.Value, endDate.Value);
-            if (termMonths.HasValue)
-            {
-                inferences.Add("Derived term from start and end dates.");
-            }
+            Principal = input.Principal,
+            Payment = input.MonthlyPayment,
+            TotalOwed = input.TotalOwed,
+            TermMonths = input.TermMonths
+        };
+
+        if (!terms.TermMonths.HasValue && startDate.HasValue && endDate.HasValue)
+        {
+            terms.TermMonths = CalculateMonthSpan(startDate.Value, endDate.Value);
+            inferences.Add("Derived term from start and end dates.");
         }
 
-        if (!endDate.HasValue && startDate.HasValue && termMonths.HasValue)
+        if (!startDate.HasValue && endDate.HasValue && terms.TermMonths.HasValue)
         {
-            endDate = startDate.Value.AddMonths(termMonths.Value);
-            inferences.Add("Derived end date from start date and term.");
-        }
-
-        if (!startDate.HasValue && endDate.HasValue && termMonths.HasValue)
-        {
-            startDate = endDate.Value.AddMonths(-termMonths.Value);
+            startDate = endDate.Value.AddMonths(-terms.TermMonths.Value);
             inferences.Add("Derived start date from end date and term.");
         }
 
-        var resolvedType = ResolveInterestType(input.InterestType, interestRate);
-        DebtCompoundingFrequency? compoundingFrequency = resolvedType == DebtInterestType.Compound
+        if (terms.TermMonths > MaxTermMonths)
+        {
+            return Invalid(input, [$"The term can be at most {MaxTermMonths} months (100 years)."]);
+        }
+
+        var resolvedType = ResolveInterestType(input.InterestType, annualRate);
+        DebtCompoundingFrequency? frequency = resolvedType is DebtInterestType.Compound or DebtInterestType.Amortizing
             ? input.CompoundingFrequency ?? DebtCompoundingFrequency.Monthly
             : null;
 
-        decimal? years = termMonths.HasValue ? termMonths.Value / 12m : null;
+        if (resolvedType != DebtInterestType.None && !annualRate.HasValue)
+        {
+            return Invalid(input, ["Enter the interest rate for this debt type."]);
+        }
+
+        decimal monthlyRate = resolvedType switch
+        {
+            DebtInterestType.None => 0m,
+            DebtInterestType.Simple => annualRate!.Value / 12m,
+            _ => EffectiveMonthlyRate(annualRate!.Value, frequency!.Value)
+        };
 
         switch (resolvedType)
         {
             case DebtInterestType.None:
-                CalculateNoInterest(ref principal, ref monthlyPayment, ref totalOwed, ref termMonths, inferences, errors);
+                SolveNoInterest(terms, inferences, warnings, errors);
                 break;
 
             case DebtInterestType.Simple:
-                CalculateSimpleInterest(ref principal, interestRate, ref monthlyPayment, ref totalOwed, ref termMonths, ref years, inferences, errors);
+                SolveSimple(terms, monthlyRate, inferences, warnings, errors);
                 break;
 
-            case DebtInterestType.Compound:
-                CalculateCompoundInterest(ref principal, interestRate, compoundingFrequency, ref monthlyPayment, ref totalOwed, ref termMonths, ref years, inferences, errors);
-                break;
-
-            case DebtInterestType.Amortizing:
-                CalculateAmortizing(ref principal, interestRate, ref monthlyPayment, ref totalOwed, ref termMonths, inferences, errors);
+            default:
+                SolveOnBalance(terms, monthlyRate, inferences, warnings, errors);
                 break;
         }
 
-        if (principal.HasValue && totalOwed.HasValue && totalOwed < principal)
+        if (errors.Count > 0)
         {
-            warnings.Add("Total owed is less than principal. Check inputs or debt type selection.");
+            return Invalid(input, errors, inferences);
         }
 
-        if (termMonths.HasValue && termMonths <= 0)
+        var principal = terms.Principal!.Value;
+        var payment = terms.Payment!.Value;
+        var termMonths = terms.TermMonths!.Value;
+        var totalOwed = terms.TotalRepaid;
+
+        if (!endDate.HasValue && startDate.HasValue)
         {
-            errors.Add("Term must be greater than zero months.");
+            endDate = startDate.Value.AddMonths(termMonths);
+            inferences.Add("Derived end date from start date and term.");
         }
-
-        years = termMonths.HasValue ? termMonths.Value / 12m : years;
-        decimal? interestAmount = principal.HasValue && totalOwed.HasValue
-            ? decimal.Round(totalOwed.Value - principal.Value, 2)
-            : null;
 
         decimal? remainingBalance = null;
-        if (paymentsMade.HasValue && paymentsMade.Value >= 0 && monthlyPayment.HasValue)
+        if (input.PaymentsMade is { } paymentsMade)
         {
-            remainingBalance = CalculateRemainingBalance(resolvedType, principal, totalOwed, interestRate, monthlyPayment.Value, paymentsMade.Value, termMonths, compoundingFrequency);
-            if (remainingBalance.HasValue)
+            remainingBalance = resolvedType is DebtInterestType.Simple or DebtInterestType.None
+                ? Math.Max(0m, totalOwed - (paymentsMade * payment))
+                : Simulate(principal, monthlyRate, payment, paymentsMade).Balance;
+        }
+
+        var rateScenarios = new List<DebtRateScenario>();
+        if (input.IsVariableRate && frequency.HasValue && annualRate.HasValue)
+        {
+            foreach (var shock in VariableRateShocks)
             {
-                remainingBalance = decimal.Round(Math.Max(0m, remainingBalance.Value), 2);
+                var shockedRate = annualRate.Value + (shock / 100m);
+                if (shockedRate < 0m)
+                {
+                    continue;
+                }
+
+                var shockedMonthly = EffectiveMonthlyRate(shockedRate, frequency.Value);
+                var shockedPayment = Instalment(principal, shockedMonthly, termMonths);
+                var shockedTotal = Simulate(principal, shockedMonthly, shockedPayment, termMonths).Paid;
+                rateScenarios.Add(new DebtRateScenario(
+                    shock,
+                    shockedRate,
+                    RoundCurrency(shockedPayment),
+                    RoundCurrency(shockedTotal),
+                    RoundCurrency(shockedTotal - principal)));
             }
         }
 
-        AmortisationScheduleResult? amortisationSchedule = null;
-        if (errors.Count == 0
-            && input.FirstPaymentDate.HasValue
-            && principal.HasValue
-            && monthlyPayment.HasValue
-            && resolvedType is DebtInterestType.Simple or DebtInterestType.Amortizing or DebtInterestType.None)
+        AmortisationScheduleResult? schedule = null;
+        if (input.FirstPaymentDate.HasValue)
         {
-            amortisationSchedule = BuildAmortisationSchedule(
-                principal.Value,
-                interestRate,
-                monthlyPayment.Value,
-                input.FirstPaymentDate.Value.Date);
+            var flatInterest = principal * monthlyRate;
+            schedule = BuildAmortisationSchedule(
+                principal,
+                payment,
+                input.FirstPaymentDate.Value.Date,
+                resolvedType == DebtInterestType.Simple ? _ => flatInterest : balance => balance * monthlyRate);
         }
 
         return new DebtCalculationResult
         {
-            IsValid = errors.Count == 0,
+            IsValid = true,
             Errors = errors,
             Warnings = warnings,
             Inferences = inferences,
             ResolvedInterestType = resolvedType,
-            CompoundingFrequency = compoundingFrequency,
+            CompoundingFrequency = frequency,
             Principal = RoundCurrency(principal),
-            InterestRate = interestRate,
-            MonthlyPayment = RoundCurrency(monthlyPayment),
+            InterestRate = annualRate,
+            EffectiveMonthlyRate = decimal.Round(monthlyRate, 8),
+            MonthlyPayment = RoundCurrency(payment),
             TotalOwed = RoundCurrency(totalOwed),
-            InterestAmount = RoundCurrency(interestAmount),
-            RemainingBalanceAfterPayments = RoundCurrency(remainingBalance),
+            InterestAmount = RoundCurrency(totalOwed - principal),
+            RemainingBalanceAfterPayments = remainingBalance.HasValue ? RoundCurrency(remainingBalance.Value) : null,
             TermMonths = termMonths,
-            Years = years.HasValue ? decimal.Round(years.Value, 2) : null,
+            Years = decimal.Round(termMonths / 12m, 2),
             StartDate = startDate,
             EndDate = endDate,
             FormulaUsed = GetFormulaLabel(resolvedType),
-            AmortisationSchedule = amortisationSchedule
+            AmortisationSchedule = schedule,
+            RateScenarios = rateScenarios
         };
     }
 
-    private static void CalculateNoInterest(
-        ref decimal? principal,
-        ref decimal? monthlyPayment,
-        ref decimal? totalOwed,
-        ref int? termMonths,
+    /// <summary>Interest on the outstanding balance every month (amortizing and compound debt).</summary>
+    private static void SolveOnBalance(
+        LoanTerms terms,
+        decimal monthlyRate,
         List<string> inferences,
+        List<string> warnings,
         List<string> errors)
     {
-        if (!principal.HasValue && totalOwed.HasValue)
+        if (!terms.Principal.HasValue && terms.TotalOwed.HasValue)
         {
-            principal = totalOwed;
-            inferences.Add("Derived principal from total owed (no-interest debt).");
+            terms.Principal = terms.TotalOwed;
+            inferences.Add("Used total owed as the outstanding balance.");
         }
 
-        if (!totalOwed.HasValue && principal.HasValue)
+        if (!terms.Principal.HasValue && terms.Payment.HasValue && terms.TermMonths.HasValue)
         {
-            totalOwed = principal;
-            inferences.Add("Derived total owed from principal (no-interest debt).");
+            terms.Principal = PresentValue(terms.Payment.Value, monthlyRate, terms.TermMonths.Value);
+            inferences.Add("Derived principal from payment, rate and term.");
         }
 
-        if (!totalOwed.HasValue && monthlyPayment.HasValue && termMonths.HasValue)
+        if (!terms.Principal.HasValue)
         {
-            totalOwed = monthlyPayment.Value * termMonths.Value;
-            inferences.Add("Derived total owed using monthlyPayment × termMonths.");
-        }
-
-        if (!monthlyPayment.HasValue && totalOwed.HasValue && termMonths.HasValue && termMonths > 0)
-        {
-            monthlyPayment = totalOwed.Value / termMonths.Value;
-            inferences.Add("Derived monthly payment from total owed and term.");
-        }
-
-        if (!termMonths.HasValue && monthlyPayment.HasValue && totalOwed.HasValue && monthlyPayment > 0)
-        {
-            termMonths = (int)Math.Ceiling(totalOwed.Value / monthlyPayment.Value);
-            inferences.Add("Derived term from total owed and monthly payment.");
-        }
-
-        if (!principal.HasValue && !totalOwed.HasValue)
-        {
-            errors.Add("Provide principal or total owed for a no-interest debt.");
-        }
-    }
-
-    private static void CalculateSimpleInterest(
-        ref decimal? principal,
-        decimal? interestRate,
-        ref decimal? monthlyPayment,
-        ref decimal? totalOwed,
-        ref int? termMonths,
-        ref decimal? years,
-        List<string> inferences,
-        List<string> errors)
-    {
-        if (!interestRate.HasValue)
-        {
-            errors.Add("Interest rate is required for simple-interest debt.");
+            errors.Add("Enter the principal (or total owed), or a monthly payment and term.");
             return;
         }
 
-        var r = interestRate.Value / 12m;
+        var principal = terms.Principal.Value;
 
-        if (!principal.HasValue && totalOwed.HasValue)
+        if (terms.Payment.HasValue && monthlyRate > 0m && terms.Payment.Value <= principal * monthlyRate)
         {
-            principal = totalOwed;
-            totalOwed = null;
-            inferences.Add("Treated total owed as principal (starting balance).");
-        }
-
-        if (!termMonths.HasValue && years.HasValue && years > 0)
-        {
-            termMonths = (int)Math.Ceiling(years.Value * 12m);
-        }
-
-        if (!termMonths.HasValue && principal.HasValue && monthlyPayment.HasValue)
-        {
-            if (r == 0)
-            {
-                termMonths = (int)Math.Ceiling(principal.Value / monthlyPayment.Value);
-            }
-            else
-            {
-                if (monthlyPayment.Value <= principal.Value * r)
-                {
-                    errors.Add("Monthly payment is too low to offset monthly interest.");
-                    return;
-                }
-
-                var n = -Math.Log(1d - (double)(principal.Value * r / monthlyPayment.Value)) / Math.Log((double)(1m + r));
-                termMonths = (int)Math.Ceiling((decimal)n);
-            }
-
-            years = termMonths.Value / 12m;
-            inferences.Add("Derived term from principal, interest rate, and monthly payment.");
-        }
-
-        if (!termMonths.HasValue || termMonths <= 0)
-        {
-            errors.Add("Provide term (months) or start/end dates for simple-interest calculations.");
+            errors.Add("The monthly payment is too low to cover the monthly interest, so the debt would never be repaid.");
             return;
         }
 
-        years = termMonths.Value / 12m;
-
-        if (!principal.HasValue && monthlyPayment.HasValue)
+        if (!terms.TermMonths.HasValue && terms.Payment.HasValue)
         {
-            if (r == 0)
+            var months = MonthsToRepay(principal, monthlyRate, terms.Payment.Value);
+            if (months > MaxTermMonths)
             {
-                principal = monthlyPayment.Value * termMonths.Value;
-            }
-            else
-            {
-                var pow = (decimal)Math.Pow((double)(1m + r), -termMonths.Value);
-                principal = monthlyPayment.Value * (1m - pow) / r;
-            }
-
-            inferences.Add("Derived principal from payment, rate, and term.");
-        }
-
-        if (!principal.HasValue)
-        {
-            errors.Add("Provide principal or total owed for simple-interest calculations.");
-            return;
-        }
-
-        if (!monthlyPayment.HasValue)
-        {
-            if (r == 0)
-            {
-                monthlyPayment = principal.Value / termMonths.Value;
-            }
-            else
-            {
-                var denominator = 1m - (decimal)Math.Pow((double)(1m + r), -termMonths.Value);
-                if (denominator == 0)
-                {
-                    errors.Add("Unable to derive monthly payment with the provided values.");
-                    return;
-                }
-
-                monthlyPayment = (principal.Value * r) / denominator;
-            }
-
-            inferences.Add("Derived monthly payment from principal, rate, and term.");
-        }
-
-        totalOwed = monthlyPayment.Value * termMonths.Value;
-        inferences.Add("Derived total owed as sum of all monthly payments.");
-    }
-
-    private static void CalculateCompoundInterest(
-        ref decimal? principal,
-        decimal? interestRate,
-        DebtCompoundingFrequency? compoundingFrequency,
-        ref decimal? monthlyPayment,
-        ref decimal? totalOwed,
-        ref int? termMonths,
-        ref decimal? years,
-        List<string> inferences,
-        List<string> errors)
-    {
-        if (!interestRate.HasValue)
-        {
-            errors.Add("Interest rate is required for compound-interest debt.");
-            return;
-        }
-
-        var n = compoundingFrequency == DebtCompoundingFrequency.Annual ? 1m : 12m;
-
-        if (!years.HasValue && termMonths.HasValue)
-        {
-            years = termMonths.Value / 12m;
-        }
-
-        if (!years.HasValue && principal.HasValue && totalOwed.HasValue && principal > 0)
-        {
-            var growthRatio = totalOwed.Value / principal.Value;
-            if (growthRatio <= 0)
-            {
-                errors.Add("Cannot derive term from non-positive principal/total values.");
+                errors.Add("At this payment the debt would take more than 100 years to repay.");
                 return;
             }
 
-            var numerator = Math.Log((double)growthRatio);
-            var denominator = (double)(n * (decimal)Math.Log((double)(1m + (interestRate.Value / n))));
-            if (denominator <= 0)
+            terms.TermMonths = months;
+            inferences.Add("Derived term from principal, payment and rate.");
+        }
+
+        if (!terms.Payment.HasValue && terms.TermMonths.HasValue)
+        {
+            terms.Payment = Instalment(principal, monthlyRate, terms.TermMonths.Value);
+            inferences.Add("Derived monthly payment from principal, rate and term.");
+        }
+
+        if (!terms.Payment.HasValue || !terms.TermMonths.HasValue)
+        {
+            errors.Add("Enter a term or a monthly payment.");
+            return;
+        }
+
+        var outcome = Simulate(principal, monthlyRate, terms.Payment.Value, terms.TermMonths.Value);
+        if (outcome.Balance > Cent)
+        {
+            warnings.Add($"This payment doesn't clear the debt within the term: {outcome.Balance:N2} would still be owed after {terms.TermMonths} months.");
+            terms.TotalRepaid = outcome.Paid + outcome.Balance;
+            return;
+        }
+
+        if (outcome.Months < terms.TermMonths)
+        {
+            warnings.Add($"At this payment the debt is repaid after {outcome.Months} months, before the {terms.TermMonths}-month term.");
+            terms.TermMonths = outcome.Months;
+        }
+
+        terms.TotalRepaid = outcome.Paid;
+    }
+
+    /// <summary>Flat interest: principal × rate × years, fixed up front and spread over the instalments.</summary>
+    private static void SolveSimple(
+        LoanTerms terms,
+        decimal monthlyRate,
+        List<string> inferences,
+        List<string> warnings,
+        List<string> errors)
+    {
+        if (!terms.Principal.HasValue && terms.TotalOwed.HasValue)
+        {
+            terms.Principal = terms.TotalOwed;
+            inferences.Add("Used total owed as the amount borrowed.");
+        }
+
+        if (!terms.Principal.HasValue && terms.Payment.HasValue && terms.TermMonths.HasValue)
+        {
+            // payment × n = P × (1 + monthlyRate × n)
+            var n = terms.TermMonths.Value;
+            terms.Principal = terms.Payment.Value * n / (1m + (monthlyRate * n));
+            inferences.Add("Derived principal from payment, rate and term.");
+        }
+
+        if (!terms.Principal.HasValue)
+        {
+            errors.Add("Enter the principal (or total owed), or a monthly payment and term.");
+            return;
+        }
+
+        var principal = terms.Principal.Value;
+        var interestPerMonth = principal * monthlyRate;
+
+        if (!terms.TermMonths.HasValue && terms.Payment.HasValue)
+        {
+            if (terms.Payment.Value <= interestPerMonth)
             {
-                errors.Add("Unable to derive term with the selected compound settings.");
+                errors.Add("The monthly payment is too low to cover the monthly interest, so the debt would never be repaid.");
                 return;
             }
 
-            years = (decimal)(numerator / denominator);
-            termMonths = (int)Math.Ceiling(years.Value * 12m);
-            inferences.Add("Derived term from principal, total owed, and compound-interest settings.");
+            var months = CeilingMonths(principal / (terms.Payment.Value - interestPerMonth));
+            if (months > MaxTermMonths)
+            {
+                errors.Add("At this payment the debt would take more than 100 years to repay.");
+                return;
+            }
+
+            terms.TermMonths = months;
+            inferences.Add("Derived term from principal, payment and rate.");
         }
 
-        if (!years.HasValue && monthlyPayment.HasValue && totalOwed.HasValue && monthlyPayment > 0)
+        if (!terms.TermMonths.HasValue)
         {
-            termMonths = (int)Math.Ceiling(totalOwed.Value / monthlyPayment.Value);
-            years = termMonths.Value / 12m;
-            inferences.Add("Derived term from total owed and monthly payment.");
-        }
-
-        if (!years.HasValue || years <= 0)
-        {
-            errors.Add("Provide term (months) or enough values to derive it for compound interest.");
+            errors.Add("Enter a term or a monthly payment.");
             return;
         }
 
-        var factor = (decimal)Math.Pow((double)(1m + (interestRate.Value / n)), (double)(n * years.Value));
+        var term = terms.TermMonths.Value;
+        var total = principal + (interestPerMonth * term);
 
-        if (!principal.HasValue && totalOwed.HasValue)
+        if (!terms.Payment.HasValue)
         {
-            principal = totalOwed.Value / factor;
-            inferences.Add("Derived principal from total owed and compound-interest factor.");
+            terms.Payment = total / term;
+            inferences.Add("Derived monthly payment as (principal + interest) ÷ term.");
         }
 
-        if (!totalOwed.HasValue && principal.HasValue)
+        var scheduled = terms.Payment.Value * term;
+        if (scheduled < total - Cent)
         {
-            totalOwed = principal.Value * factor;
-            inferences.Add("Derived total owed using compound-interest formula.");
+            warnings.Add($"This payment doesn't clear the debt within the term: {total - scheduled:N2} would still be owed after {term} months.");
+        }
+        else if (scheduled - total >= terms.Payment.Value)
+        {
+            warnings.Add($"At this payment the total is repaid after {CeilingMonths(total / terms.Payment.Value)} months, before the {term}-month term.");
         }
 
-        if (!monthlyPayment.HasValue && totalOwed.HasValue && termMonths.HasValue && termMonths > 0)
+        terms.TotalRepaid = total;
+    }
+
+    private static void SolveNoInterest(
+        LoanTerms terms,
+        List<string> inferences,
+        List<string> warnings,
+        List<string> errors)
+    {
+        if (!terms.Principal.HasValue && terms.TotalOwed.HasValue)
         {
-            monthlyPayment = totalOwed.Value / termMonths.Value;
+            terms.Principal = terms.TotalOwed;
+            inferences.Add("Used total owed as the principal (no-interest debt).");
+        }
+
+        if (!terms.Principal.HasValue && terms.Payment.HasValue && terms.TermMonths.HasValue)
+        {
+            terms.Principal = terms.Payment.Value * terms.TermMonths.Value;
+            inferences.Add("Derived total owed as monthly payment × term.");
+        }
+
+        if (!terms.Principal.HasValue)
+        {
+            errors.Add("Enter the principal or total owed for a no-interest debt.");
+            return;
+        }
+
+        var principal = terms.Principal.Value;
+
+        if (!terms.TermMonths.HasValue && terms.Payment.HasValue)
+        {
+            var months = CeilingMonths(principal / terms.Payment.Value);
+            if (months > MaxTermMonths)
+            {
+                errors.Add("At this payment the debt would take more than 100 years to repay.");
+                return;
+            }
+
+            terms.TermMonths = months;
+            inferences.Add("Derived term from total owed and monthly payment.");
+        }
+
+        if (!terms.TermMonths.HasValue)
+        {
+            errors.Add("Enter a term or a monthly payment.");
+            return;
+        }
+
+        if (!terms.Payment.HasValue)
+        {
+            terms.Payment = principal / terms.TermMonths.Value;
             inferences.Add("Derived monthly payment from total owed and term.");
         }
 
-        if (!termMonths.HasValue && monthlyPayment.HasValue && totalOwed.HasValue && monthlyPayment > 0)
+        var scheduled = terms.Payment.Value * terms.TermMonths.Value;
+        if (scheduled < principal - Cent)
         {
-            termMonths = (int)Math.Ceiling(totalOwed.Value / monthlyPayment.Value);
-            inferences.Add("Derived term from total owed and monthly payment.");
+            warnings.Add($"This payment doesn't clear the debt within the term: {principal - scheduled:N2} would still be owed after {terms.TermMonths} months.");
         }
+        else if (scheduled - principal >= terms.Payment.Value)
+        {
+            var months = CeilingMonths(principal / terms.Payment.Value);
+            warnings.Add($"At this payment the debt is repaid after {months} months, before the {terms.TermMonths}-month term.");
+            terms.TermMonths = months;
+        }
+
+        terms.TotalRepaid = principal;
     }
 
-    private static void CalculateAmortizing(
-        ref decimal? principal,
-        decimal? interestRate,
-        ref decimal? monthlyPayment,
-        ref decimal? totalOwed,
-        ref int? termMonths,
-        List<string> inferences,
-        List<string> errors)
+    /// <summary>The monthly rate that matches <paramref name="annualRate"/> at the given compounding.</summary>
+    internal static decimal EffectiveMonthlyRate(decimal annualRate, DebtCompoundingFrequency frequency)
     {
-        if (!interestRate.HasValue)
+        return frequency switch
         {
-            errors.Add("Interest rate is required for amortizing-loan calculations.");
-            return;
+            // Interest added once a year: the monthly rate that grows to the annual rate over 12 months.
+            DebtCompoundingFrequency.Annual => (decimal)(Math.Pow(1d + (double)annualRate, 1d / 12d) - 1d),
+            // Daily interest (APR): 365/12 days of daily compounding in an average month.
+            DebtCompoundingFrequency.Daily => (decimal)(Math.Pow(1d + ((double)annualRate / 365d), 365d / 12d) - 1d),
+            _ => annualRate / 12m
+        };
+    }
+
+    /// <summary>The level payment that clears <paramref name="principal"/> in <paramref name="months"/>.</summary>
+    private static decimal Instalment(decimal principal, decimal monthlyRate, int months)
+    {
+        if (monthlyRate == 0m)
+        {
+            return principal / months;
         }
 
-        if (!principal.HasValue && totalOwed.HasValue)
+        var discount = (decimal)Math.Pow(1d + (double)monthlyRate, -months);
+        return principal * monthlyRate / (1m - discount);
+    }
+
+    private static decimal PresentValue(decimal payment, decimal monthlyRate, int months)
+    {
+        if (monthlyRate == 0m)
         {
-            principal = totalOwed;
-            inferences.Add("Derived principal from total owed for amortizing loan.");
+            return payment * months;
         }
 
-        if (!principal.HasValue && monthlyPayment.HasValue && termMonths.HasValue)
-        {
-            var r = interestRate.Value / 12m;
-            if (r == 0)
-            {
-                principal = monthlyPayment.Value * termMonths.Value;
-            }
-            else
-            {
-                var pow = (decimal)Math.Pow((double)(1m + r), -termMonths.Value);
-                principal = monthlyPayment.Value * (1m - pow) / r;
-            }
+        var discount = (decimal)Math.Pow(1d + (double)monthlyRate, -months);
+        return payment * (1m - discount) / monthlyRate;
+    }
 
-            inferences.Add("Derived principal from payment, rate, and term.");
+    /// <summary>Months until the balance is cleared; the caller has checked the payment beats the interest.</summary>
+    private static int MonthsToRepay(decimal principal, decimal monthlyRate, decimal payment)
+    {
+        if (monthlyRate == 0m)
+        {
+            return CeilingMonths(principal / payment);
         }
 
-        if (!termMonths.HasValue && principal.HasValue && monthlyPayment.HasValue)
+        var n = -Math.Log(1d - (double)(principal * monthlyRate / payment)) / Math.Log(1d + (double)monthlyRate);
+        return double.IsFinite(n) && n < MaxTermMonths ? CeilingMonths((decimal)n) : MaxTermMonths + 1;
+    }
+
+    /// <summary>Rounds a month count up, ignoring floating-point noise such as 36.0000001.</summary>
+    private static int CeilingMonths(decimal months)
+    {
+        if (months > MaxTermMonths)
         {
-            var r = interestRate.Value / 12m;
-            if (r == 0)
-            {
-                termMonths = (int)Math.Ceiling(principal.Value / monthlyPayment.Value);
-            }
-            else
-            {
-                if (monthlyPayment.Value <= principal.Value * r)
-                {
-                    errors.Add("Monthly payment is too low to amortize this loan.");
-                    return;
-                }
-
-                var n = -Math.Log(1d - (double)(principal.Value * r / monthlyPayment.Value)) / Math.Log((double)(1m + r));
-                termMonths = (int)Math.Ceiling((decimal)n);
-            }
-
-            inferences.Add("Derived term from principal, payment, and rate.");
+            return MaxTermMonths + 1;
         }
 
-        if (!monthlyPayment.HasValue && principal.HasValue && termMonths.HasValue)
+        return Math.Max(1, (int)Math.Ceiling(months - 0.000001m));
+    }
+
+    /// <summary>Runs the balance forward month by month: interest is added, then the payment taken off.</summary>
+    private static (int Months, decimal Paid, decimal Balance) Simulate(decimal principal, decimal monthlyRate, decimal payment, int maxMonths)
+    {
+        var balance = principal;
+        var paid = 0m;
+        var months = 0;
+
+        while (balance > Cent && months < maxMonths)
         {
-            var r = interestRate.Value / 12m;
-            if (r == 0)
-            {
-                monthlyPayment = principal.Value / termMonths.Value;
-            }
-            else
-            {
-                var denominator = 1m - (decimal)Math.Pow((double)(1m + r), -termMonths.Value);
-                if (denominator == 0)
-                {
-                    errors.Add("Unable to derive monthly payment with the provided values.");
-                    return;
-                }
-
-                monthlyPayment = (principal.Value * r) / denominator;
-            }
-
-            inferences.Add("Derived monthly payment using amortization formula.");
+            months++;
+            var due = balance + (balance * monthlyRate);
+            var paidNow = Math.Min(payment, due);
+            paid += paidNow;
+            balance = due - paidNow;
         }
 
-        if (!principal.HasValue)
-        {
-            errors.Add("Provide principal or total owed for amortizing-loan calculations.");
-            return;
-        }
-
-        if (!termMonths.HasValue)
-        {
-            errors.Add("Provide term (months) or enough inputs to derive it for amortizing loans.");
-            return;
-        }
-
-        if (!monthlyPayment.HasValue)
-        {
-            errors.Add("Provide monthly payment or enough inputs to derive it for amortizing loans.");
-            return;
-        }
-
-        totalOwed = monthlyPayment.Value * termMonths.Value;
+        return (months, paid, Math.Max(0m, balance));
     }
 
     private static AmortisationScheduleResult BuildAmortisationSchedule(
         decimal principal,
-        decimal? annualRate,
         decimal monthlyPayment,
-        DateTime firstPaymentDate)
+        DateTime firstPaymentDate,
+        Func<decimal, decimal> interestFor)
     {
-        var monthlyRate = annualRate.HasValue ? annualRate.Value / 12m : 0m;
         var today = DateTime.Today;
         var rows = new List<AmortisationRow>();
         var balance = principal;
 
-        for (var n = 1; balance > 0.005m && rows.Count < 1200; n++)
+        for (var n = 1; balance > Cent && rows.Count < MaxTermMonths; n++)
         {
             var paymentDate = firstPaymentDate.AddMonths(n - 1);
             var startingBalance = balance;
-            var interest = decimal.Round(balance * monthlyRate, 2);
-            var totalDue = balance + interest;
-            var payment = decimal.Round(Math.Min(monthlyPayment, totalDue), 2);
+            var interest = decimal.Round(interestFor(balance), 2);
+            var payment = decimal.Round(Math.Min(monthlyPayment, balance + interest), 2);
             var principalPaid = decimal.Round(Math.Max(0m, payment - interest), 2);
             var endingBalance = decimal.Round(Math.Max(0m, startingBalance - principalPaid), 2);
-            var isPaid = paymentDate.Date < today;
 
             rows.Add(new AmortisationRow
             {
@@ -497,153 +517,48 @@ public sealed class DebtCalculatorEngine : IDebtCalculatorEngine
                 InterestPortion = interest,
                 PrincipalPortion = principalPaid,
                 EndingBalance = endingBalance,
-                IsPaid = isPaid
+                IsPaid = paymentDate.Date < today
             });
+
+            if (endingBalance >= startingBalance)
+            {
+                // The payment no longer reduces the balance; stop rather than list the same row forever.
+                break;
+            }
 
             balance = endingBalance;
         }
 
         var paidRows = rows.Where(r => r.IsPaid).ToList();
         var paymentsMade = paidRows.Count;
-        var totalInterestPaid = decimal.Round(paidRows.Sum(r => r.InterestPortion), 2);
         var totalPrincipalRepaid = decimal.Round(paidRows.Sum(r => r.PrincipalPortion), 2);
-        var totalAmountPaid = decimal.Round(paidRows.Sum(r => r.Payment), 2);
-        var currentRemainingBalance = paymentsMade > 0 ? paidRows[^1].EndingBalance : principal;
-        var paymentsRemaining = rows.Count - paymentsMade;
-        var payoffDate = rows.LastOrDefault()?.PaymentDate;
-        var percentageCompleted = principal > 0
-            ? decimal.Round(totalPrincipalRepaid / principal * 100m, 2)
-            : 0m;
 
         return new AmortisationScheduleResult
         {
             Rows = rows,
-            TotalInterestPaidToDate = totalInterestPaid,
+            TotalInterestPaidToDate = decimal.Round(paidRows.Sum(r => r.InterestPortion), 2),
             TotalPrincipalRepaidToDate = totalPrincipalRepaid,
-            TotalAmountPaidToDate = totalAmountPaid,
-            CurrentRemainingBalance = currentRemainingBalance,
+            TotalAmountPaidToDate = decimal.Round(paidRows.Sum(r => r.Payment), 2),
+            CurrentRemainingBalance = paymentsMade > 0 ? paidRows[^1].EndingBalance : principal,
             PaymentsMadeCount = paymentsMade,
-            PaymentsRemainingCount = paymentsRemaining,
-            PayoffDate = payoffDate,
-            PercentageCompleted = percentageCompleted
+            PaymentsRemainingCount = rows.Count - paymentsMade,
+            PayoffDate = rows.LastOrDefault()?.PaymentDate,
+            PercentageCompleted = principal > 0 ? decimal.Round(totalPrincipalRepaid / principal * 100m, 2) : 0m
         };
     }
 
-    private static decimal? CalculateRemainingBalance(
-        DebtInterestType type,
-        decimal? principal,
-        decimal? totalOwed,
-        decimal? interestRate,
-        decimal monthlyPayment,
-        int paymentsMade,
-        int? termMonths,
-        DebtCompoundingFrequency? frequency)
-    {
-        if (paymentsMade < 0)
-        {
-            return null;
-        }
-
-        return type switch
-        {
-            DebtInterestType.Amortizing => CalculateAmortizingRemaining(principal, interestRate, monthlyPayment, paymentsMade),
-            DebtInterestType.None => totalOwed.HasValue ? totalOwed.Value - (paymentsMade * monthlyPayment) : null,
-            DebtInterestType.Simple => CalculateAmortizingRemaining(principal, interestRate, monthlyPayment, paymentsMade),
-            DebtInterestType.Compound => CalculateCompoundRemaining(principal, interestRate, monthlyPayment, paymentsMade, frequency, totalOwed),
-            _ => null
-        };
-    }
-
-    private static decimal? CalculateAmortizingRemaining(decimal? principal, decimal? interestRate, decimal monthlyPayment, int paymentsMade)
-    {
-        if (!principal.HasValue || !interestRate.HasValue)
-        {
-            return null;
-        }
-
-        var r = interestRate.Value / 12m;
-        if (r == 0)
-        {
-            return principal.Value - (paymentsMade * monthlyPayment);
-        }
-
-        var rDouble = (double)r;
-        var pow = Math.Pow(1.0 + rDouble, paymentsMade);
-
-        if (!double.IsFinite(pow))
-            return null;
-
-        var remainingDouble = ((double)principal.Value * pow) - ((double)monthlyPayment * (pow - 1.0) / rDouble);
-
-        if (!double.IsFinite(remainingDouble) || remainingDouble > (double)decimal.MaxValue || remainingDouble < (double)decimal.MinValue)
-            return null;
-
-        return (decimal)Math.Round(remainingDouble, 10);
-    }
-
-    private static decimal? CalculateCompoundRemaining(
-        decimal? principal,
-        decimal? interestRate,
-        decimal monthlyPayment,
-        int paymentsMade,
-        DebtCompoundingFrequency? frequency,
-        decimal? totalOwed)
-    {
-        if (!principal.HasValue || !interestRate.HasValue)
-        {
-            return totalOwed.HasValue ? totalOwed.Value - (paymentsMade * monthlyPayment) : null;
-        }
-
-        var n = frequency == DebtCompoundingFrequency.Annual ? 1m : 12m;
-        var monthlyRate = interestRate.Value / n;
-        var balance = principal.Value;
-
-        for (var i = 0; i < paymentsMade; i++)
-        {
-            balance += balance * monthlyRate;
-            balance -= monthlyPayment;
-        }
-
-        return balance;
-    }
-
-    private static DebtInterestType ResolveInterestType(DebtInterestType? explicitType, decimal? interestRate)
+    private static DebtInterestType ResolveInterestType(DebtInterestType? explicitType, decimal? annualRate)
     {
         if (explicitType.HasValue)
         {
             return explicitType.Value;
         }
 
-        if (!interestRate.HasValue || interestRate <= 0)
-        {
-            return DebtInterestType.None;
-        }
-
-        return DebtInterestType.Amortizing;
+        return annualRate is > 0m ? DebtInterestType.Amortizing : DebtInterestType.None;
     }
 
-    private static decimal? NormalizeInterestRate(decimal? interestRate)
+    private static int CalculateMonthSpan(DateTime start, DateTime end)
     {
-        if (!interestRate.HasValue)
-        {
-            return null;
-        }
-
-        if (interestRate < 0)
-        {
-            return interestRate;
-        }
-
-        return interestRate > 1m ? interestRate / 100m : interestRate;
-    }
-
-    private static int? CalculateMonthSpan(DateTime start, DateTime end)
-    {
-        if (end <= start)
-        {
-            return null;
-        }
-
         var months = ((end.Year - start.Year) * 12) + end.Month - start.Month;
         if (end.Day > start.Day)
         {
@@ -657,39 +572,53 @@ public sealed class DebtCalculatorEngine : IDebtCalculatorEngine
     {
         return type switch
         {
-            DebtInterestType.Simple => "total = payment × n, payment = (P × r) / (1 - (1 + r)^(-n))",
-            DebtInterestType.Compound => "total = principal × (1 + rate / n)^(n × years)",
-            DebtInterestType.Amortizing => "payment = (P × r) / (1 - (1 + r)^(-n))",
-            DebtInterestType.None => "total = monthlyPayment × termMonths",
+            DebtInterestType.Simple => "interest = P × rate × years, payment = (P + interest) ÷ n",
+            DebtInterestType.Compound or DebtInterestType.Amortizing => "payment = P × i ÷ (1 − (1 + i)^−n), i = monthly rate",
+            DebtInterestType.None => "payment = total owed ÷ n",
             _ => ""
         };
     }
 
     private static void ValidateBasicInput(DebtCalculationInput input, List<string> errors)
     {
-        if (input.Principal.HasValue && input.Principal < 0)
+        if (input.Principal < 0)
         {
             errors.Add("Principal cannot be negative.");
         }
 
-        if (input.MonthlyPayment.HasValue && input.MonthlyPayment <= 0)
+        if (input.MonthlyPayment <= 0)
         {
             errors.Add("Monthly payment must be greater than zero.");
         }
 
-        if (input.TotalOwed.HasValue && input.TotalOwed <= 0)
+        if (input.TotalOwed <= 0)
         {
             errors.Add("Total owed must be greater than zero.");
         }
 
-        if (input.InterestRate.HasValue && input.InterestRate < 0)
+        if (input.Principal > MaxAmount || input.MonthlyPayment > MaxAmount || input.TotalOwed > MaxAmount)
+        {
+            errors.Add("Amounts can be at most 1 000 000 000 000.");
+        }
+
+        if (input.AnnualRatePercent < 0)
         {
             errors.Add("Interest rate cannot be negative.");
         }
 
-        if (input.TermMonths.HasValue && input.TermMonths <= 0)
+        if (input.AnnualRatePercent > MaxAnnualRatePercent)
+        {
+            errors.Add($"Interest rate can be at most {MaxAnnualRatePercent:0}% a year.");
+        }
+
+        if (input.TermMonths <= 0)
         {
             errors.Add("Term months must be greater than zero.");
+        }
+
+        if (input.TermMonths > MaxTermMonths)
+        {
+            errors.Add($"The term can be at most {MaxTermMonths} months (100 years).");
         }
 
         if (input.StartDate.HasValue && input.EndDate.HasValue && input.EndDate <= input.StartDate)
@@ -697,14 +626,38 @@ public sealed class DebtCalculatorEngine : IDebtCalculatorEngine
             errors.Add("End date must be after start date.");
         }
 
-        if (input.PaymentsMade.HasValue && input.PaymentsMade < 0)
+        if (input.PaymentsMade < 0)
         {
             errors.Add("Payments made cannot be negative.");
         }
+
+        if (input.PaymentsMade > MaxTermMonths)
+        {
+            errors.Add($"Payments made can be at most {MaxTermMonths}.");
+        }
     }
 
-    private static decimal? RoundCurrency(decimal? value)
+    private static DebtCalculationResult Invalid(DebtCalculationInput input, List<string> errors, List<string>? inferences = null)
     {
-        return value.HasValue ? decimal.Round(value.Value, 2) : null;
+        return new DebtCalculationResult
+        {
+            IsValid = false,
+            Errors = errors,
+            Inferences = inferences ?? [],
+            ResolvedInterestType = input.InterestType ?? DebtInterestType.Amortizing
+        };
+    }
+
+    private static decimal RoundCurrency(decimal value) => decimal.Round(value, 2);
+
+    private sealed class LoanTerms
+    {
+        public decimal? Principal { get; set; }
+        public decimal? Payment { get; set; }
+        public decimal? TotalOwed { get; set; }
+        public int? TermMonths { get; set; }
+
+        /// <summary>Principal plus all interest, filled in once the terms are solved.</summary>
+        public decimal TotalRepaid { get; set; }
     }
 }

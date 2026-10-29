@@ -1,6 +1,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using CoinStack.Data.Entities;
 using CoinStack.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -11,7 +12,7 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
 {
     private readonly ISettingsService _settings;
 
-    [ObservableProperty] private string _currency = "USD";
+    [ObservableProperty] private string _currency = AppSettings.DefaultCurrency;
     [ObservableProperty] private int _monthStartDay = 1;
     [ObservableProperty] private decimal _monthlyIncome;
     [ObservableProperty] private decimal _currentBankBalance;

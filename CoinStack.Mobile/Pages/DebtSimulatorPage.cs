@@ -1,3 +1,4 @@
+using CoinStack.Data.Entities;
 using CoinStack.Mobile.Core;
 using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Services;
@@ -17,6 +18,7 @@ public sealed class DebtSimulatorPage : ContentPage
     private readonly Label _interestRateLabel;
     private readonly Label _currentPaymentLabel;
     private IReadOnlyList<MobileDebtSummary> _debts = [];
+    private string _currency = AppSettings.DefaultCurrency;
 
     public DebtSimulatorPage(IMobileFinanceService financeService)
     {
@@ -105,10 +107,11 @@ public sealed class DebtSimulatorPage : ContentPage
     {
         try
         {
+            _currency = (await _financeService.GetSettingsAsync()).Currency;
             _debts = await _financeService.GetDebtsAsync();
             _debtPicker.Items.Clear();
             foreach (var d in _debts)
-                _debtPicker.Items.Add($"{d.Name} ({MoneyDisplay.Format("USD", d.CurrentBalance)})");
+                _debtPicker.Items.Add($"{d.Name} ({MoneyDisplay.Format(_currency, d.CurrentBalance)})");
 
             if (_debts.Count > 0)
                 _debtPicker.SelectedIndex = 0;
@@ -124,9 +127,9 @@ public sealed class DebtSimulatorPage : ContentPage
         if (_debtPicker.SelectedIndex < 0 || _debtPicker.SelectedIndex >= _debts.Count) return;
 
         var debt = _debts[_debtPicker.SelectedIndex];
-        _currentBalanceLabel.Text = MoneyDisplay.Format("USD", debt.CurrentBalance);
+        _currentBalanceLabel.Text = MoneyDisplay.Format(_currency, debt.CurrentBalance);
         _interestRateLabel.Text = $"{debt.InterestRatePercent:F2}%";
-        _currentPaymentLabel.Text = MoneyDisplay.Format("USD", debt.MonthlyPaymentAmount);
+        _currentPaymentLabel.Text = MoneyDisplay.Format(_currency, debt.MonthlyPaymentAmount);
 
         _paymentSlider.Maximum = Math.Max((double)debt.CurrentBalance / 2, (double)debt.MonthlyPaymentAmount * 5);
         _paymentSlider.Minimum = Math.Max(1, (double)debt.MonthlyPaymentAmount * 0.5);
@@ -146,7 +149,7 @@ public sealed class DebtSimulatorPage : ContentPage
 
         var debt = _debts[_debtPicker.SelectedIndex];
         var payment = (decimal)_paymentSlider.Value;
-        _paymentLabel.Text = MoneyDisplay.Format("USD", payment);
+        _paymentLabel.Text = MoneyDisplay.Format(_currency, payment);
 
         if (payment <= 0)
         {
@@ -177,7 +180,7 @@ public sealed class DebtSimulatorPage : ContentPage
 
         var payoffDate = DateTime.UtcNow.AddMonths(months);
         _payoffDateLabel.Text = $"{payoffDate:MMM yyyy} ({months} months)";
-        _totalInterestLabel.Text = MoneyDisplay.Format("USD", totalInterest);
+        _totalInterestLabel.Text = MoneyDisplay.Format(_currency, totalInterest);
     }
 
     private static View CreateInfoRow(string label, Label valueLabel)

@@ -126,7 +126,7 @@ public static partial class MerchantNormalizer
                 return new MerchantInfo(
                     "Refund / Fee Reversal",
                     "REFUND",
-                    "Freelance",
+                    TransactionConventions.RefundsCategoryName,
                     "fa-solid fa-rotate-left");
             }
         }

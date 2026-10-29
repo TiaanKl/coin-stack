@@ -28,34 +28,44 @@ public sealed class DailyChallengeService : IDailyChallengeService
         ("Goal Contribution", "Contribute any amount towards a savings goal.", "fa-bullseye", 10, ChallengeFrequency.Daily),
     ];
 
-    public DailyChallengeService(IDbContextFactory<CoinStackDbContext> dbFactory, ILevelService levelService)
+    private readonly IAchievementService? _achievementService;
+
+    public DailyChallengeService(
+        IDbContextFactory<CoinStackDbContext> dbFactory,
+        ILevelService levelService,
+        IAchievementService? achievementService = null)
     {
         _dbFactory = dbFactory;
         _levelService = levelService;
+        _achievementService = achievementService;
     }
 
+    /// <summary>Today's daily challenges plus this week's weekly challenge, which stays visible until it expires.</summary>
     public async Task<List<DailyChallenge>> GetTodaysChallengesAsync(CancellationToken ct = default)
     {
+        await GenerateDailyChallengesAsync(ct);
+
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         var today = DateTime.UtcNow.Date;
-        var challenges = await db.DailyChallenges
+        var weekStart = StartOfWeek(today);
+
+        return await db.DailyChallenges
             .AsNoTracking()
-            .Where(c => c.AssignedDateUtc >= today && c.AssignedDateUtc < today.AddDays(1))
+            .Where(c => (c.AssignedDateUtc >= today && c.AssignedDateUtc < today.AddDays(1))
+                        || (c.Frequency == ChallengeFrequency.Weekly
+                            && c.AssignedDateUtc >= weekStart
+                            && c.AssignedDateUtc < weekStart.AddDays(7)))
             .OrderBy(c => c.Status)
+            .ThenBy(c => c.Frequency)
             .ThenBy(c => c.CreatedAtUtc)
             .ToListAsync(ct);
+    }
 
-        if (challenges.Count == 0)
-        {
-            await GenerateDailyChallengesAsync(ct);
-            challenges = await db.DailyChallenges
-                .AsNoTracking()
-                .Where(c => c.AssignedDateUtc >= today && c.AssignedDateUtc < today.AddDays(1))
-                .OrderBy(c => c.Status)
-                .ToListAsync(ct);
-        }
-
-        return challenges;
+    /// <summary>The Monday that starts the week containing <paramref name="date"/>.</summary>
+    private static DateTime StartOfWeek(DateTime date)
+    {
+        var daysSinceMonday = ((int)date.DayOfWeek + 6) % 7;
+        return date.Date.AddDays(-daysSinceMonday);
     }
 
     public async Task<DailyChallenge?> CompleteChallengeAsync(int id, CancellationToken ct = default)
@@ -70,50 +80,69 @@ public sealed class DailyChallengeService : IDailyChallengeService
 
         await _levelService.AddXpAsync(challenge.XpReward, ct);
 
+        if (_achievementService is not null)
+        {
+            await _achievementService.EvaluateAsync(ct);
+        }
+
         return challenge;
     }
 
+    /// <summary>
+    /// Adds today's three daily challenges, and this week's weekly challenge if the week has none yet,
+    /// whichever day the app is first opened. The weekly one runs Monday to Monday.
+    /// </summary>
     public async Task GenerateDailyChallengesAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
         var today = DateTime.UtcNow.Date;
-        var existing = await db.DailyChallenges
-            .AnyAsync(c => c.AssignedDateUtc >= today && c.AssignedDateUtc < today.AddDays(1), ct);
+        var weekStart = StartOfWeek(today);
 
-        if (existing) return;
+        var hasDaily = await db.DailyChallenges
+            .AnyAsync(c => c.Frequency == ChallengeFrequency.Daily
+                           && c.AssignedDateUtc >= today && c.AssignedDateUtc < today.AddDays(1), ct);
+        var hasWeekly = await db.DailyChallenges
+            .AnyAsync(c => c.Frequency == ChallengeFrequency.Weekly
+                           && c.AssignedDateUtc >= weekStart && c.AssignedDateUtc < weekStart.AddDays(7), ct);
+
+        if (hasDaily && hasWeekly) return;
 
         var random = new Random(today.DayOfYear + today.Year);
         var dailyPool = ChallengePool.Where(c => c.Freq == ChallengeFrequency.Daily).ToArray();
         var weeklyPool = ChallengePool.Where(c => c.Freq == ChallengeFrequency.Weekly).ToArray();
 
-        var selected = new List<(string Title, string Description, string Icon, int Xp, ChallengeFrequency Freq)>();
+        var challenges = new List<DailyChallenge>();
 
-        // Pick 3 daily challenges
-        var dailyIndices = Enumerable.Range(0, dailyPool.Length).OrderBy(_ => random.Next()).Take(3);
-        selected.AddRange(dailyIndices.Select(i => dailyPool[i]));
-
-        // On Mondays, add a weekly challenge
-        if (today.DayOfWeek == DayOfWeek.Monday && weeklyPool.Length > 0)
+        if (!hasDaily)
         {
-            var weekly = weeklyPool[random.Next(weeklyPool.Length)];
-            selected.Add(weekly);
+            var dailyIndices = Enumerable.Range(0, dailyPool.Length).OrderBy(_ => random.Next()).Take(3);
+            challenges.AddRange(dailyIndices.Select(i => ToChallenge(dailyPool[i], today, today.AddDays(1))));
         }
 
-        var challenges = selected.Select(s => new DailyChallenge
+        if (!hasWeekly && weeklyPool.Length > 0)
         {
-            Title = s.Title,
-            Description = s.Description,
-            Icon = s.Icon,
-            XpReward = s.Xp,
-            Frequency = s.Freq,
-            Status = ChallengeStatus.Active,
-            AssignedDateUtc = today,
-            ExpiresAtUtc = s.Freq == ChallengeFrequency.Weekly ? today.AddDays(7) : today.AddDays(1),
-        });
+            var weeklyRandom = new Random(weekStart.DayOfYear + weekStart.Year);
+            challenges.Add(ToChallenge(weeklyPool[weeklyRandom.Next(weeklyPool.Length)], weekStart, weekStart.AddDays(7)));
+        }
 
         db.DailyChallenges.AddRange(challenges);
         await db.SaveChangesAsync(ct);
     }
+
+    private static DailyChallenge ToChallenge(
+        (string Title, string Description, string Icon, int Xp, ChallengeFrequency Freq) template,
+        DateTime assigned,
+        DateTime expires) => new()
+    {
+        Title = template.Title,
+        Description = template.Description,
+        Icon = template.Icon,
+        XpReward = template.Xp,
+        Frequency = template.Freq,
+        Status = ChallengeStatus.Active,
+        AssignedDateUtc = assigned,
+        ExpiresAtUtc = expires,
+    };
 
     public async Task ExpireOldChallengesAsync(CancellationToken ct = default)
     {

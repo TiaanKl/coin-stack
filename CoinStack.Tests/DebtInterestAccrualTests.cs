@@ -132,4 +132,19 @@ public sealed class DebtInterestAccrualTests
         PaymentStartDateUtc = Start,
         InterestAccruedThroughUtc = Start
     };
+
+    [Theory]
+    [InlineData(25, 1, "2026-11-25")]
+    [InlineData(29, 1, "2026-10-29")]
+    [InlineData(31, 1, "2026-10-31")]
+    [InlineData(31, 2, "2026-11-30")]
+    [InlineData(31, 5, "2027-02-28")]
+    public void Debit_Order_Dates_Fall_On_The_Debit_Day(int debitDay, int paymentNumber, string expected)
+    {
+        var from = new DateTime(2026, 10, 29, 0, 0, 0, DateTimeKind.Utc);
+
+        var date = DebtInterestAccrual.DebitOrderDate(from, debitDay, paymentNumber);
+
+        Assert.Equal(DateTime.Parse(expected, System.Globalization.CultureInfo.InvariantCulture).Date, date.Date);
+    }
 }

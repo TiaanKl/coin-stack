@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using CoinStack.Data.Entities;
 using CoinStack.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -13,7 +14,7 @@ public partial class SavingsViewModel : ViewModelBase, IAsyncInitializable
     private readonly ISettingsService _settings;
     private readonly IMoneyFormatter _money;
 
-    private string _currency = "USD";
+    private string _currency = AppSettings.DefaultCurrency;
 
     [ObservableProperty] private string _totalSavedText = "";
     [ObservableProperty] private string _availableText = "";

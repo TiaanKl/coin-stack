@@ -28,5 +28,8 @@ public sealed class WaitlistItem : EntityBase
 
     public DateTime? PurchasedAtUtc { get; set; }
 
+    /// <summary>When the user decided not to buy it. Kept (not deleted) so the money saved by waiting adds up.</summary>
+    public DateTime? ResistedAtUtc { get; set; }
+
     public string? ReflectionNote { get; set; }
 }

@@ -22,8 +22,12 @@ public interface IWaitlistService
     /// <summary>
     /// Explicitly records that the user decided not to buy after cool-off. Awards ImpulseResisted points
     /// and increments the NoImpulseBuy streak. Distinct from <see cref="DeleteAsync"/> so accidental deletes are not rewarded.
+    /// The item is kept, hidden from the list, so it counts towards <see cref="GetSavedByWaitingAsync"/>.
     /// </summary>
     Task MarkResistedAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>The total price of everything the user decided not to buy.</summary>
+    Task<WaitlistSavings> GetSavedByWaitingAsync(CancellationToken cancellationToken = default);
 
     Task EvaluateCoolOffsAsync(CancellationToken cancellationToken = default);
     Task<int> CalculateReadinessScoreAsync(int itemId, CancellationToken cancellationToken = default);
@@ -39,3 +43,6 @@ public interface IWaitlistService
     /// <summary>Resets the NoImpulseBuy streak after an impulse purchase.</summary>
     Task ResetNoImpulseBuyStreakAsync(CancellationToken cancellationToken = default);
 }
+
+/// <summary>Money not spent because the user waited and decided against buying.</summary>
+public sealed record WaitlistSavings(decimal Total, int ItemCount);

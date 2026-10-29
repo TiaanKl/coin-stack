@@ -219,4 +219,43 @@ public sealed class SavingsProjectionTests
             await connection.DisposeAsync();
         }
     }
+
+    [Fact]
+    public async Task Projections_And_Monthly_Interest_Start_From_Available_After_A_Withdrawal()
+    {
+        var settings = new AppSettings
+        {
+            MonthlyIncome = 0m,
+            SavingsIsPercent = false,
+            MonthlySavingsAmount = 500m,
+            SavingsInterestRate = 0.12m,
+            SavingsInterestIsYearly = true
+        };
+
+        var (connection, service) = await CreateServiceAsync(settings, 10000m);
+
+        try
+        {
+            // R6 000 of the R10 000 is taken out; Total stays at R10 000.
+            await service.WithdrawForEmergencyAsync(6000m, "Car repair");
+
+            var projections = await service.GetProjectionsAsync(12, includeInterest: true);
+            var expected = FinancialEngine.CalculateSavingsProjection(4000m, 500m, 0.12m, 12);
+            Assert.Equal(expected.FutureValue, projections[^1].Projected);
+
+            var summary = await service.CalculateMonthAsync();
+            Assert.NotNull(summary);
+            // 1% of (R4 000 + R500), not of (R10 000 + R500).
+            Assert.Equal(45m, summary.Interest);
+            Assert.Equal(4545m, summary.RunningTotal);
+
+            var state = await service.GetStateAsync();
+            Assert.Equal(4545m, state.Available);
+            Assert.Equal(10545m, state.Total);
+        }
+        finally
+        {
+            await connection.DisposeAsync();
+        }
+    }
 }

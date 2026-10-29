@@ -30,7 +30,7 @@ public sealed class WaitlistService : IWaitlistService
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         return await db.WaitlistItems
             .AsNoTracking()
-            .Where(x => !x.IsPurchased)
+            .Where(x => !x.IsPurchased && x.ResistedAtUtc == null)
             .OrderByDescending(x => x.Score)
             .ThenBy(x => x.CoolOffUntil)
             .ToListAsync(cancellationToken);
@@ -96,13 +96,20 @@ public sealed class WaitlistService : IWaitlistService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var existing = await db.WaitlistItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (existing is null || existing.IsPurchased)
+        if (existing is null || existing.IsPurchased || existing.ResistedAtUtc is not null)
         {
             return (null, null);
         }
 
+        var now = DateTime.UtcNow;
+
+        // Waiting out the cool-off and still wanting it is the considered purchase the waitlist is for;
+        // only buying before the cool-off ends is an impulse buy.
+        var cooledOff = existing.IsUnlocked || existing.CoolOffUntil <= now;
+
         existing.IsPurchased = true;
-        existing.PurchasedAtUtc = DateTime.UtcNow;
+        existing.IsUnlocked |= cooledOff;
+        existing.PurchasedAtUtc = now;
         await db.SaveChangesAsync(cancellationToken);
 
         var transaction = new Transaction
@@ -114,8 +121,8 @@ public sealed class WaitlistService : IWaitlistService
             BucketId = bucketId,
             CategoryId = categoryId,
             ExpenseKind = ExpenseKind.Discretionary,
-            IsImpulse = true,
-            OccurredAtUtc = DateTime.UtcNow,
+            IsImpulse = !cooledOff,
+            OccurredAtUtc = now,
         };
 
         var (_, gameResult) = await _transactionService.CreateWithGameLoopAsync(transaction, 0, cancellationToken);
@@ -128,13 +135,13 @@ public sealed class WaitlistService : IWaitlistService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
         var existing = await db.WaitlistItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (existing is null || existing.IsPurchased)
+        if (existing is null || existing.IsPurchased || existing.ResistedAtUtc is not null)
         {
             return;
         }
 
         var itemName = existing.Name;
-        db.WaitlistItems.Remove(existing);
+        existing.ResistedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(cancellationToken);
 
         var settings = await _settingsService.GetAsync(cancellationToken);
@@ -151,6 +158,18 @@ public sealed class WaitlistService : IWaitlistService
         {
             await IncrementNoImpulseBuyStreakAsync(cancellationToken);
         }
+    }
+
+    public async Task<WaitlistSavings> GetSavedByWaitingAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var resisted = await db.WaitlistItems
+            .AsNoTracking()
+            .Where(x => x.ResistedAtUtc != null)
+            .Select(x => x.EstimatedCost)
+            .ToListAsync(cancellationToken);
+
+        return new WaitlistSavings(resisted.Sum(), resisted.Count);
     }
 
     public async Task EvaluateCoolOffsAsync(CancellationToken cancellationToken = default)
@@ -217,15 +236,11 @@ public sealed class WaitlistService : IWaitlistService
             }
         }
 
-        int budgetScore = totalBuckets == 0
-            ? 10
-            : (int)Math.Round(20.0 * (1.0 - (double)overCount / totalBuckets));
-
         var savingsBucket = await db.Buckets
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.IsSavings, cancellationToken);
 
-        int savingsScore = 10; // neutral default
+        decimal? savingsRate = null;
 
         if (savingsBucket is not null && savingsBucket.AllocatedAmount > 0)
         {
@@ -244,13 +259,7 @@ public sealed class WaitlistService : IWaitlistService
                 netSavedThisMonth = 0;
             }
 
-            var savingsRate = (double)(netSavedThisMonth / savingsBucket.AllocatedAmount);
-
-            savingsScore = savingsRate >= 1.0 ? 20
-                         : savingsRate >= 0.75 ? 17
-                         : savingsRate >= 0.5 ? 13
-                         : savingsRate >= 0.25 ? 8
-                         : 3;
+            savingsRate = netSavedThisMonth / savingsBucket.AllocatedAmount;
         }
 
         var debts = await db.DebtAccounts
@@ -271,20 +280,7 @@ public sealed class WaitlistService : IWaitlistService
 
         var totalMonthlyDebt = debts.Sum(d => d.MonthlyPaymentAmount);
 
-        int debtScore;
-        if (monthlyIncome <= 0 || totalMonthlyDebt <= 0)
-        {
-            debtScore = debts.Count == 0 ? 20 : 10;
-        }
-        else
-        {
-            var debtToIncomeRatio = (double)(totalMonthlyDebt / monthlyIncome);
-            debtScore = debtToIncomeRatio < 0.15 ? 20
-                      : debtToIncomeRatio < 0.25 ? 16
-                      : debtToIncomeRatio < 0.35 ? 11
-                      : debtToIncomeRatio < 0.50 ? 6
-                      : 2;
-        }
+        var savingsState = await db.SavingsState.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
 
         var emotion = item.EmotionAtTimeOfAdding;
         if (emotion is null)
@@ -298,34 +294,19 @@ public sealed class WaitlistService : IWaitlistService
             emotion = latestReflection?.EmotionTag;
         }
 
-        int emotionScore = emotion switch
-        {
-            EmotionTag.Motivated or EmotionTag.Proud => 15,
-            EmotionTag.Excited => 12,
-            EmotionTag.Neutral => 10,
-            EmotionTag.Bored or EmotionTag.Tired => 6,
-            EmotionTag.Stressed or EmotionTag.Anxious => 4,
-            EmotionTag.Impulsive or EmotionTag.Guilty => 2,
-            null => 8,
-            _ => 8
-        };
-
-        int priorityScore = item.Priority switch
-        {
-            WaitlistPriority.High => 15,
-            WaitlistPriority.Medium => 10,
-            WaitlistPriority.Low => 4,
-            _ => 4
-        };
-
-        var daysWaited = (now - item.CreatedAtUtc).TotalDays;
-        int timeScore = daysWaited >= 30 ? 10
-                      : daysWaited >= 14 ? 8
-                      : daysWaited >= 7 ? 6
-                      : daysWaited >= 3 ? 3
-                      : 0;
-
-        var total = Math.Clamp(budgetScore + savingsScore + debtScore + emotionScore + priorityScore + timeScore, 0, 100);
+        var total = WaitlistReadiness.Calculate(new WaitlistReadinessInputs(
+            item.EstimatedCost,
+            totalBuckets,
+            overCount,
+            savingsRate,
+            monthlyIncome,
+            totalMonthlyDebt,
+            debts.Count,
+            // The emergency fund is not money for wants, so only ordinary savings count.
+            savingsState?.Available ?? 0m,
+            emotion,
+            item.Priority,
+            (now - item.CreatedAtUtc).TotalDays));
 
         item.Score = total;
         item.LastEvaluated = now;

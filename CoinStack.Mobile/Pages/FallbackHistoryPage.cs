@@ -42,6 +42,7 @@ public sealed class FallbackHistoryPage : ContentPage
         try
         {
             var snapshot = await _financeService.GetSavingsSnapshotAsync();
+            var currency = (await _financeService.GetSettingsAsync()).Currency;
             _eventsList.Children.Clear();
 
             if (snapshot.FallbackEvents.Count == 0)
@@ -87,7 +88,7 @@ public sealed class FallbackHistoryPage : ContentPage
                             },
                             new Label
                             {
-                                Text = $"Amount: {MoneyDisplay.Format("USD", evt.AmountUsed)}",
+                                Text = $"Amount: {MoneyDisplay.Format(currency, evt.AmountUsed)}",
                                 FontSize = 14,
                                 TextColor = AppColors.Danger
                             },

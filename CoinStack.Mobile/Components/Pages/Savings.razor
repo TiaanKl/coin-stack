@@ -140,7 +140,7 @@ else
 	private bool _isLoading = true;
 	private bool _isSaving;
 	private string? _statusMessage;
-	private string _currency = "USD";
+	private string _currency = CoinStack.Data.Entities.AppSettings.DefaultCurrency;
 	private readonly List<SavingsMonthlySummary> _monthlySummaries = [];
 	private readonly List<SavingsFallbackEvent> _fallbackEvents = [];
 
@@ -159,7 +159,7 @@ else
 			await using var db = await DbFactory.CreateDbContextAsync();
 
 			var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync();
-			_currency = settings?.Currency ?? "USD";
+			_currency = settings?.Currency ?? CoinStack.Data.Entities.AppSettings.DefaultCurrency;
 
 			var state = await db.SavingsState.FirstOrDefaultAsync();
 			if (state is null)

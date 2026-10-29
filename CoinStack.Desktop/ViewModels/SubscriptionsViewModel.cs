@@ -28,8 +28,7 @@ public partial class SubscriptionsViewModel : ViewModelBase, IAsyncInitializable
 
     public ObservableCollection<SubscriptionRow> Subscriptions { get; } = [];
     public ObservableCollection<CategoryOption> CategoryOptions { get; } = [];
-    public ObservableCollection<SubscriptionCycle> CycleOptions { get; } =
-        [SubscriptionCycle.Weekly, SubscriptionCycle.Monthly, SubscriptionCycle.Quarterly, SubscriptionCycle.Yearly];
+    public ObservableCollection<SubscriptionCycle> CycleOptions { get; } = new(SubscriptionCosts.CyclesInOrder);
     public ObservableCollection<SubscriptionStatus> StatusOptions { get; } =
         [SubscriptionStatus.Active, SubscriptionStatus.Paused, SubscriptionStatus.Cancelled];
 
@@ -79,15 +78,7 @@ public partial class SubscriptionsViewModel : ViewModelBase, IAsyncInitializable
             var active = list.Where(s => s.Status == SubscriptionStatus.Active).ToList();
             ActiveCount = active.Count;
             HasSubscriptions = Subscriptions.Count > 0;
-            MonthlyTotalText = _money.Format(currency, active
-                .Sum(s => s.Cycle switch
-                {
-                    SubscriptionCycle.Weekly => s.Cost * 52m / 12m,
-                    SubscriptionCycle.Monthly => s.Cost,
-                    SubscriptionCycle.Quarterly => s.Cost / 3m,
-                    SubscriptionCycle.Yearly => s.Cost / 12m,
-                    _ => s.Cost
-                }));
+            MonthlyTotalText = _money.Format(currency, active.Sum(SubscriptionCosts.MonthlyEquivalent));
         }
         catch (Exception ex)
         {

@@ -33,8 +33,29 @@ public static class TransactionConventions
         return string.Equals(transaction.Source, BankSource, StringComparison.OrdinalIgnoreCase);
     }
 
+    public const string RefundsCategoryName = "Refunds";
+
     public static bool LooksLikeSalary(string description)
     {
         return description.Contains("SALARY", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool LooksLikeRefund(string? description)
+    {
+        return description is not null
+               && (description.Contains("REFUND", StringComparison.OrdinalIgnoreCase)
+                   || description.Contains("REVERSAL", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// A credit that gives back money already spent (a refund or reversed charge). It is not earnings,
+    /// so forecasts subtract it from spending instead of counting it as income.
+    /// </summary>
+    public static bool IsRefund(Transaction transaction)
+    {
+        return transaction.Type == TransactionType.Income
+               && (LooksLikeRefund(transaction.Description)
+                   || LooksLikeRefund(transaction.Notes)
+                   || string.Equals(transaction.Category?.Name, RefundsCategoryName, StringComparison.OrdinalIgnoreCase));
     }
 }

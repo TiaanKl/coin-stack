@@ -47,6 +47,14 @@ var app = builder.Build();
 
 await DatabaseInitializer.InitializeAsync(app.Services);
 
+// Format money in the saved currency from the very first render, not only after a page has loaded
+// settings: otherwise a page opened first (such as Debt) showed "$" amounts.
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var settings = await scope.ServiceProvider.GetRequiredService<ISettingsService>().GetAsync();
+    CurrencyFormatting.ApplyCurrency(settings.Currency);
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);

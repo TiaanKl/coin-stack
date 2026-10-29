@@ -23,5 +23,8 @@ public sealed class Subscription : EntityBase
     /// </summary>
     public string? CustomHexColor { get; set; }
 
+    /// <summary>The bank import that created this subscription, so reverting that import removes it.</summary>
+    public int? CreatedByStatementImportId { get; set; }
+
     public ICollection<Transaction> Transactions { get; set; } = new List<Transaction>();
 }

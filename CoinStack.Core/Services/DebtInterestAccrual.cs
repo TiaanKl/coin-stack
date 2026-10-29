@@ -60,6 +60,17 @@ public static class DebtInterestAccrual
         return total;
     }
 
+    /// <summary>
+    /// The date of debit order number <paramref name="paymentNumber"/> on <paramref name="debitDay"/>, where 1 is
+    /// the first one on or after <paramref name="from"/>. Short months use their last day.
+    /// </summary>
+    public static DateTime DebitOrderDate(DateTime from, int debitDay, int paymentNumber)
+    {
+        var first = NextPostingDate(from.Date.AddDays(-1), debitDay);
+        var month = new DateTime(first.Year, first.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(paymentNumber - 1);
+        return OnDay(month.Year, month.Month, debitDay);
+    }
+
     /// <summary>The first posting date strictly after <paramref name="after"/>, on the anchor day of a month.</summary>
     internal static DateTime NextPostingDate(DateTime after, int anchorDay)
     {

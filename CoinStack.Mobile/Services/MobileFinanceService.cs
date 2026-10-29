@@ -567,7 +567,8 @@ public sealed class MobileFinanceService : IMobileFinanceService
             ? income * (settings.MonthlySavingsPercent / 100m)
             : settings.MonthlySavingsAmount;
 
-        var currentTotal = state?.Total ?? 0m;
+        // Interest is earned on what is still in savings; Total never goes down after a withdrawal.
+        var currentBalance = (state?.Available ?? 0m) + (state?.Reserved ?? 0m);
         var interest = 0m;
 
         if (settings.SavingsInterestRate.HasValue && settings.SavingsInterestRate.Value > 0)
@@ -576,18 +577,18 @@ public sealed class MobileFinanceService : IMobileFinanceService
             var apr = settings.SavingsInterestRate.Value;
             var monthlyRate = settings.SavingsInterestIsYearly ? apr / 12m : apr;
             interest = decimal.Round(
-                (currentTotal + baseSavings) * monthlyRate, 2, MidpointRounding.AwayFromZero);
+                (currentBalance + baseSavings) * monthlyRate, 2, MidpointRounding.AwayFromZero);
         }
 
         var totalAdded = baseSavings + interest;
-        var newRunningTotal = currentTotal + totalAdded;
+        var newBalance = currentBalance + totalAdded;
 
         if (state is null)
         {
             state = new SavingsState
             {
-                Total = newRunningTotal,
-                Available = newRunningTotal,
+                Total = totalAdded,
+                Available = totalAdded,
                 Reserved = 0,
                 LastCalculatedMonth = currentMonth,
                 FallbackEnabled = false
@@ -608,7 +609,7 @@ public sealed class MobileFinanceService : IMobileFinanceService
             Base = baseSavings,
             Interest = interest,
             Total = totalAdded,
-            RunningTotal = newRunningTotal
+            RunningTotal = newBalance
         });
 
         await db.SaveChangesAsync(cancellationToken);
@@ -853,7 +854,7 @@ public sealed class MobileFinanceService : IMobileFinanceService
             ? (settings.SavingsInterestIsYearly ? apr / 12m : apr)
             : 0m;
 
-        var running = state.Total;
+        var running = state.Available + state.Reserved;
         var now = DateTime.UtcNow;
 
         for (var i = 1; i <= months; i++)

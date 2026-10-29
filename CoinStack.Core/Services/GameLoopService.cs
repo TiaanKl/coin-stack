@@ -19,6 +19,7 @@ public sealed class GameLoopService : IGameLoopService
     private readonly ISettingsService _settingsService;
     private readonly ISavingsService _savingsService;
     private readonly ILevelService _levelService;
+    private readonly IAchievementService? _achievementService;
 
     public GameLoopService(
         IDbContextFactory<CoinStackDbContext> dbFactory,
@@ -27,7 +28,8 @@ public sealed class GameLoopService : IGameLoopService
         IReflectionService reflectionService,
         ISettingsService settingsService,
         ISavingsService savingsService,
-        ILevelService levelService)
+        ILevelService levelService,
+        IAchievementService? achievementService = null)
     {
         _dbFactory = dbFactory;
         _bucketService = bucketService;
@@ -36,6 +38,43 @@ public sealed class GameLoopService : IGameLoopService
         _settingsService = settingsService;
         _savingsService = savingsService;
         _levelService = levelService;
+        _achievementService = achievementService;
+    }
+
+    public async Task ProcessDailyCheckInAsync(CancellationToken cancellationToken = default)
+    {
+        await ProcessDailyCheckInCoreAsync(cancellationToken);
+        await EvaluateAchievementsAsync(cancellationToken);
+    }
+
+    public async Task<GameTransactionResult> ProcessTransactionAsync(
+        Transaction transaction,
+        int userTimezoneOffsetHours,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await ProcessTransactionCoreAsync(transaction, userTimezoneOffsetHours, cancellationToken);
+
+        var unlocked = await EvaluateAchievementsAsync(cancellationToken);
+        if (unlocked.Count > 0)
+        {
+            var names = string.Join(", ", unlocked.Select(a => a.Title));
+            var note = $"Achievement unlocked: {names} (+{unlocked.Sum(a => a.XpReward)} XP)";
+            result.Message = string.IsNullOrEmpty(result.Message) ? note : $"{result.Message} · {note}";
+            if (result.Kind == FeedbackKind.Normal)
+            {
+                result.Kind = FeedbackKind.Positive;
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>Checks for newly earned achievements after anything that can earn one.</summary>
+    private async Task<List<Achievement>> EvaluateAchievementsAsync(CancellationToken cancellationToken)
+    {
+        return _achievementService is null
+            ? []
+            : await _achievementService.EvaluateAsync(cancellationToken);
     }
 
     public async Task<GameState> GetCurrentStateAsync(CancellationToken cancellationToken = default)
@@ -70,7 +109,7 @@ public sealed class GameLoopService : IGameLoopService
         };
     }
 
-    public async Task ProcessDailyCheckInAsync(CancellationToken cancellationToken = default)
+    private async Task ProcessDailyCheckInCoreAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var settings = await _settingsService.GetAsync(cancellationToken);
@@ -163,7 +202,7 @@ public sealed class GameLoopService : IGameLoopService
         }
     }
 
-    public async Task<GameTransactionResult> ProcessTransactionAsync(
+    private async Task<GameTransactionResult> ProcessTransactionCoreAsync(
     Transaction transaction,
     int userTimezoneOffsetHours,
     CancellationToken cancellationToken = default)

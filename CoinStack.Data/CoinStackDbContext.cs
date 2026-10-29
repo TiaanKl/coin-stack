@@ -31,6 +31,7 @@ public sealed class CoinStackDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<DailyChallenge> DailyChallenges => Set<DailyChallenge>();
     public DbSet<WeeklyRecap> WeeklyRecaps => Set<WeeklyRecap>();
     public DbSet<StatementImport> StatementImports => Set<StatementImport>();
+    public DbSet<DismissedRecurringMerchant> DismissedRecurringMerchants => Set<DismissedRecurringMerchant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

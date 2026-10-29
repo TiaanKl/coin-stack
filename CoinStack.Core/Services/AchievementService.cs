@@ -7,12 +7,12 @@ namespace CoinStack.Services;
 public sealed class AchievementService : IAchievementService
 {
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
-    private readonly IScoringService _scoringService;
+    private readonly ILevelService _levelService;
 
-    public AchievementService(IDbContextFactory<CoinStackDbContext> dbFactory, IScoringService scoringService)
+    public AchievementService(IDbContextFactory<CoinStackDbContext> dbFactory, ILevelService levelService)
     {
         _dbFactory = dbFactory;
-        _scoringService = scoringService;
+        _levelService = levelService;
     }
 
     public async Task<List<Achievement>> GetAllAsync(CancellationToken ct = default)
@@ -36,6 +36,8 @@ public sealed class AchievementService : IAchievementService
         achievement.IsUnlocked = true;
         achievement.UnlockedAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+
+        await _levelService.AddXpAsync(achievement.XpReward, ct);
         return achievement;
     }
 
@@ -45,7 +47,12 @@ public sealed class AchievementService : IAchievementService
         return await db.Achievements.CountAsync(a => a.IsUnlocked, ct);
     }
 
-    public async Task EvaluateAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Unlocks every achievement whose condition is now met and awards its XP once.
+    /// Safe to call after any action; already unlocked achievements are left alone.
+    /// </summary>
+    /// <returns>The achievements unlocked by this call.</returns>
+    public async Task<List<Achievement>> EvaluateAsync(CancellationToken ct = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(ct);
 
@@ -85,17 +92,31 @@ public sealed class AchievementService : IAchievementService
             ("challenges-50", challengeCount >= 50),
         };
 
-        foreach (var (key, condition) in checks)
-        {
-            if (!condition) continue;
-            var achievement = await db.Achievements.FirstOrDefaultAsync(a => a.Key == key && !a.IsUnlocked, ct);
-            if (achievement is null) continue;
+        var metKeys = checks.Where(c => c.Condition).Select(c => c.Key).ToList();
+        var unlocked = await db.Achievements
+            .Where(a => metKeys.Contains(a.Key) && !a.IsUnlocked)
+            .ToListAsync(ct);
 
+        if (unlocked.Count == 0)
+        {
+            return unlocked;
+        }
+
+        foreach (var achievement in unlocked)
+        {
             achievement.IsUnlocked = true;
             achievement.UnlockedAtUtc = DateTime.UtcNow;
         }
 
         await db.SaveChangesAsync(ct);
+
+        var xp = unlocked.Sum(a => a.XpReward);
+        if (xp > 0)
+        {
+            await _levelService.AddXpAsync(xp, ct);
+        }
+
+        return unlocked;
     }
 
     public async Task SeedAchievementsAsync(CancellationToken ct = default)

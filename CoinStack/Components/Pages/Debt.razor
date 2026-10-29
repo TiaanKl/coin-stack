@@ -4,6 +4,10 @@
 @using CoinStack.Services
 @inject IDebtCalculatorEngine Calculator
 @inject IDebtService DebtService
+@inject ISettingsService SettingsService
+@inject ITransactionService TransactionService
+@inject ICategoryService CategoryService
+@inject IJSRuntime JS
 
 <PageTitle>Debt Calculator</PageTitle>
 
@@ -63,6 +67,7 @@
                                                 <select @bind="_model.CompoundingFrequency"
                                                         class="h-11 w-full rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
                                                     <option value="@DebtCompoundingFrequency.Monthly">Monthly</option>
+                                                    <option value="@DebtCompoundingFrequency.Daily">Daily</option>
                                                     <option value="@DebtCompoundingFrequency.Annual">Annual</option>
                                                 </select>
                                             </div>
@@ -91,7 +96,7 @@
                                                     <div>
                                                         <label
                                                         class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">@GetDebtRateLabel()</label>
-                                                        <InputNumber TValue="decimal?" @bind-Value="_model.InterestRate"
+                                                        <InputNumber TValue="decimal?" @bind-Value="_model.AnnualRatePercent"
                                                                      class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
                                                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">@GetDebtRateHelpText()</p>
                                                     </div>
@@ -229,12 +234,43 @@
                                                                                                     <p class="text-xs text-gray-500 dark:text-gray-400">End Date</p>
                                                                                                     <p class="font-semibold text-gray-800 dark:text-white/90">@FormatDate(_result.EndDate)</p>
                                                                                                 </div>
-                                                                                                <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70 sm:col-span-2">
-                                                                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Rate (normalized)</p>
+                                                                                                <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                                                                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Annual rate</p>
                                                                                                     <p class="font-semibold text-gray-800 dark:text-white/90">@FormatRate(_result.InterestRate)
                                                                                                     </p>
                                                                                                 </div>
+                                                                                                <div class="rounded-xl bg-gray-50 p-3 dark:bg-gray-800/70">
+                                                                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Monthly rate charged</p>
+                                                                                                    <p class="font-semibold text-gray-800 dark:text-white/90">@FormatMonthlyRate(_result.EffectiveMonthlyRate)
+                                                                                                    </p>
+                                                                                                </div>
                                                                                             </div>
+
+                                                                                            @if (_result.RateScenarios.Count > 0)
+                                                                                            {
+                                                                                                <div class="rounded-xl border border-gray-200 p-3 text-sm dark:border-gray-700">
+                                                                                                    <p class="mb-2 font-medium text-gray-800 dark:text-white/90">If the rate changes</p>
+                                                                                                    <table class="w-full text-left text-xs text-gray-600 dark:text-gray-300">
+                                                                                                        <thead>
+                                                                                                            <tr class="text-gray-500 dark:text-gray-400">
+                                                                                                                <th class="py-1 font-medium">Rate</th>
+                                                                                                                <th class="py-1 text-right font-medium">Monthly payment</th>
+                                                                                                                <th class="py-1 text-right font-medium">Total interest</th>
+                                                                                                            </tr>
+                                                                                                        </thead>
+                                                                                                        <tbody>
+                                                                                                            @foreach (var scenario in _result.RateScenarios)
+                                                                                                            {
+                                                                                                                <tr>
+                                                                                                                    <td class="py-1">@FormatRate(scenario.AnnualRate) (@scenario.RateChangePercentPoints.ToString("+0.##;-0.##") pt)</td>
+                                                                                                                    <td class="py-1 text-right">@FormatCurrency(scenario.MonthlyPayment)</td>
+                                                                                                                    <td class="py-1 text-right">@FormatCurrency(scenario.InterestAmount)</td>
+                                                                                                                </tr>
+                                                                                                            }
+                                                                                                        </tbody>
+                                                                                                    </table>
+                                                                                                </div>
+                                                                                            }
 
                                                                                             @if (_result.Inferences.Count > 0)
                                                                                             {
@@ -311,8 +347,8 @@
                                                                                                     </div>
 
                                                                                                     <div class="mb-2 flex items-end justify-between">
-                                                                                                        <p class="text-lg font-bold text-gray-800 dark:text-white/90">@debt.CurrentBalance.ToString("C")</p>
-                                                                                                        <p class="text-xs text-gray-500 dark:text-gray-400">of @debt.TotalAmount.ToString("C")</p>
+                                                                                                        <p class="text-lg font-bold text-gray-800 dark:text-white/90">@FormatCurrency(debt.CurrentBalance)</p>
+                                                                                                        <p class="text-xs text-gray-500 dark:text-gray-400">of @FormatCurrency(debt.TotalAmount)</p>
                                                                                                     </div>
 
                                                                                                     <div class="mb-2 h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-800">
@@ -323,18 +359,56 @@
 
                                                                                                     <div class="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
                                                                                                         <p>Monthly: <span
-                                                                                                            class="font-medium text-gray-700 dark:text-gray-300">@debt.MonthlyPaymentAmount.ToString("C")</span>
+                                                                                                            class="font-medium text-gray-700 dark:text-gray-300">@FormatCurrency(debt.MonthlyPaymentAmount)</span>
                                                                                                         </p>
                                                                                                         <p>Start: <span
                                                                                                             class="font-medium text-gray-700 dark:text-gray-300">@debt.PaymentStartDateUtc.ToString("dd MMM yyyy")</span></p>
                                                                                                         </div>
 
-                                                                                                        <div class="mt-3 flex justify-end">
-                                                                                                            <button @onclick="() => OpenEditDebtModal(debt)"
-                                                                                                                    class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
-                                                                                                                Edit
-                                                                                                            </button>
-                                                                                                        </div>
+                                                                                                        @if (_paymentDebtId == debt.Id)
+                                                                                                        {
+                                                                                                            <form class="mt-3 space-y-2" @onsubmit="() => RecordPaymentAsync(debt)">
+                                                                                                                <label class="block text-xs font-medium text-gray-700 dark:text-gray-400">Payment amount</label>
+                                                                                                                <InputNumber TValue="decimal?" @bind-Value="_paymentAmount" min="0.01" step="0.01"
+                                                                                                                             class="block w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
+                                                                                                                <p class="text-xs text-gray-500 dark:text-gray-400">Logged as a Debt expense today and taken off this balance.</p>
+                                                                                                                @if (!string.IsNullOrEmpty(_paymentError))
+                                                                                                                {
+                                                                                                                    <p class="text-xs text-error-600 dark:text-error-400">@_paymentError</p>
+                                                                                                                }
+                                                                                                                <div class="flex justify-end gap-2">
+                                                                                                                    <button type="button" @onclick="CancelRecordPayment"
+                                                                                                                            class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                                                                                        Cancel
+                                                                                                                    </button>
+                                                                                                                    <button type="submit"
+                                                                                                                            class="inline-flex items-center justify-center rounded-full bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-600">
+                                                                                                                        Save payment
+                                                                                                                    </button>
+                                                                                                                </div>
+                                                                                                            </form>
+                                                                                                        }
+                                                                                                        else
+                                                                                                        {
+                                                                                                            <div class="mt-3 flex flex-wrap justify-end gap-2">
+                                                                                                                <button type="button" @onclick="() => LoadDebtIntoCalculator(debt)"
+                                                                                                                        class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                                                                                    Calculate payoff
+                                                                                                                </button>
+                                                                                                                <button type="button" @onclick="() => OpenRecordPayment(debt)"
+                                                                                                                        class="inline-flex items-center justify-center rounded-full border border-brand-300 bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-500/10 dark:text-brand-400">
+                                                                                                                    Record payment
+                                                                                                                </button>
+                                                                                                                <button type="button" @onclick="() => OpenEditDebtModal(debt)"
+                                                                                                                        class="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                                                                                    Edit
+                                                                                                                </button>
+                                                                                                                <button type="button" @onclick="() => DeleteDebtAsync(debt)"
+                                                                                                                        class="inline-flex items-center justify-center rounded-full border border-error-300 bg-white px-3 py-1.5 text-xs font-medium text-error-600 hover:bg-error-50 dark:border-error-500/40 dark:bg-gray-900 dark:text-error-400">
+                                                                                                                    Delete
+                                                                                                                </button>
+                                                                                                            </div>
+                                                                                                        }
                                                                                                     </div>
                                                                                                 }
                                                                                             </div>
@@ -505,10 +579,89 @@
     private int? _debtFormPlannedTermMonths;
     private string _debtFormError = "";
 
+    private string _currency = "ZAR";
+
+    private int? _paymentDebtId;
+    private decimal? _paymentAmount;
+    private string _paymentError = "";
+
     protected override async Task OnInitializedAsync()
     {
+        _currency = (await SettingsService.GetAsync()).Currency;
         _model.InterestType = DebtInterestType.Amortizing;
         BuildExamples();
+        await LoadSavedDebtsAsync();
+    }
+
+    /// <summary>Fills the calculator with a saved debt so it shows the payoff date and interest still to pay.</summary>
+    private void LoadDebtIntoCalculator(DebtAccount debt)
+    {
+        SelectPersonalDebtInterestType(PersonalDebtInterestType.Fixed);
+        _model.Principal = Math.Max(0m, debt.CurrentBalance);
+        _model.TotalOwed = null;
+        _model.AnnualRatePercent = debt.InterestRatePercent;
+        _model.MonthlyPayment = debt.MonthlyPaymentAmount;
+        _model.TermMonths = null;
+        _model.PaymentsMade = null;
+        _model.StartDate = DateTime.UtcNow.Date;
+        _model.EndDate = null;
+        _result = Calculator.Calculate(_model);
+    }
+
+    private void OpenRecordPayment(DebtAccount debt)
+    {
+        _paymentDebtId = debt.Id;
+        _paymentAmount = debt.MonthlyPaymentAmount;
+        _paymentError = "";
+    }
+
+    private void CancelRecordPayment()
+    {
+        _paymentDebtId = null;
+        _paymentError = "";
+    }
+
+    /// <summary>
+    /// Logs the payment as an expense linked to the debt, so it reduces the balance and also shows in
+    /// spending and the bank balance, the same as a payment entered on the Transactions page.
+    /// </summary>
+    private async Task RecordPaymentAsync(DebtAccount debt)
+    {
+        if (_paymentAmount is not > 0m)
+        {
+            _paymentError = "Enter an amount greater than zero.";
+            return;
+        }
+
+        var debtCategoryId = (await CategoryService.GetAllAsync())
+            .FirstOrDefault(c => string.Equals(c.Name, "Debt", StringComparison.OrdinalIgnoreCase))?.Id;
+
+        await TransactionService.CreateWithGameLoopAsync(new Transaction
+        {
+            Description = $"{debt.Name} payment",
+            Amount = decimal.Round(_paymentAmount.Value, 2),
+            Type = TransactionType.Expense,
+            ExpenseKind = ExpenseKind.Mandatory,
+            CategoryId = debtCategoryId,
+            DebtAccountId = debt.Id,
+            OccurredAtUtc = DateTime.UtcNow
+        }, 0);
+
+        _paymentDebtId = null;
+        await LoadSavedDebtsAsync();
+    }
+
+    private async Task DeleteDebtAsync(DebtAccount debt)
+    {
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Delete \"{debt.Name}\"? Payments already logged stay in your transactions but are no longer linked to this debt.");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await DebtService.DeleteAsync(debt.Id);
         await LoadSavedDebtsAsync();
     }
 
@@ -530,16 +683,19 @@
     {
         _selectedDebtInterestType = type;
 
+        _model.IsVariableRate = type == PersonalDebtInterestType.Variable;
+
         switch (type)
         {
             case PersonalDebtInterestType.Fixed:
-            case PersonalDebtInterestType.Apr:
-                _model.InterestType = DebtInterestType.Amortizing;
-                _model.CompoundingFrequency = null;
-                break;
             case PersonalDebtInterestType.Variable:
                 _model.InterestType = DebtInterestType.Amortizing;
-                _model.CompoundingFrequency = null;
+                _model.CompoundingFrequency = DebtCompoundingFrequency.Monthly;
+                break;
+            case PersonalDebtInterestType.Apr:
+                // Cards and APR-quoted loans charge interest daily on the balance.
+                _model.InterestType = DebtInterestType.Amortizing;
+                _model.CompoundingFrequency = DebtCompoundingFrequency.Daily;
                 break;
             case PersonalDebtInterestType.Simple:
                 _model.InterestType = DebtInterestType.Simple;
@@ -547,14 +703,16 @@
                 break;
             case PersonalDebtInterestType.Compound:
                 _model.InterestType = DebtInterestType.Compound;
-                _model.CompoundingFrequency ??= DebtCompoundingFrequency.Monthly;
+                _model.CompoundingFrequency = DebtCompoundingFrequency.Monthly;
                 break;
             case PersonalDebtInterestType.None:
                 _model.InterestType = DebtInterestType.None;
                 _model.CompoundingFrequency = null;
-                _model.InterestRate = 0m;
+                _model.AnnualRatePercent = 0m;
                 break;
         }
+
+        _result = null;
     }
 
     private string GetDebtInterestTypeChipClass(PersonalDebtInterestType type)
@@ -577,50 +735,49 @@
 
     private string GetSelectedDebtInterestDescription() => _selectedDebtInterestType switch
     {
-        PersonalDebtInterestType.Fixed => "Best for predictable loan payments where the rate stays constant.",
-        PersonalDebtInterestType.Variable => "Use current rate for planning and recalculate when your lender updates the rate.",
-        PersonalDebtInterestType.Apr => "Common for cards and personal loans; this is annualized borrowing cost.",
-        PersonalDebtInterestType.Simple => "Interest is calculated from principal and rate without interest-on-interest.",
-        PersonalDebtInterestType.Compound => "Interest accrues on principal and accumulated interest.",
+        PersonalDebtInterestType.Fixed => "Interest on the outstanding balance each month at a rate that stays constant.",
+        PersonalDebtInterestType.Variable => "Calculated at today's rate, with what the payment becomes if the rate moves.",
+        PersonalDebtInterestType.Apr => "Interest is charged daily on the balance, as on credit cards and store accounts.",
+        PersonalDebtInterestType.Simple => "Flat interest on the amount borrowed for the whole term, with no interest on interest.",
+        PersonalDebtInterestType.Compound => "Interest is added to the balance at the chosen frequency and then earns interest itself.",
         _ => "For 0% financing or family/friend arrangements with no interest charged."
     };
 
     private string GetSelectedDebtInterestExample() => _selectedDebtInterestType switch
     {
-        PersonalDebtInterestType.Fixed => "Example: $100,000 at 10% fixed keeps the rate stable across the term.",
-        PersonalDebtInterestType.Variable => "Example: A loan starts at 10% and later adjusts to 11% or 9%.",
-        PersonalDebtInterestType.Apr => "Example: 24% APR is roughly 2% monthly before daily-cycle effects.",
-        PersonalDebtInterestType.Simple => "Example: $1,000 at 10% for 3 years gives $300 simple interest.",
-        PersonalDebtInterestType.Compound => "Example: Compounding grows faster than simple interest over time.",
-        _ => "Example: $600 monthly for 36 months with 0% interest totals $21,600."
+        PersonalDebtInterestType.Fixed => $"Example: {FormatCurrency(100000m)} at 10% fixed keeps the instalment the same for the whole term.",
+        PersonalDebtInterestType.Variable => "Example: a loan at prime that moves from 10% to 11% or 9% when the repo rate changes.",
+        PersonalDebtInterestType.Apr => "Example: 24% APR charged daily works out to about 2.02% a month.",
+        PersonalDebtInterestType.Simple => $"Example: {FormatCurrency(1000m)} at 10% for 3 years gives {FormatCurrency(300m)} simple interest.",
+        PersonalDebtInterestType.Compound => "Example: compounding grows faster than simple interest over time.",
+        _ => $"Example: {FormatCurrency(600m)} monthly for 36 months with 0% interest totals {FormatCurrency(21600m)}."
     };
 
     private bool ShouldShowDebtCompounding() => _selectedDebtInterestType == PersonalDebtInterestType.Compound;
 
     private string GetDebtCompoundingNote() => _selectedDebtInterestType switch
     {
-        PersonalDebtInterestType.Apr => "APR is annualized and does not use the compounding selector in this form.",
-        PersonalDebtInterestType.Variable => "Variable-rate loans change over time; update the rate and recalculate periodically.",
+        PersonalDebtInterestType.Apr => "APR interest is worked out daily and added monthly.",
+        PersonalDebtInterestType.Variable => "Variable-rate loans change over time; update the rate and recalculate when it moves.",
         PersonalDebtInterestType.None => "No compounding is used for zero-interest debt.",
-        _ => "Compounding applies only when Compound interest is selected."
+        _ => "Interest is worked out monthly on the outstanding balance."
     };
 
     private string GetDebtRateLabel() => _selectedDebtInterestType switch
     {
-        PersonalDebtInterestType.Apr => "APR (0.22 or 22)",
-        PersonalDebtInterestType.Fixed => "Fixed Interest Rate (0.22 or 22)",
-        PersonalDebtInterestType.Variable => "Current Variable Rate (0.22 or 22)",
-        PersonalDebtInterestType.Simple => "Simple Interest Rate (0.22 or 22)",
-        PersonalDebtInterestType.Compound => "Compound Interest Rate (0.22 or 22)",
-        _ => "Interest Rate (use 0 for no-interest debt)"
+        PersonalDebtInterestType.Apr => "APR (% per year)",
+        PersonalDebtInterestType.Fixed => "Fixed interest rate (% per year)",
+        PersonalDebtInterestType.Variable => "Current variable rate (% per year)",
+        PersonalDebtInterestType.Simple => "Simple interest rate (% per year)",
+        PersonalDebtInterestType.Compound => "Compound interest rate (% per year)",
+        _ => "Interest rate (use 0 for no-interest debt)"
     };
 
     private string GetDebtRateHelpText() => _selectedDebtInterestType switch
     {
-        PersonalDebtInterestType.Apr => "Enter APR as percent or decimal. Example: 24 or 0.24.",
-        PersonalDebtInterestType.Variable => "Enter your current rate now, then re-run when the rate changes.",
+        PersonalDebtInterestType.Variable => "Enter today's rate, e.g. 11.75 for 11.75%.",
         PersonalDebtInterestType.None => "Leave as 0 for no-interest debt.",
-        _ => "You can use either percent (22) or decimal (0.22)."
+        _ => "Enter the yearly rate as a percentage, e.g. 22 for 22% or 1 for 1%."
     };
 
     private async Task LoadSavedDebtsAsync()
@@ -764,7 +921,7 @@
         var fixedInput = new DebtCalculationInput
         {
             Principal = 100000m,
-            InterestRate = 10m,
+            AnnualRatePercent = 10m,
             InterestType = DebtInterestType.Amortizing,
             TermMonths = 180
         };
@@ -772,23 +929,25 @@
         var variableInput = new DebtCalculationInput
         {
             Principal = 100000m,
-            InterestRate = 11m,
+            AnnualRatePercent = 11m,
             InterestType = DebtInterestType.Amortizing,
+            IsVariableRate = true,
             TermMonths = 180
         };
 
         var aprInput = new DebtCalculationInput
         {
             Principal = 5000m,
-            InterestRate = 24m,
+            AnnualRatePercent = 24m,
             InterestType = DebtInterestType.Amortizing,
+            CompoundingFrequency = DebtCompoundingFrequency.Daily,
             TermMonths = 24
         };
 
         var simpleInput = new DebtCalculationInput
         {
             Principal = 1000m,
-            InterestRate = 10m,
+            AnnualRatePercent = 10m,
             InterestType = DebtInterestType.Simple,
             TermMonths = 36
         };
@@ -798,7 +957,7 @@
         var compoundInput = new DebtCalculationInput
         {
             Principal = 1000m,
-            InterestRate = 10m,
+            AnnualRatePercent = 10m,
             InterestType = DebtInterestType.Compound,
             CompoundingFrequency = DebtCompoundingFrequency.Monthly,
             TermMonths = 36
@@ -832,14 +991,14 @@
                 "apr",
                 "principal=5 000, APR=24%, termMonths=24",
                 Calculator.Calculate(aprInput),
-                "APR is annualized; monthly cost can be high if balances persist."),
+                "Interest is charged daily, so 24% APR costs about 2.02% a month."),
 
             new DebtExampleViewModel(
                 "Simple-interest personal loan",
                 "simple",
                 "principal=1 000, rate=10%, termMonths=36",
                 simpleResult,
-                "Simple interest reference: $1,000 × 10% × 3 years = $300 interest."),
+                $"Simple interest: {FormatCurrency(1000m)} × 10% × 3 years = {FormatCurrency(simpleResult.InterestAmount)} interest."),
 
             new DebtExampleViewModel(
                 "Compound-interest debt (monthly)",
@@ -857,9 +1016,14 @@
         ];
     }
 
-    private static string FormatCurrency(decimal? value)
+    private string FormatCurrency(decimal? value)
     {
-        return value.HasValue ? value.Value.ToString("C") : "—";
+        return value.HasValue ? CurrencyFormatting.FormatCurrency(value.Value, _currency) : "—";
+    }
+
+    private static string FormatMonthlyRate(decimal? value)
+    {
+        return value.HasValue ? $"{value:P3}" : "—";
     }
 
     private static string FormatDate(DateTime? value)

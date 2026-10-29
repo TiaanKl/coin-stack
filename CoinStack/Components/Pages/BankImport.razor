@@ -8,6 +8,7 @@
 @inject ISettingsService SettingsService
 @inject ICategoryService CategoryService
 @inject IGameFeedbackService GameFeedbackService
+@inject IJSRuntime JS
 
 <PageTitle>Bank Import & Intelligence</PageTitle>
 
@@ -86,9 +87,9 @@
                 {
                     <text> · @_result.SubscriptionsCreated subscription(s) created</text>
                 }
-                @if (_result.SubscriptionsUpdated > 0)
+                @if (_result.SubscriptionsLinked > 0)
                 {
-                    <text> · @_result.SubscriptionsUpdated subscription(s) updated</text>
+                    <text> · @_result.SubscriptionsLinked existing subscription(s) linked</text>
                 }
             </span>
             <button type="button" @onclick="() => _result = null" class="ml-auto text-success-500 hover:text-success-600">
@@ -275,9 +276,15 @@
                                 <td class="px-3 py-2">
                                     <input type="checkbox" @bind="proposal.CreateBucket" />
                                 </td>
-                                <td class="px-3 py-2 text-gray-800 dark:text-white/90">@proposal.MerchantName</td>
+                                <td class="px-3 py-2 text-gray-800 dark:text-white/90">
+                                    @proposal.MerchantName
+                                    @if (proposal.SubscriptionExists || proposal.BucketExists)
+                                    {
+                                        <span class="ml-1 text-xs text-gray-500 dark:text-gray-400">(already set up: transactions are linked, its amounts are left as you set them)</span>
+                                    }
+                                </td>
                                 <td class="px-3 py-2">@Money(proposal.MedianAmount)</td>
-                                <td class="px-3 py-2">@proposal.Cycle</td>
+                                <td class="px-3 py-2">@SubscriptionCosts.CycleLabel(proposal.Cycle)</td>
                                 <td class="px-3 py-2">@proposal.DebitOrderDay</td>
                             </tr>
                         }
@@ -924,7 +931,7 @@
 
             if (previews.Count > 0)
             {
-                _preview = previews.Count == 1 ? previews[0] : MergePreviews(previews);
+                _preview = await ImportService.MergePreviewsAsync(previews);
                 _result = null;
                 _showAllRows = false;
                 _expandedGroups.Clear();
@@ -945,44 +952,6 @@
         }
     }
 
-    private static StatementImportPreview MergePreviews(List<StatementImportPreview> previews)
-    {
-        var merged = new StatementImportPreview
-        {
-            BankFormat = previews[0].BankFormat,
-            FileName = string.Join(", ", previews.Select(p => p.FileName ?? "Statement").Distinct()),
-            AccountNumber = previews[0].AccountNumber,
-            PeriodStartUtc = previews.Min(p => p.PeriodStartUtc),
-            PeriodEndUtc = previews.Max(p => p.PeriodEndUtc),
-            OpeningBalance = previews.OrderBy(p => p.PeriodStartUtc).First().OpeningBalance,
-            ClosingBalance = previews.OrderByDescending(p => p.PeriodEndUtc).First().ClosingBalance,
-            RowsParsed = previews.Sum(p => p.RowsParsed),
-            InformationalRowsSkipped = previews.Sum(p => p.InformationalRowsSkipped),
-            PeakOverdraft = previews.Min(p => p.PeakOverdraft),
-            DaysInOverdraft = previews.Sum(p => p.DaysInOverdraft),
-            TotalAvoidableBankFees = previews.Sum(p => p.TotalAvoidableBankFees),
-            AvoidableBankFeeCount = previews.Sum(p => p.AvoidableBankFeeCount)
-        };
-
-        merged.Warnings.AddRange(previews.SelectMany(p => p.Warnings));
-
-        var seenFingerprints = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var candidate in previews.SelectMany(p => p.Candidates))
-        {
-            if (!seenFingerprints.Add(candidate.Fingerprint))
-            {
-                candidate.Include = false;
-                candidate.AlreadyExists = true;
-                candidate.SkipReason = "Duplicate of another uploaded statement";
-            }
-
-            merged.Candidates.Add(candidate);
-        }
-
-        BankStatementImportService.BuildGroupedMerchants(merged);
-        return merged;
-    }
 
     private void ToggleAccordion(string key)
     {
@@ -1080,13 +1049,26 @@
 
     private async Task RevertImportAsync(int importId)
     {
+        var confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            "Revert this import? Its transactions, and the subscriptions and buckets it created, will be deleted.");
+        if (!confirmed)
+        {
+            return;
+        }
+
         var removed = await ImportService.RevertImportAsync(importId);
 
-        if (removed > 0)
+        if (removed.TransactionsRemoved + removed.SubscriptionsRemoved + removed.BucketsRemoved > 0)
         {
+            var extras = new List<string>();
+            if (removed.SubscriptionsRemoved > 0) extras.Add($"{removed.SubscriptionsRemoved} subscription(s)");
+            if (removed.BucketsRemoved > 0) extras.Add($"{removed.BucketsRemoved} bucket(s)");
+
             GameFeedbackService.Trigger(new FeedbackPayload(
                 0,
-                $"Import reverted — {removed} transactions removed",
+                $"Import reverted — {removed.TransactionsRemoved} transactions removed"
+                + (extras.Count > 0 ? $", plus {string.Join(" and ", extras)}" : ""),
                 FeedbackKind.Normal));
 
             await ReloadDataAsync();

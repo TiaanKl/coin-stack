@@ -4,15 +4,19 @@
 @using CoinStack.Services
 @inject IGoalService GoalService
 @inject ISettingsService SettingsService
+@inject ISavingsService SavingsService
+@inject IJSRuntime JS
 
 <PageTitle>Goals</PageTitle>
 
 <div class="grid grid-cols-1 gap-6 xl:grid-cols-12">
     <div class="xl:col-span-4">
         <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h2 class="mb-1 text-xl font-semibold text-gray-800 dark:text-white/90">Goals</h2>
-            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">Create a savings goal with milestones and rewards.</p>
-            <form class="space-y-4" @onsubmit="CreateGoalAsync">
+            <h2 class="mb-1 text-xl font-semibold text-gray-800 dark:text-white/90">@(_editingGoalId.HasValue ? "Edit goal" : "Goals")</h2>
+            <p class="mb-4 text-sm text-gray-500 dark:text-gray-400">
+                @(_editingGoalId.HasValue ? "Change the name, target or date. Use Add and Withdraw to move money." : "Create a savings goal with milestones and rewards.")
+            </p>
+            <form class="space-y-4" @onsubmit="SaveGoalAsync">
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Goal name</label>
                     <input @bind="_goalName" type="text" placeholder="New Car"
@@ -23,11 +27,15 @@
                     <input @bind-value="_goalTargetAmount" @bind-value:event="oninput" type="number" min="0" step="0.01"
                            class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
                 </div>
-                <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Current amount</label>
-                    <input @bind-value="_goalCurrentAmount" @bind-value:event="oninput" type="number" min="0" step="0.01"
-                           class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
-                </div>
+                @if (!_editingGoalId.HasValue)
+                {
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Already saved elsewhere (optional)</label>
+                        <input @bind-value="_goalCurrentAmount" @bind-value:event="oninput" type="number" min="0" step="0.01"
+                               class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Money you've already put aside outside the app. Later contributions come from your savings.</p>
+                    </div>
+                }
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Target date (optional)</label>
                     <InputDate TValue="DateTime?" @bind-Value="_goalTargetDateUtc"
@@ -37,8 +45,28 @@
                 {
                     <div class="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">@_goalFormError</div>
                 }
-                <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-brand-500 px-4 py-3 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">Create goal</button>
+                <div class="flex gap-2">
+                    @if (_editingGoalId.HasValue)
+                    {
+                        <button type="button" @onclick="CancelEdit"
+                                class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                            Cancel
+                        </button>
+                    }
+                    <button type="submit" class="inline-flex flex-1 items-center justify-center rounded-lg bg-brand-500 px-4 py-3 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                        @(_editingGoalId.HasValue ? "Save changes" : "Create goal")
+                    </button>
+                </div>
             </form>
+        </div>
+
+        <div class="mt-4 rounded-2xl border border-gray-200 bg-white p-5 text-sm dark:border-gray-800 dark:bg-white/[0.03]">
+            <p class="text-gray-500 dark:text-gray-400">Free in savings</p>
+            <p class="text-xl font-bold text-gray-800 dark:text-white/90">@FormatC(_savingsAvailable)</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                @FormatC(_savingsReserved) is set aside for goals. Adding to a goal moves money out of free savings;
+                withdrawing, abandoning or deleting a goal moves it back.
+            </p>
         </div>
     </div>
 
@@ -52,16 +80,17 @@
         else
         {
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                @foreach (var goal in _goals.OrderByDescending(x => x.CreatedAtUtc))
+                @foreach (var goal in _goals.OrderBy(x => x.Status == GoalStatus.Abandoned).ThenByDescending(x => x.CreatedAtUtc))
                 {
                     var progressPercent = goal.TargetAmount <= 0 ? 0m : Math.Clamp(goal.CurrentAmount / goal.TargetAmount * 100m, 0m, 100m);
-                    <div class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+                    var isActive = goal.Status == GoalStatus.Active;
+                    <div class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] @(goal.Status == GoalStatus.Abandoned ? "opacity-60" : "")">
                         <div class="mb-3 flex items-start justify-between gap-3">
                             <div>
                                 <h4 class="text-base font-semibold text-gray-800 dark:text-white/90">@goal.Name</h4>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">@(goal.TargetDateUtc.HasValue ? $"Target: {goal.TargetDateUtc.Value:dd MMM yyyy}" : "No target date")</p>
                             </div>
-                            <span class="rounded-lg px-2 py-1 text-xs font-semibold @(goal.Status == GoalStatus.Completed ? "bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500" : "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400")">@goal.Status</span>
+                            <span class="rounded-lg px-2 py-1 text-xs font-semibold @StatusClass(goal.Status)">@goal.Status</span>
                         </div>
 
                         <div class="mb-3 flex items-end justify-between">
@@ -83,15 +112,39 @@
                             }
                         </div>
 
-                        <div class="mt-auto flex items-end gap-2">
-                            <div class="flex-1">
-                                <label class="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">Add contribution</label>
-                                <input type="number" min="0" step="0.01" value="@GetContributionInput(goal)"
-                                       @oninput="e => SetContributionInput(goal.Id, e.Value?.ToString())"
-                                       class="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                        @if (_messages.TryGetValue(goal.Id, out var message))
+                        {
+                            <p class="mb-3 rounded-lg px-3 py-2 text-xs @(message.IsError ? "bg-error-50 text-error-700 dark:bg-error-500/10 dark:text-error-400" : "bg-success-50 text-success-700 dark:bg-success-500/10 dark:text-success-400")">
+                                @message.Text
+                            </p>
+                        }
+
+                        @if (goal.Status != GoalStatus.Abandoned)
+                        {
+                            <div class="mt-auto flex items-end gap-2">
+                                <div class="flex-1">
+                                    <label class="mb-1.5 block text-xs font-medium text-gray-500 dark:text-gray-400">Amount</label>
+                                    <input type="number" min="0" step="0.01" value="@GetAmountInput(goal.Id)"
+                                           @oninput="e => SetAmountInput(goal.Id, e.Value?.ToString())"
+                                           class="h-10 w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800" />
+                                </div>
+                                @if (isActive)
+                                {
+                                    <button @onclick="() => ContributeAsync(goal.Id)" disabled="@(_busyGoalId == goal.Id)"
+                                            class="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600 disabled:opacity-50">Add</button>
+                                }
+                                <button @onclick="() => WithdrawAsync(goal.Id)" disabled="@(_busyGoalId == goal.Id || goal.CurrentAmount <= 0)"
+                                        class="inline-flex h-10 items-center justify-center rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">Withdraw</button>
                             </div>
-                            <button @onclick="() => AddContributionAsync(goal.Id)"
-                                    class="inline-flex h-10 items-center justify-center rounded-lg bg-brand-500 px-4 text-sm font-medium text-white hover:bg-brand-600">Add</button>
+                        }
+
+                        <div class="mt-3 flex flex-wrap justify-end gap-2 border-t border-gray-100 pt-3 text-xs dark:border-gray-800">
+                            @if (goal.Status != GoalStatus.Abandoned)
+                            {
+                                <button @onclick="() => StartEdit(goal)" class="rounded-full px-3 py-1 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800">Edit</button>
+                                <button @onclick="() => AbandonAsync(goal)" disabled="@(_busyGoalId == goal.Id)" class="rounded-full px-3 py-1 text-warning-700 hover:bg-warning-50 dark:text-warning-400 dark:hover:bg-warning-500/10">Abandon</button>
+                            }
+                            <button @onclick="() => DeleteAsync(goal)" disabled="@(_busyGoalId == goal.Id)" class="rounded-full px-3 py-1 text-error-600 hover:bg-error-50 dark:text-error-400 dark:hover:bg-error-500/10">Delete</button>
                         </div>
                     </div>
                 }
@@ -102,24 +155,32 @@
 
 @code {
     private readonly List<Goal> _goals = [];
-    private readonly Dictionary<int, decimal> _goalContributionInputs = new();
+    private readonly Dictionary<int, decimal> _amountInputs = new();
+    private readonly Dictionary<int, GoalMessage> _messages = new();
 
+    private int? _editingGoalId;
     private string _goalName = "";
     private decimal _goalTargetAmount;
     private decimal _goalCurrentAmount;
     private DateTime? _goalTargetDateUtc;
     private string _goalFormError = "";
-    private string _currency = "USD";
+    private string _currency = CoinStack.Data.Entities.AppSettings.DefaultCurrency;
+
+    private decimal _savingsAvailable;
+    private decimal _savingsReserved;
+
+    /// <summary>The goal whose money is moving; its buttons are disabled so a double-click can't add twice.</summary>
+    private int? _busyGoalId;
 
     protected override async Task OnInitializedAsync()
     {
         var settings = await SettingsService.GetAsync();
         _currency = settings.Currency;
         CurrencyFormatting.ApplyCurrency(_currency);
-        await ReloadGoalsAsync();
+        await ReloadAsync();
     }
 
-    private async Task CreateGoalAsync()
+    private async Task SaveGoalAsync()
     {
         _goalFormError = "";
 
@@ -135,9 +196,24 @@
             return;
         }
 
+        if (_editingGoalId is { } goalId)
+        {
+            await GoalService.UpdateAsync(new Goal
+            {
+                Id = goalId,
+                Name = _goalName.Trim(),
+                TargetAmount = _goalTargetAmount,
+                TargetDateUtc = _goalTargetDateUtc
+            });
+
+            CancelEdit();
+            await ReloadAsync();
+            return;
+        }
+
         if (_goalCurrentAmount < 0)
         {
-            _goalFormError = "Current amount cannot be negative.";
+            _goalFormError = "The amount already saved cannot be negative.";
             return;
         }
 
@@ -152,59 +228,170 @@
             Status = current >= _goalTargetAmount ? GoalStatus.Completed : GoalStatus.Active
         });
 
+        ClearForm();
+        await ReloadAsync();
+    }
+
+    private void StartEdit(Goal goal)
+    {
+        _editingGoalId = goal.Id;
+        _goalName = goal.Name;
+        _goalTargetAmount = goal.TargetAmount;
+        _goalTargetDateUtc = goal.TargetDateUtc;
+        _goalFormError = "";
+    }
+
+    private void CancelEdit()
+    {
+        _editingGoalId = null;
+        ClearForm();
+    }
+
+    private void ClearForm()
+    {
         _goalName = "";
         _goalTargetAmount = 0;
         _goalCurrentAmount = 0;
         _goalTargetDateUtc = null;
-
-        await ReloadGoalsAsync();
+        _goalFormError = "";
     }
 
-    private async Task AddContributionAsync(int goalId)
+    private async Task ContributeAsync(int goalId)
     {
-        if (!_goalContributionInputs.TryGetValue(goalId, out var amount) || amount <= 0)
+        var amount = _amountInputs.GetValueOrDefault(goalId);
+        await MoveMoneyAsync(goalId, async () =>
         {
-            return;
-        }
+            var result = await GoalService.ContributeAsync(goalId, amount);
+            if (!result.Succeeded)
+            {
+                return new GoalMessage(result.Error!, true);
+            }
 
-        var goal = _goals.FirstOrDefault(x => x.Id == goalId);
-        if (goal is null)
-        {
-            return;
-        }
+            var text = $"Moved {FormatC(result.Moved)} from savings into this goal.";
+            if (result.NotMoved > 0)
+            {
+                text += $" {FormatC(result.NotMoved)} stayed in savings: the goal only needed {FormatC(result.Moved)}.";
+            }
 
-        goal.CurrentAmount = Math.Min(goal.TargetAmount, goal.CurrentAmount + amount);
-        goal.Status = goal.CurrentAmount >= goal.TargetAmount ? GoalStatus.Completed : GoalStatus.Active;
-
-        await GoalService.UpdateAsync(goal);
-        await ReloadGoalsAsync();
+            return new GoalMessage(result.GoalCompleted ? text + " Goal reached!" : text, false);
+        });
     }
 
-    private async Task ReloadGoalsAsync()
+    private async Task WithdrawAsync(int goalId)
+    {
+        var amount = _amountInputs.GetValueOrDefault(goalId);
+        await MoveMoneyAsync(goalId, async () =>
+        {
+            var result = await GoalService.WithdrawAsync(goalId, amount);
+            if (!result.Succeeded)
+            {
+                return new GoalMessage(result.Error!, true);
+            }
+
+            var text = $"Moved {FormatC(result.Moved)} back into savings.";
+            if (result.NotMoved > 0)
+            {
+                text += $" The goal only held {FormatC(result.Moved)}.";
+            }
+
+            return new GoalMessage(text, false);
+        });
+    }
+
+    private async Task AbandonAsync(Goal goal)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Abandon \"{goal.Name}\"? The {FormatC(goal.CurrentAmount)} in it goes back to savings."))
+        {
+            return;
+        }
+
+        await MoveMoneyAsync(goal.Id, async () =>
+        {
+            var result = await GoalService.AbandonAsync(goal.Id);
+            return result.Succeeded
+                ? new GoalMessage($"Abandoned. {FormatC(result.Moved)} went back to savings.", false)
+                : new GoalMessage(result.Error!, true);
+        });
+    }
+
+    private async Task DeleteAsync(Goal goal)
+    {
+        var moneyNote = goal.CurrentAmount > 0 ? $" The {FormatC(goal.CurrentAmount)} in it goes back to savings." : "";
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete \"{goal.Name}\"?{moneyNote}"))
+        {
+            return;
+        }
+
+        _busyGoalId = goal.Id;
+        try
+        {
+            await GoalService.DeleteAsync(goal.Id);
+            _messages.Remove(goal.Id);
+            if (_editingGoalId == goal.Id)
+            {
+                CancelEdit();
+            }
+
+            await ReloadAsync();
+        }
+        finally
+        {
+            _busyGoalId = null;
+        }
+    }
+
+    /// <summary>Runs one money movement at a time, then clears the amount so a repeat click moves nothing.</summary>
+    private async Task MoveMoneyAsync(int goalId, Func<Task<GoalMessage>> move)
+    {
+        if (_busyGoalId.HasValue)
+        {
+            return;
+        }
+
+        _busyGoalId = goalId;
+        try
+        {
+            var message = await move();
+            _messages[goalId] = message;
+            if (!message.IsError)
+            {
+                _amountInputs[goalId] = 0m;
+            }
+
+            await ReloadAsync();
+        }
+        finally
+        {
+            _busyGoalId = null;
+        }
+    }
+
+    private async Task ReloadAsync()
     {
         var goals = await GoalService.GetAllAsync();
         _goals.Clear();
         _goals.AddRange(goals);
+
+        var savings = await SavingsService.GetStateAsync();
+        _savingsAvailable = savings.Available;
+        _savingsReserved = savings.Reserved;
     }
 
-    private decimal GetContributionInput(Goal goal)
+    private decimal GetAmountInput(int goalId) => _amountInputs.GetValueOrDefault(goalId);
+
+    private void SetAmountInput(int goalId, string? value)
     {
-        if (_goalContributionInputs.TryGetValue(goal.Id, out var amount))
-        {
-            return amount;
-        }
-
-        _goalContributionInputs[goal.Id] = 0m;
-        return 0m;
+        _amountInputs[goalId] = decimal.TryParse(value, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : 0m;
     }
 
-    private void SetContributionInput(int goalId, string? value)
+    private static string StatusClass(GoalStatus status) => status switch
     {
-        if (decimal.TryParse(value, out var parsed))
-        {
-            _goalContributionInputs[goalId] = parsed;
-        }
-    }
+        GoalStatus.Completed => "bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500",
+        GoalStatus.Abandoned => "bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400",
+        _ => "bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400"
+    };
 
     private IEnumerable<MilestoneData> GetMilestones(decimal progressPercent)
     {
@@ -217,4 +404,6 @@
     private string FormatC(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _currency, 2);
 
     private sealed record MilestoneData(string Label, string Reward, bool IsUnlocked);
+
+    private sealed record GoalMessage(string Text, bool IsError);
 }

@@ -106,22 +106,38 @@ public sealed class StatementImportResult
     public decimal? DetectedMonthlySalary { get; set; }
     public int SyntheticIncomeRemoved { get; set; }
     public int SubscriptionsCreated { get; set; }
-    public int SubscriptionsUpdated { get; set; }
+    /// <summary>Existing subscriptions the imported transactions were linked to; their cost is left as it was.</summary>
+    public int SubscriptionsLinked { get; set; }
     public int BucketsCreated { get; set; }
 }
+
+/// <summary>What reverting an import removed.</summary>
+public sealed record StatementRevertResult(int TransactionsRemoved, int SubscriptionsRemoved, int BucketsRemoved);
 
 public interface IBankStatementImportService
 {
     /// <summary>Parses the PDF, classifies rows, aggregates merchant groups, and checks them against existing data.</summary>
     Task<StatementImportPreview?> BuildPreviewAsync(Stream pdfStream, string fileName, CancellationToken cancellationToken = default);
 
-    /// <summary>Commits the selected candidates as transactions, grouped under a statement import record.</summary>
+    /// <summary>
+    /// Combines several uploaded files into one preview: rows found in more than one file are kept once,
+    /// and recurring payments are detected across all of them.
+    /// </summary>
+    Task<StatementImportPreview> MergePreviewsAsync(IReadOnlyList<StatementImportPreview> previews, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Commits the selected candidates as transactions, grouped under a statement import record.
+    /// Everything is saved in one database transaction: a failure part-way leaves nothing behind.
+    /// </summary>
     Task<StatementImportResult> ImportAsync(StatementImportPreview preview, CancellationToken cancellationToken = default);
 
     Task<List<StatementImport>> GetImportHistoryAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Deletes every transaction created by one import and marks it reverted.</summary>
-    Task<int> RevertImportAsync(int importId, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Deletes every transaction created by one import, plus the subscriptions and buckets it created,
+    /// and marks it reverted.
+    /// </summary>
+    Task<StatementRevertResult> RevertImportAsync(int importId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// After a statement has been imported: drop the app-generated "Monthly Income" rows,
@@ -262,6 +278,27 @@ public sealed class BankStatementImportService : IBankStatementImportService
         // 7. Aggregate into Grouped Merchant Views
         BuildGroupedMerchants(preview);
 
+        await DetectRecurringProposalsAsync(db, preview, cancellationToken);
+
+        if (preview.ClosingBalance is null)
+        {
+            preview.Warnings.Add("This file has no running balance. Transactions will still import; set today's FNB balance with Update balance so cash matches the bank.");
+        }
+
+        if (preview.PeriodEndUtc is { } end && (DateTime.UtcNow.Date - end.Date).TotalDays > 21)
+        {
+            preview.Warnings.Add($"This file only goes to {end:dd MMM yyyy}. Monthly PDFs often lag. Download transaction history (CSV/OFX) from the FNB app or online banking for the missing weeks.");
+        }
+
+        return preview;
+    }
+
+    /// <summary>Finds recurring payments across what is already saved plus the rows this preview will add.</summary>
+    private static async Task DetectRecurringProposalsAsync(
+        CoinStackDbContext db,
+        StatementImportPreview preview,
+        CancellationToken cancellationToken)
+    {
         var existingTransactions = await db.Transactions
             .AsNoTracking()
             .Include(t => t.Category)
@@ -278,20 +315,68 @@ public sealed class BankStatementImportService : IBankStatementImportService
                 OccurredAtUtc = c.DateUtc
             });
 
+        preview.RecurringProposals.Clear();
         preview.RecurringProposals.AddRange(
             RecurringMerchantDetector.DetectFromTransactions(existingTransactions.Concat(fromPreview).ToList()));
 
-        if (preview.ClosingBalance is null)
+        await ApplyDismissalsAndExistingAsync(db, preview.RecurringProposals, cancellationToken);
+    }
+
+    public async Task<StatementImportPreview> MergePreviewsAsync(
+        IReadOnlyList<StatementImportPreview> previews,
+        CancellationToken cancellationToken = default)
+    {
+        if (previews.Count == 1)
         {
-            preview.Warnings.Add("This file has no running balance. Transactions will still import; set today's FNB balance with Update balance so cash matches the bank.");
+            return previews[0];
         }
 
-        if (preview.PeriodEndUtc is { } end && (DateTime.UtcNow.Date - end.Date).TotalDays > 21)
+        var byStart = previews.OrderBy(p => p.PeriodStartUtc ?? DateTime.MaxValue).ToList();
+        var byEnd = previews.OrderByDescending(p => p.PeriodEndUtc ?? DateTime.MinValue).ToList();
+
+        var merged = new StatementImportPreview
         {
-            preview.Warnings.Add($"This file only goes to {end:dd MMM yyyy}. Monthly PDFs often lag. Download transaction history (CSV/OFX) from the FNB app or online banking for the missing weeks.");
+            BankFormat = previews[0].BankFormat,
+            FileName = string.Join(", ", previews.Select(p => p.FileName ?? "Statement").Distinct()),
+            AccountNumber = previews[0].AccountNumber,
+            PeriodStartUtc = previews.Min(p => p.PeriodStartUtc),
+            PeriodEndUtc = previews.Max(p => p.PeriodEndUtc),
+            OpeningBalance = byStart[0].OpeningBalance,
+            ClosingBalance = byEnd[0].ClosingBalance,
+            RowsParsed = previews.Sum(p => p.RowsParsed),
+            InformationalRowsSkipped = previews.Sum(p => p.InformationalRowsSkipped),
+            PeakOverdraft = previews.Min(p => p.PeakOverdraft),
+            DaysInOverdraft = previews.Sum(p => p.DaysInOverdraft),
+            TotalAvoidableBankFees = previews.Sum(p => p.TotalAvoidableBankFees),
+            AvoidableBankFeeCount = previews.Sum(p => p.AvoidableBankFeeCount),
+            DetectedSalaryAmount = byEnd.FirstOrDefault(p => p.DetectedSalaryAmount is not null)?.DetectedSalaryAmount,
+            DetectedSalaryPayday = byEnd.FirstOrDefault(p => p.DetectedSalaryPayday is not null)?.DetectedSalaryPayday
+        };
+
+        merged.Warnings.AddRange(previews.SelectMany(p => p.Warnings).Distinct());
+
+        var seenFingerprints = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var candidate in previews.SelectMany(p => p.Candidates))
+        {
+            if (!seenFingerprints.Add(candidate.Fingerprint))
+            {
+                candidate.Include = false;
+                candidate.AlreadyExists = true;
+                candidate.SkipReason = "Duplicate of another uploaded statement";
+            }
+
+            merged.Candidates.Add(candidate);
         }
 
-        return preview;
+        BuildGroupedMerchants(merged);
+
+        // Detect across every file together: a monthly debit order seen once per statement only looks
+        // recurring when the statements are combined.
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await DetectRecurringProposalsAsync(db, merged, cancellationToken);
+
+        return merged;
     }
 
     private static void DetectPassThroughs(List<ImportCandidate> candidates)
@@ -368,6 +453,10 @@ public sealed class BankStatementImportService : IBankStatementImportService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
+        // Several saves happen below (the import row first, for its id); one database transaction makes
+        // them all-or-nothing, so a failure can't leave an import with half its rows or subscriptions.
+        await using var dbTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
         var categories = await db.Categories
             .AsNoTracking()
             .ToListAsync(cancellationToken);
@@ -415,6 +504,9 @@ public sealed class BankStatementImportService : IBankStatementImportService
         import.DuplicatesSkipped = preview.DuplicateCount;
         import.TransfersSkipped = preview.TransferCount;
 
+        // Saved now so the recurring step below finds these rows and links them to their subscriptions.
+        await db.SaveChangesAsync(cancellationToken);
+
         var salaryAmounts = toImport
             .Concat(preview.Candidates.Where(c => c.AlreadyExists))
             .Where(c => c.Type == TransactionType.Income && TransactionConventions.LooksLikeSalary(c.RawDescription ?? c.Description))
@@ -451,9 +543,10 @@ public sealed class BankStatementImportService : IBankStatementImportService
             db, preview.ClosingBalance, balanceAsOf, isNewestStatement ? detectedSalary : null,
             isNewestStatement ? payday : 0, cancellationToken);
 
-        var recurringStats = await ApplyRecurringProposalsAsync(db, preview.RecurringProposals, cancellationToken);
+        var recurringStats = await ApplyRecurringProposalsAsync(db, preview.RecurringProposals, import.Id, cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
+        await dbTransaction.CommitAsync(cancellationToken);
 
         return new StatementImportResult
         {
@@ -468,7 +561,7 @@ public sealed class BankStatementImportService : IBankStatementImportService
             DetectedMonthlySalary = detectedSalary,
             SyntheticIncomeRemoved = syntheticsRemoved,
             SubscriptionsCreated = recurringStats.Created,
-            SubscriptionsUpdated = recurringStats.Updated,
+            SubscriptionsLinked = recurringStats.Linked,
             BucketsCreated = recurringStats.BucketsCreated
         };
     }
@@ -482,25 +575,34 @@ public sealed class BankStatementImportService : IBankStatementImportService
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<int> RevertImportAsync(int importId, CancellationToken cancellationToken = default)
+    public async Task<StatementRevertResult> RevertImportAsync(int importId, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
         var import = await db.StatementImports.FirstOrDefaultAsync(i => i.Id == importId, cancellationToken);
         if (import is null || import.Status == StatementImportStatus.Reverted)
         {
-            return 0;
+            return new StatementRevertResult(0, 0, 0);
         }
 
         var transactions = await db.Transactions
             .Where(t => t.StatementImportId == importId)
             .ToListAsync(cancellationToken);
+        var subscriptions = await db.Subscriptions
+            .Where(s => s.CreatedByStatementImportId == importId)
+            .ToListAsync(cancellationToken);
+        var buckets = await db.Buckets
+            .Where(b => b.CreatedByStatementImportId == importId)
+            .ToListAsync(cancellationToken);
 
+        // Other transactions linked to these lose the link (the foreign keys are set to null).
         db.Transactions.RemoveRange(transactions);
+        db.Subscriptions.RemoveRange(subscriptions);
+        db.Buckets.RemoveRange(buckets);
         import.Status = StatementImportStatus.Reverted;
         await db.SaveChangesAsync(cancellationToken);
 
-        return transactions.Count;
+        return new StatementRevertResult(transactions.Count, subscriptions.Count, buckets.Count);
     }
 
     public async Task ReconcileAppWithBankDataAsync(CancellationToken cancellationToken = default)
@@ -616,36 +718,48 @@ public sealed class BankStatementImportService : IBankStatementImportService
             .ToListAsync(cancellationToken);
 
         var proposals = RecurringMerchantDetector.DetectFromTransactions(transactions);
-        var stats = await ApplyRecurringProposalsAsync(db, proposals, cancellationToken);
+        var stats = await ApplyRecurringProposalsAsync(db, proposals, statementImportId: null, cancellationToken);
         await db.SaveChangesAsync(cancellationToken);
-        return stats.Created + stats.Updated;
+        return stats.Created + stats.Linked;
     }
 
-    private static async Task<(int Created, int Updated, int BucketsCreated)> ApplyRecurringProposalsAsync(
+    /// <summary>
+    /// Creates the subscriptions and buckets the user kept ticked, and links the merchant's transactions
+    /// to them. Existing ones are linked but never changed: the user may have edited the cost or
+    /// allocation. Merchants whose subscription or bucket the user deleted are not created again.
+    /// </summary>
+    /// <returns>Subscriptions created, existing subscriptions linked, and buckets created.</returns>
+    private static async Task<(int Created, int Linked, int BucketsCreated)> ApplyRecurringProposalsAsync(
         CoinStackDbContext db,
         IReadOnlyList<RecurringProposal> proposals,
+        int? statementImportId,
         CancellationToken cancellationToken)
     {
         var created = 0;
-        var updated = 0;
+        var linked = 0;
         var bucketsCreated = 0;
 
         var subscriptions = await db.Subscriptions.ToListAsync(cancellationToken);
         var buckets = await db.Buckets.ToListAsync(cancellationToken);
         var categories = await db.Categories.ToListAsync(cancellationToken);
+        var dismissed = await LoadDismissalsAsync(db, cancellationToken);
         var transactions = await db.Transactions
             .Where(t => t.Type == TransactionType.Expense)
             .ToListAsync(cancellationToken);
 
         foreach (var proposal in proposals)
         {
-            if (!proposal.CreateSubscription && !proposal.CreateBucket)
+            dismissed.TryGetValue(proposal.NormalizedKey, out var dismissal);
+            var wantsSubscription = proposal.CreateSubscription && dismissal?.SubscriptionDismissed != true;
+            var wantsBucket = proposal.CreateBucket && dismissal?.BucketDismissed != true;
+
+            if (!wantsSubscription && !wantsBucket)
             {
                 continue;
             }
 
             Subscription? subscription = null;
-            if (proposal.CreateSubscription)
+            if (wantsSubscription)
             {
                 subscription = subscriptions.FirstOrDefault(s =>
                     string.Equals(s.Name, proposal.MerchantName, StringComparison.OrdinalIgnoreCase));
@@ -659,7 +773,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
                         Cycle = proposal.Cycle,
                         Cost = proposal.MedianAmount,
                         Status = SubscriptionStatus.Active,
-                        DebitOrderDay = proposal.DebitOrderDay
+                        DebitOrderDay = proposal.DebitOrderDay,
+                        CreatedByStatementImportId = statementImportId
                     };
                     db.Subscriptions.Add(subscription);
                     subscriptions.Add(subscription);
@@ -668,49 +783,34 @@ public sealed class BankStatementImportService : IBankStatementImportService
                 }
                 else
                 {
-                    subscription.Cost = proposal.MedianAmount;
-                    subscription.Cycle = proposal.Cycle;
-                    subscription.DebitOrderDay = proposal.DebitOrderDay;
-                    if (string.IsNullOrWhiteSpace(subscription.Category))
-                    {
-                        subscription.Category = proposal.CategoryName;
-                    }
-
-                    updated++;
+                    linked++;
                 }
             }
 
             Bucket? bucket = null;
-            if (proposal.CreateBucket)
+            if (wantsBucket)
             {
                 bucket = buckets.FirstOrDefault(b =>
                     string.Equals(b.Name, proposal.MerchantName, StringComparison.OrdinalIgnoreCase));
 
-                var categoryId = categories
-                    .FirstOrDefault(c => string.Equals(c.Name, proposal.CategoryName, StringComparison.OrdinalIgnoreCase))
-                    ?.Id;
-
                 if (bucket is null)
                 {
+                    var categoryId = categories
+                        .FirstOrDefault(c => string.Equals(c.Name, proposal.CategoryName, StringComparison.OrdinalIgnoreCase))
+                        ?.Id;
+
                     bucket = new Bucket
                     {
                         Name = proposal.MerchantName,
                         AllocatedAmount = proposal.MonthlyAllocation,
                         CategoryId = categoryId,
-                        SortOrder = buckets.Count
+                        SortOrder = buckets.Count,
+                        CreatedByStatementImportId = statementImportId
                     };
                     db.Buckets.Add(bucket);
                     buckets.Add(bucket);
                     bucketsCreated++;
                     await db.SaveChangesAsync(cancellationToken);
-                }
-                else
-                {
-                    bucket.AllocatedAmount = proposal.MonthlyAllocation;
-                    if (bucket.CategoryId is null)
-                    {
-                        bucket.CategoryId = categoryId;
-                    }
                 }
             }
 
@@ -722,19 +822,58 @@ public sealed class BankStatementImportService : IBankStatementImportService
                     continue;
                 }
 
-                if (subscription is not null)
+                // Never move a transaction the user already filed somewhere else.
+                if (subscription is not null && tx.SubscriptionId is null)
                 {
                     tx.SubscriptionId = subscription.Id;
                 }
 
-                if (bucket is not null)
+                if (bucket is not null && tx.BucketId is null)
                 {
                     tx.BucketId = bucket.Id;
                 }
             }
         }
 
-        return (created, updated, bucketsCreated);
+        return (created, linked, bucketsCreated);
+    }
+
+    private static async Task<Dictionary<string, DismissedRecurringMerchant>> LoadDismissalsAsync(
+        CoinStackDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var rows = await db.DismissedRecurringMerchants.AsNoTracking().ToListAsync(cancellationToken);
+        return rows.ToDictionary(r => r.NormalizedKey, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Untick what the user deleted before, and flag what already exists, so the preview shows what an
+    /// import will really do. Merchants dismissed for both are dropped from the list.
+    /// </summary>
+    private static async Task ApplyDismissalsAndExistingAsync(
+        CoinStackDbContext db,
+        List<RecurringProposal> proposals,
+        CancellationToken cancellationToken)
+    {
+        var dismissed = await LoadDismissalsAsync(db, cancellationToken);
+        var subscriptionNames = (await db.Subscriptions.AsNoTracking().Select(s => s.Name).ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var bucketNames = (await db.Buckets.AsNoTracking().Select(b => b.Name).ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        proposals.RemoveAll(p => dismissed.TryGetValue(p.NormalizedKey, out var d) && d.SubscriptionDismissed && d.BucketDismissed);
+
+        foreach (var proposal in proposals)
+        {
+            if (dismissed.TryGetValue(proposal.NormalizedKey, out var dismissal))
+            {
+                proposal.CreateSubscription &= !dismissal.SubscriptionDismissed;
+                proposal.CreateBucket &= !dismissal.BucketDismissed;
+            }
+
+            proposal.SubscriptionExists = subscriptionNames.Contains(proposal.MerchantName);
+            proposal.BucketExists = bucketNames.Contains(proposal.MerchantName);
+        }
     }
 
     private static ImportCandidate Classify(ParsedStatementTransaction parsed)

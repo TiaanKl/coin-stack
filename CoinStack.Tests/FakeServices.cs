@@ -218,6 +218,8 @@ internal sealed class FakeTransactionService : ITransactionService
 {
     public int CreateWithGameLoopCalls { get; private set; }
 
+    public Transaction? LastCreated { get; private set; }
+
     public Task<List<Transaction>> GetAllAsync(CancellationToken cancellationToken = default)
         => Task.FromResult<List<Transaction>>([]);
 
@@ -242,6 +244,7 @@ internal sealed class FakeTransactionService : ITransactionService
         CancellationToken cancellationToken = default)
     {
         CreateWithGameLoopCalls++;
+        LastCreated = transaction;
         transaction.Id = 1;
         return Task.FromResult((transaction, new GameTransactionResult
         {

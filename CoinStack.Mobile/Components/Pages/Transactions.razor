@@ -131,7 +131,7 @@
 	private bool _isSaving;
 	private bool _isLoading = true;
 	private string? _statusMessage;
-	private string _currency = "USD";
+	private string _currency = CoinStack.Data.Entities.AppSettings.DefaultCurrency;
 
 	protected override async Task OnInitializedAsync()
 	{
@@ -147,7 +147,7 @@
 		{
 			await using var db = await DbFactory.CreateDbContextAsync();
 			var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync();
-			_currency = settings?.Currency ?? "USD";
+			_currency = settings?.Currency ?? CoinStack.Data.Entities.AppSettings.DefaultCurrency;
 
 			var buckets = await db.Buckets
 				.AsNoTracking()

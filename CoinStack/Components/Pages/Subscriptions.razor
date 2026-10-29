@@ -75,7 +75,7 @@
                                         </div>
                                     </td>
                                     <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">@subscription.Category</td>
-                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">@subscription.Cycle</td>
+                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">@SubscriptionCosts.CycleLabel(subscription.Cycle)</td>
                                     <td class="px-4 py-4 text-sm font-medium text-gray-800 dark:text-white/90">@subscription.Cost.ToString("0.00")</td>
                                     <td class="px-4 py-4">
                                         <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium @GetStatusClasses(subscription.Status)">
@@ -181,9 +181,9 @@
                         <select
                             @bind="_formCycle"
                             class="dark:bg-dark-900 h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800">
-                            @foreach (var value in Enum.GetValues<SubscriptionCycle>())
+                            @foreach (var value in SubscriptionCosts.CyclesInOrder)
                             {
-                                <option value="@value">@value</option>
+                                <option value="@value">@SubscriptionCosts.CycleLabel(value)</option>
                             }
                         </select>
                     </div>

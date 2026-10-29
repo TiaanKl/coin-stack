@@ -34,7 +34,9 @@ public enum SubscriptionCycle
     Weekly = 0,
     Monthly = 1,
     Quarterly = 2,
-    Yearly = 3
+    Yearly = 3,
+    Fortnightly = 4,
+    HalfYearly = 5
 }
 
 public enum SubscriptionStatus

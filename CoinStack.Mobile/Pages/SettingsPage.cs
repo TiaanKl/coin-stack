@@ -136,7 +136,7 @@ public sealed class SettingsPage : ContentPage
             return;
         }
 
-        var currency = _currencyPicker.SelectedItem as string ?? "USD";
+        var currency = _currencyPicker.SelectedItem as string ?? AppSettings.DefaultCurrency;
         var monthStart = _monthStartPicker.SelectedItem is int day ? day : 1;
 
         _settings.Currency = currency;

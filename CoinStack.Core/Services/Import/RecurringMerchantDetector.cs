@@ -22,9 +22,14 @@ public sealed class RecurringProposal
 
     public bool CreateBucket { get; set; } = true;
 
-    public decimal MonthlyAllocation => Cycle == SubscriptionCycle.Monthly
-        ? MedianAmount
-        : Math.Round(SubscriptionCosts.MonthlyEquivalent(Cycle, MedianAmount), 2, MidpointRounding.AwayFromZero);
+    /// <summary>A subscription with this name already exists; importing links to it and leaves its cost alone.</summary>
+    public bool SubscriptionExists { get; set; }
+
+    /// <summary>A bucket with this name already exists; importing links to it and leaves its allocation alone.</summary>
+    public bool BucketExists { get; set; }
+
+    public decimal MonthlyAllocation =>
+        Math.Round(SubscriptionCosts.MonthlyEquivalent(Cycle, MedianAmount), 2, MidpointRounding.AwayFromZero);
 }
 
 public static class RecurringMerchantDetector
@@ -147,7 +152,7 @@ public static class RecurringMerchantDetector
                 continue;
             }
 
-            var cycle = InferCycle(group.Select(r => r.DateUtc).OrderBy(d => d).ToList());
+            var (cycle, cost) = ResolveCycleAndCost(group.ToList(), median);
             var debitDay = group
                 .Select(r => r.DateUtc.Day)
                 .GroupBy(d => d)
@@ -160,7 +165,7 @@ public static class RecurringMerchantDetector
                 MerchantName = sample.Name,
                 NormalizedKey = group.Key,
                 CategoryName = sample.Category,
-                MedianAmount = Math.Round(median, 2, MidpointRounding.AwayFromZero),
+                MedianAmount = Math.Round(cost, 2, MidpointRounding.AwayFromZero),
                 Cycle = cycle,
                 DebitOrderDay = Math.Clamp(debitDay, 1, 28),
                 OccurrenceCount = group.Count(),
@@ -201,11 +206,17 @@ public static class RecurringMerchantDetector
         return false;
     }
 
-    private static SubscriptionCycle InferCycle(List<DateTime> ordered)
+    /// <summary>
+    /// Works out how often the merchant charges, from the typical gap between charges, and the cost
+    /// per cycle. A merchant that charges more than once in a month at uneven spacing (two plans, or a
+    /// top-up) is monthly, costing the month's total rather than one charge.
+    /// </summary>
+    private static (SubscriptionCycle Cycle, decimal Cost) ResolveCycleAndCost(List<RecurringRow> rows, decimal medianCharge)
     {
+        var ordered = rows.Select(r => r.DateUtc).OrderBy(d => d).ToList();
         if (ordered.Count < 2)
         {
-            return SubscriptionCycle.Monthly;
+            return (SubscriptionCycle.Monthly, medianCharge);
         }
 
         var gaps = new List<double>();
@@ -214,23 +225,49 @@ public static class RecurringMerchantDetector
             gaps.Add((ordered[i] - ordered[i - 1]).TotalDays);
         }
 
-        var avg = gaps.Average();
-        if (avg is >= 5 and <= 10)
+        var medianGap = Median(gaps.OrderBy(g => g).Select(g => (decimal)g).ToList());
+
+        bool MostGapsBetween(decimal low, decimal high) =>
+            gaps.Count(g => (decimal)g >= low && (decimal)g <= high) >= Math.Ceiling(gaps.Count * 0.75);
+
+        if (medianGap is >= 5 and <= 10 && MostGapsBetween(5, 10))
         {
-            return SubscriptionCycle.Weekly;
+            return (SubscriptionCycle.Weekly, medianCharge);
         }
 
-        if (avg is >= 80 and <= 100)
+        if (medianGap is >= 11 and <= 18 && MostGapsBetween(11, 18))
         {
-            return SubscriptionCycle.Quarterly;
+            return (SubscriptionCycle.Fortnightly, medianCharge);
         }
 
-        if (avg >= 300)
+        if (medianGap is >= 75 and <= 110)
         {
-            return SubscriptionCycle.Yearly;
+            return (SubscriptionCycle.Quarterly, medianCharge);
         }
 
-        return SubscriptionCycle.Monthly;
+        if (medianGap is >= 150 and <= 210)
+        {
+            return (SubscriptionCycle.HalfYearly, medianCharge);
+        }
+
+        if (medianGap >= 300)
+        {
+            return (SubscriptionCycle.Yearly, medianCharge);
+        }
+
+        if (medianGap <= 45)
+        {
+            var monthlyTotals = rows
+                .GroupBy(r => (r.DateUtc.Year, r.DateUtc.Month))
+                .Select(g => g.Sum(r => r.Amount))
+                .OrderBy(total => total)
+                .ToList();
+
+            return (SubscriptionCycle.Monthly, Median(monthlyTotals));
+        }
+
+        // Spacing between the standard cycles (e.g. every two months): book the monthly average.
+        return (SubscriptionCycle.Monthly, medianCharge * 30.44m / medianGap);
     }
 
     private static decimal Median(List<decimal> ordered)

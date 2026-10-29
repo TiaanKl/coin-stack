@@ -1,5 +1,6 @@
 using CoinStack.Data;
 using CoinStack.Data.Entities;
+using CoinStack.Services.Import;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Services;
@@ -55,6 +56,8 @@ public sealed class BucketService : IBucketService
         existing.CategoryId = bucket.CategoryId;
         existing.Icon = bucket.Icon;
         existing.SortOrder = bucket.SortOrder;
+        existing.IsSavings = bucket.IsSavings;
+        existing.GoalId = bucket.IsSavings ? bucket.GoalId : null;
 
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -67,6 +70,9 @@ public sealed class BucketService : IBucketService
         {
             return;
         }
+
+        // Only the bucket's own name: a bucket like "Groceries" holds many merchants that must stay scannable.
+        await RecurringDismissals.RecordAsync(db, existing.Name, [], subscription: false, bucket: true, cancellationToken);
 
         db.Buckets.Remove(existing);
         await db.SaveChangesAsync(cancellationToken);

@@ -465,11 +465,13 @@
     private void RunSimulation()
     {
         if (_selectedDebt is null) return;
-        _currentResult = Simulate(_selectedDebt.CurrentBalance, _selectedDebt.InterestRatePercent, _selectedDebt.MonthlyPaymentAmount);
-        _simResult = Simulate(_selectedDebt.CurrentBalance, _selectedDebt.InterestRatePercent, _simPayment);
+        var debitDay = _selectedDebt.PaymentStartDateUtc.Day;
+        _currentResult = Simulate(_selectedDebt.CurrentBalance, _selectedDebt.InterestRatePercent, _selectedDebt.MonthlyPaymentAmount, debitDay);
+        _simResult = Simulate(_selectedDebt.CurrentBalance, _selectedDebt.InterestRatePercent, _simPayment, debitDay);
     }
 
-    private static SimResult Simulate(decimal balance, decimal annualRatePercent, decimal monthlyPayment)
+    /// <summary>Runs the payoff schedule, dating each payment on the debt's debit-order day.</summary>
+    private static SimResult Simulate(decimal balance, decimal annualRatePercent, decimal monthlyPayment, int debitDay)
     {
         if (balance <= 0)
             return new SimResult(0, 0m, 0m, DateTime.Today, []);
@@ -492,7 +494,7 @@
         {
             rows.Add(new SimRow(
                 instalment.PaymentNumber,
-                startDate.AddMonths(instalment.PaymentNumber),
+                DebtInterestAccrual.DebitOrderDate(startDate, debitDay, instalment.PaymentNumber),
                 instalment.Payment,
                 instalment.PrincipalPortion,
                 instalment.InterestPortion,

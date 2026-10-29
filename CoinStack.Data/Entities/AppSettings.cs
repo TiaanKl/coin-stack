@@ -2,7 +2,10 @@ namespace CoinStack.Data.Entities;
 
 public sealed class AppSettings : EntityBase
 {
-    public string Currency { get; set; } = "USD";
+    /// <summary>The currency for new installs and for any code path that has not loaded settings yet.</summary>
+    public const string DefaultCurrency = "ZAR";
+
+    public string Currency { get; set; } = DefaultCurrency;
     public int MonthStartDay { get; set; } = 1;
     public decimal MonthlyIncome { get; set; }
 
