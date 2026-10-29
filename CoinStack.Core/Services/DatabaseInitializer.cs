@@ -1,6 +1,7 @@
 using CoinStack.Data;
 using CoinStack.Data.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CoinStack.Services;
 

@@ -1,37 +1,138 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="CoinStack.Desktop.Views.BudgetsView"
-             x:DataType="viewModels:BudgetsViewModel">
-    <StackPanel Spacing="20">
-        <Grid ColumnDefinitions="*, Auto">
-            <TextBlock Text="Budgets" Classes="h1" />
-            <Button Classes="primary" Grid.Column="1">+ Add Bucket</Button>
+             x:DataType="vm:BudgetsViewModel">
+    <StackPanel Spacing="24">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Buckets" Classes="PageTitle" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="primary" Command="{Binding AddBucketCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <i:Icon Value="fa-solid fa-plus" FontSize="12" />
+                    <TextBlock Text="Add bucket" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
         </Grid>
 
-        <ItemsControl ItemsSource="{Binding Buckets}">
+        <TextBlock Text="{Binding StatusMessage}" Classes="body"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+            <Border Classes="StatCard">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Allocated" Classes="body" />
+                    <TextBlock Text="{Binding TotalAllocatedText}" Classes="Money" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Spent" Classes="body" />
+                    <TextBlock Text="{Binding TotalSpentText}" Classes="Money" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="2">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Remaining" Classes="body" />
+                    <TextBlock Text="{Binding TotalRemainingText}" Classes="Money" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="New bucket" Classes="h2" />
+                <Grid ColumnDefinitions="2*,*,*,*,Auto,Auto" ColumnSpacing="12">
+                    <TextBox PlaceholderText="Name" Text="{Binding NewBucketName}" />
+                    <NumericUpDown Grid.Column="1" Width="168" Minimum="0"
+                                   FormatString="0.00"
+                                   Value="{Binding NewAllocatedAmount}" />
+                    <ComboBox Grid.Column="2" MinWidth="140"
+                              ItemsSource="{Binding CategoryOptions}"
+                              SelectedItem="{Binding SelectedCategory}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CategoryOption">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ComboBox Grid.Column="3" MinWidth="140"
+                              ItemsSource="{Binding GoalOptions}"
+                              SelectedItem="{Binding SelectedGoal}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:GoalOption">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <CheckBox Grid.Column="4"
+                              Content="Savings"
+                              IsChecked="{Binding IsSavingsBucket}"
+                              VerticalAlignment="Center" />
+                    <Button Grid.Column="5" Classes="secondary" Command="{Binding AddBucketCommand}" Content="Create" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card" IsVisible="{Binding !HasBuckets}">
+            <StackPanel Spacing="8" HorizontalAlignment="Center" Margin="0,24">
+                <i:Icon Value="fa-solid fa-wallet" FontSize="28" Foreground="{DynamicResource TextMutedBrush}"
+                        HorizontalAlignment="Center" />
+                <TextBlock Text="No buckets yet" Classes="h2" HorizontalAlignment="Center" />
+                <TextBlock Text="Create a bucket to allocate spend for the current budget period."
+                           Classes="body" HorizontalAlignment="Center" TextAlignment="Center" />
+            </StackPanel>
+        </Border>
+
+        <ItemsControl ItemsSource="{Binding Buckets}" IsVisible="{Binding HasBuckets}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel />
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <Border Classes="Card" Width="280" Margin="8">
+                <DataTemplate x:DataType="vm:BucketRow">
+                    <Border Classes="Card" Width="320" Margin="0,0,16,16">
                         <StackPanel Spacing="12">
-                            <TextBlock Text="{Binding Name}" Classes="h2" />
-                            <ProgressBar Value="{Binding Spent}" Maximum="{Binding Planned}" Height="6"
-                                         CornerRadius="3">
-                                <ProgressBar.Foreground>
-                                    <SolidColorBrush Color="{Binding Color}" />
-                                </ProgressBar.Foreground>
-                            </ProgressBar>
-                            <Grid ColumnDefinitions="*, *">
-                                <TextBlock Classes="body" Text="{Binding Spent, StringFormat='Spent: ${0:F2}'}" />
-                                <TextBlock Classes="body" Grid.Column="1"
-                                           Text="{Binding Remaining, StringFormat='Remaining: ${0:F2}'}"
-                                           HorizontalAlignment="Right" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Name}" Classes="h2"
+                                               Foreground="{DynamicResource TextPrimaryBrush}" />
+                                    <TextBlock Text="{Binding CategoryText}" Classes="body" FontSize="12" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding StatusText}"
+                                           Classes="body" FontSize="12"
+                                           Foreground="{Binding IsOverBudget, Converter={StaticResource BoolToStatusBrushConverter}, ConverterParameter=invert}" />
                             </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto">
+                                <ProgressBar Classes="pill"
+                                             Value="{Binding ProgressValue}"
+                                             Maximum="{Binding ProgressMaximum}" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding ProgressPercentText}"
+                                           Classes="MoneySm"
+                                           Margin="12,0,0,0"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,*">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="Spent" Classes="body" FontSize="11" />
+                                    <TextBlock Text="{Binding SpentText}" Classes="MoneySm" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2" HorizontalAlignment="Right">
+                                    <TextBlock Text="Remaining" Classes="body" FontSize="11" HorizontalAlignment="Right" />
+                                    <TextBlock Text="{Binding RemainingText}" Classes="MoneySm" HorizontalAlignment="Right" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="{Binding AllocatedText, StringFormat='Allocated {0}'}"
+                                       Classes="body" FontSize="12" />
+                            <TextBlock Text="{Binding GoalText, StringFormat='Goal · {0}'}"
+                                       Classes="body" FontSize="12"
+                                       IsVisible="{Binding GoalText, Converter={x:Static ObjectConverters.IsNotNull}}" />
                         </StackPanel>
                     </Border>
                 </DataTemplate>

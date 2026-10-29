@@ -1,33 +1,75 @@
-<!-- File: CoinStack.Desktop/Views/SavingsView.axaml -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="CoinStack.Desktop.Views.SavingsView"
-             x:DataType="viewModels:SavingsViewModel">
-    <StackPanel Spacing="20">
-        <TextBlock Text="Savings" Classes="h1" />
-        
-        <Grid ColumnDefinitions="*, *, *" RowDefinitions="Auto, Auto" ColumnSpacing="16">
-            <Border Classes="Card" Grid.Row="0" Grid.Column="0">
-                <StackPanel><TextBlock Text="Total Saved" Classes="body"/><TextBlock Text="{Binding TotalSaved, StringFormat='${0:F2}'}" FontSize="24" FontWeight="Bold"/></StackPanel>
+             x:DataType="vm:SavingsViewModel">
+    <StackPanel Spacing="24">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Savings" Classes="PageTitle" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="primary" Command="{Binding ApplyMonthCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <i:Icon Value="fa-solid fa-calendar-check" FontSize="12" />
+                    <TextBlock Text="Apply this month" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <TextBlock Text="{Binding StatusMessage}" Classes="body"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="16">
+            <Border Classes="StatCard">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Total saved" Classes="body" />
+                    <TextBlock Text="{Binding TotalSavedText}" Classes="Money" />
+                </StackPanel>
             </Border>
-            <Border Classes="Card" Grid.Row="0" Grid.Column="1">
-                <StackPanel><TextBlock Text="Available" Classes="body"/><TextBlock Text="{Binding Available, StringFormat='${0:F2}'}" FontSize="24" FontWeight="Bold"/></StackPanel>
+            <Border Classes="StatCard" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Available" Classes="body" />
+                    <TextBlock Text="{Binding AvailableText}" Classes="Money" />
+                </StackPanel>
             </Border>
-            <Border Classes="Card" Grid.Row="0" Grid.Column="2">
-                <StackPanel><TextBlock Text="This Month" Classes="body"/><TextBlock Text="{Binding ThisMonth, StringFormat='+${0:F2}'}" FontSize="24" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}"/></StackPanel>
+            <Border Classes="StatCard" Grid.Column="2">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="This month" Classes="body" />
+                    <TextBlock Text="{Binding ThisMonthText}" Classes="Money" />
+                </StackPanel>
             </Border>
-            <Border Classes="Card" Grid.Row="1" Grid.Column="0">
-                <StackPanel><TextBlock Text="Interest Earned" Classes="body"/><TextBlock Text="{Binding InterestEarned, StringFormat='${0:F2}'}" FontSize="20" FontWeight="SemiBold"/></StackPanel>
+            <Border Classes="StatCard" Grid.Row="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Interest earned" Classes="body" />
+                    <TextBlock Text="{Binding InterestEarnedText}" Classes="Money" />
+                </StackPanel>
             </Border>
-            <Border Classes="Card" Grid.Row="1" Grid.Column="1">
-                <StackPanel><TextBlock Text="Emergency Total" Classes="body"/><TextBlock Text="{Binding EmergencyTotal, StringFormat='${0:F2}'}" FontSize="20" FontWeight="SemiBold"/></StackPanel>
+            <Border Classes="StatCard" Grid.Row="1" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Emergency total" Classes="body" />
+                    <TextBlock Text="{Binding EmergencyTotalText}" Classes="Money" />
+                </StackPanel>
             </Border>
-            <Border Classes="Card" Grid.Row="1" Grid.Column="2">
-                <StackPanel><TextBlock Text="Emergency Available" Classes="body"/><TextBlock Text="{Binding EmergencyAvailable, StringFormat='${0:F2}'}" FontSize="20" FontWeight="SemiBold"/></StackPanel>
+            <Border Classes="StatCard" Grid.Row="1" Grid.Column="2">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Emergency available" Classes="body" />
+                    <TextBlock Text="{Binding EmergencyAvailableText}" Classes="Money" />
+                </StackPanel>
             </Border>
         </Grid>
-        
-        <Button Classes="primary" HorizontalAlignment="Left">Apply This Month</Button>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Manage reserves" Classes="h2" />
+                <TextBlock Text="{Binding LastCalculatedMonth, StringFormat='Last calculated: {0}'}" Classes="body" />
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                    <TextBox PlaceholderText="Amount to add" Text="{Binding TransferAmount}" />
+                    <Button Grid.Column="1" Classes="primary" Command="{Binding AddToSavingsCommand}" Content="Add to savings" />
+                    <Button Grid.Column="2" Classes="secondary" Command="{Binding ToggleFallbackCommand}">
+                        <TextBlock Text="{Binding FallbackEnabled, StringFormat='Fallback: {0}'}" />
+                    </Button>
+                </Grid>
+                <TextBlock Text="{Binding ReservedText, StringFormat='Reserved {0}'}" Classes="body" FontSize="12" />
+            </StackPanel>
+        </Border>
     </StackPanel>
 </UserControl>

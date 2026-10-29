@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="CoinStack.Data/CoinStack.Data.csproj" />
+  <Project Path="CoinStack.Core/CoinStack.Core.csproj" />
   <Project Path="CoinStack/CoinStack.csproj" />
   <Project Path="CoinStack.Desktop/CoinStack.Desktop.csproj" />
   <Project Path="CoinStack.Mobile.Core/CoinStack.Mobile.Core.csproj" />

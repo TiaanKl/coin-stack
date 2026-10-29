@@ -1,39 +1,82 @@
-// File: CoinStack.Desktop/ViewModels/IncomeViewModel.cs
-
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
+using CoinStack.Data.Entities;
+using CoinStack.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace CoinStack.Desktop.ViewModels;
 
-public partial class IncomeViewModel : ViewModelBase
+public partial class IncomeViewModel : ViewModelBase, IAsyncInitializable
 {
-    [ObservableProperty] private decimal _receivedThisMonth = 3400;
-    [ObservableProperty] private decimal _yearToDate = 28500;
-    [ObservableProperty] private ObservableCollection<IncomeSource> _incomeSources;
-    [ObservableProperty] private ObservableCollection<TransactionItem> _recentDeposits;
-    
-    public IncomeViewModel()
-    {
-        IncomeSources = new ObservableCollection<IncomeSource>
-        {
-            new() { Category = "Salary", Amount = 3200, Percentage = 85 },
-            new() { Category = "Freelance", Amount = 450, Percentage = 12 },
-            new() { Category = "Investments", Amount = 120, Percentage = 3 }
-        };
-        
-        RecentDeposits = new ObservableCollection<TransactionItem>
-        {
-            new() { Date = DateTime.Now.AddDays(-2), Description = "Monthly Salary", Amount = 3200, Type = "Income" },
-            new() { Date = DateTime.Now.AddDays(-5), Description = "Freelance Project", Amount = 450, Type = "Income" },
-            new() { Date = DateTime.Now.AddDays(-10), Description = "Dividend", Amount = 45.30m, Type = "Income" }
-        };
-    }
-}
+    private readonly ITransactionService _transactions;
+    private readonly ISettingsService _settings;
+    private readonly IMoneyFormatter _money;
 
-public class IncomeSource
-{
-    public string Category { get; set; } = "";
-    public decimal Amount { get; set; }
-    public double Percentage { get; set; }
+    [ObservableProperty] private string _monthlyIncomeText = "";
+    [ObservableProperty] private string _periodIncomeText = "";
+    [ObservableProperty] private string _lifetimeIncomeText = "";
+    [ObservableProperty] private string _periodLabel = "This period";
+
+    public ObservableCollection<TransactionRow> IncomeTransactions { get; } = [];
+
+    public IncomeViewModel(
+        ITransactionService transactions,
+        ISettingsService settings,
+        IMoneyFormatter money)
+    {
+        _transactions = transactions;
+        _settings = settings;
+        _money = money;
+    }
+
+    public async Task InitializeAsync()
+    {
+        IsBusy = true;
+        StatusMessage = null;
+        try
+        {
+            var settings = await _settings.GetAsync();
+            var currency = settings.Currency;
+            var now = DateTime.UtcNow;
+            var (start, end) = BudgetPeriodHelper.GetBounds(settings.MonthStartDay, now);
+
+            MonthlyIncomeText = _money.Format(currency, settings.MonthlyIncome);
+            PeriodLabel = $"{start.ToLocalTime():MMM dd} – {end.AddDays(-1).ToLocalTime():MMM dd}";
+
+            var period = await _transactions.GetIncomeExpenseForPeriodAsync(start, end);
+            PeriodIncomeText = _money.Format(currency, period.Income);
+
+            var lifetime = await _transactions.GetLifetimeTotalsAsync();
+            LifetimeIncomeText = _money.Format(currency, lifetime.TotalIncome);
+
+            IncomeTransactions.Clear();
+            var income = (await _transactions.GetAllAsync())
+                .Where(t => t.Type == TransactionType.Income)
+                .OrderByDescending(t => t.OccurredAtUtc);
+
+            foreach (var tx in income)
+            {
+                IncomeTransactions.Add(new TransactionRow
+                {
+                    Id = tx.Id,
+                    Date = tx.OccurredAtUtc,
+                    Description = tx.Description,
+                    Category = tx.Category?.Name ?? "Uncategorized",
+                    TypeLabel = "Income",
+                    AmountText = _money.Format(currency, tx.Amount),
+                    IsIncome = true
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Failed to load income: {ex.Message}";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
 }

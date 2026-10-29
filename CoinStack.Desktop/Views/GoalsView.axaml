@@ -1,26 +1,71 @@
-<!-- File: CoinStack.Desktop/Views/GoalsView.axaml -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="CoinStack.Desktop.Views.GoalsView"
-             x:DataType="viewModels:GoalsViewModel">
-    <StackPanel Spacing="20">
-        <Grid ColumnDefinitions="*, Auto">
-            <TextBlock Text="Goals" Classes="h1" />
-            <Button Classes="primary" Grid.Column="1">+ Create Goal</Button>
+             x:DataType="vm:GoalsViewModel">
+    <StackPanel Spacing="24">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Goals" Classes="PageTitle" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="primary" Command="{Binding AddGoalCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <i:Icon Value="fa-solid fa-bullseye" FontSize="12" />
+                    <TextBlock Text="Create goal" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
         </Grid>
-        
+
+        <TextBlock Text="{Binding StatusMessage}" Classes="body"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+            <Border Classes="StatCard">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Active" Classes="body" />
+                    <TextBlock Text="{Binding ActiveCountText}" Classes="Money" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Completed" Classes="body" />
+                    <TextBlock Text="{Binding CompletedCountText}" Classes="Money" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="New goal" Classes="h2" />
+                <Grid ColumnDefinitions="2*,*,Auto" ColumnSpacing="12">
+                    <TextBox PlaceholderText="Name" Text="{Binding NewGoalName}" />
+                    <TextBox Grid.Column="1" PlaceholderText="Target amount" Text="{Binding NewTargetAmount}" />
+                    <Button Grid.Column="2" Classes="secondary" Command="{Binding AddGoalCommand}" Content="Create" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
         <ItemsControl ItemsSource="{Binding Goals}">
             <ItemsControl.ItemTemplate>
-                <DataTemplate>
+                <DataTemplate x:DataType="vm:GoalRow">
                     <Border Classes="Card" Margin="0,0,0,12">
                         <StackPanel Spacing="12">
-                            <TextBlock Text="{Binding Name}" Classes="h2" />
-                            <TextBlock Text="{Binding TargetDate, StringFormat='Target: {0:MMM yyyy}'}" Classes="body" />
-                            <ProgressBar Value="{Binding Progress}" Height="8" CornerRadius="4" Foreground="{DynamicResource PrimaryBrush}" />
-                            <Grid ColumnDefinitions="*, *">
-                                <TextBlock Text="{Binding Current, StringFormat='${0:F2}'}" />
-                                <TextBlock Text="{Binding Target, StringFormat='/ ${0:F2}'}" Grid.Column="1" HorizontalAlignment="Right" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Text="{Binding Name}" Classes="h2" />
+                                <TextBlock Grid.Column="1" Text="{Binding StatusText}" Classes="body" FontSize="12" />
+                            </Grid>
+                            <TextBlock Text="{Binding TargetDateText, StringFormat='Target {0}'}"
+                                       Classes="body"
+                                       IsVisible="{Binding TargetDateText, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            <ProgressBar Classes="pill"
+                                         Value="{Binding ProgressValue}"
+                                         Maximum="{Binding ProgressMaximum}" />
+                            <Grid ColumnDefinitions="*,*">
+                                <TextBlock Text="{Binding CurrentText}" Classes="MoneySm" />
+                                <TextBlock Text="{Binding TargetText, StringFormat='/ {0}'}"
+                                           Classes="body"
+                                           Grid.Column="1"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center" />
                             </Grid>
                         </StackPanel>
                     </Border>

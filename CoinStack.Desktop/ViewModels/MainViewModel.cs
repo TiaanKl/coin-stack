@@ -1,57 +1,110 @@
-﻿// File: CoinStack.Desktop/ViewModels/MainViewModel.cs
+﻿using System;
 using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CoinStack.Desktop.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
-    [ObservableProperty] private ViewModelBase _currentPage;
+    private readonly IServiceProvider _services;
+
+    [ObservableProperty] private ViewModelBase? _currentPage;
     [ObservableProperty] private bool _isDrawerExpanded = true;
-    
-    public ObservableCollection<MenuItem> MenuItems { get; }
-    
-    public MainViewModel()
+    [ObservableProperty] private NavItem? _selectedItem;
+
+    public ObservableCollection<NavSection> Sections { get; } = [];
+
+    public MainViewModel(IServiceProvider services)
     {
-        MenuItems =
+        _services = services;
+
+        Sections.Add(new NavSection("Overview",
         [
-            new() { Name = "Dashboard", Icon = "📊", IconChar = "\ue1ac", ViewModel = new DashboardViewModel() },
-            new() { Name = "Transactions", Icon = "💰", IconChar = "\ue1ad", ViewModel = new TransactionsViewModel() },
-            new() { Name = "Budgets", Icon = "📁", IconChar = "\ue1c0", ViewModel = new BudgetsViewModel() },
-            new() { Name = "Goals", Icon = "🎯", IconChar = "\ue1c1", ViewModel = new GoalsViewModel() },
-            new() { Name = "Debt", Icon = "💳", IconChar = "\ue1c4", ViewModel = new DebtViewModel() },
-            new() { Name = "Categories", Icon = "🏷️", IconChar = "\ue1c5", ViewModel = new CategoriesViewModel() },
-            new() { Name = "Income", Icon = "📈", IconChar = "\ue1d0", ViewModel = new IncomeViewModel() },
-            new() { Name = "Savings", Icon = "🏦", IconChar = "\ue1d5", ViewModel = new SavingsViewModel() },
-            new() { Name = "Achievements", Icon = "🏆", IconChar = "\ue1d9", ViewModel = new AchievementsViewModel() },
-            new() { Name = "Challenges", Icon = "⚡", IconChar = "\ue1da", ViewModel = new ChallengesViewModel() },
-            new() { Name = "Reports", Icon = "📄", IconChar = "\ue1db", ViewModel = new ReportsViewModel() },
-            new() { Name = "Subscriptions", Icon = "🔄", IconChar = "\ue1dc", ViewModel = new SubscriptionsViewModel() },
-            new() { Name = "Settings", Icon = "⚙️", IconChar = "\ue1de", ViewModel = new SettingsViewModel() }
-        ];
-        
-        CurrentPage = MenuItems[0].ViewModel;
+            new NavItem("Dashboard", "fa-solid fa-house", typeof(DashboardViewModel)),
+            new NavItem("Reports", "fa-solid fa-chart-line", typeof(ReportsViewModel)),
+        ]));
+
+        Sections.Add(new NavSection("Money In & Out",
+        [
+            new NavItem("Transactions", "fa-solid fa-right-left", typeof(TransactionsViewModel)),
+            new NavItem("Income", "fa-solid fa-arrow-trend-up", typeof(IncomeViewModel)),
+            new NavItem("Categories", "fa-solid fa-tags", typeof(CategoriesViewModel)),
+            new NavItem("Subscriptions", "fa-solid fa-rotate", typeof(SubscriptionsViewModel)),
+        ]));
+
+        Sections.Add(new NavSection("Planning",
+        [
+            new NavItem("Buckets", "fa-solid fa-wallet", typeof(BudgetsViewModel)),
+            new NavItem("Goals", "fa-solid fa-bullseye", typeof(GoalsViewModel)),
+            new NavItem("Savings", "fa-solid fa-piggy-bank", typeof(SavingsViewModel)),
+        ]));
+
+        Sections.Add(new NavSection("Debt",
+        [
+            new NavItem("Debt Accounts", "fa-solid fa-credit-card", typeof(DebtViewModel)),
+        ]));
+
+        Sections.Add(new NavSection("System",
+        [
+            new NavItem("Settings", "fa-solid fa-gear", typeof(SettingsViewModel)),
+        ]));
+
+        var first = Sections[0].Items[0];
+        _ = NavigateAsync(first);
     }
-    
-    [RelayCommand]
-    private void Navigate(MenuItem item)
+
+    partial void OnSelectedItemChanged(NavItem? value)
     {
-        if (item?.ViewModel != null)
-            CurrentPage = item.ViewModel;
+        foreach (var section in Sections)
+        {
+            foreach (var item in section.Items)
+                item.IsSelected = ReferenceEquals(item, value);
+        }
     }
-    
+
     [RelayCommand]
-    private void ToggleDrawer()
+    private async Task NavigateAsync(NavItem? item)
     {
-        IsDrawerExpanded = !IsDrawerExpanded;
+        if (item is null) return;
+
+        SelectedItem = item;
+        var vm = (ViewModelBase)_services.GetRequiredService(item.ViewModelType);
+        CurrentPage = vm;
+
+        if (vm is IAsyncInitializable initializable)
+            await initializable.InitializeAsync();
     }
+
+    [RelayCommand]
+    private void ToggleDrawer() => IsDrawerExpanded = !IsDrawerExpanded;
 }
 
-public class MenuItem
+public interface IAsyncInitializable
 {
-    public string Name { get; set; } = "";
-    public string Icon { get; set; } = "";
-    public string IconChar { get; set; } = "";
-    public ViewModelBase ViewModel { get; set; } = null!;
+    Task InitializeAsync();
+}
+
+public sealed class NavSection(string title, NavItem[] items)
+{
+    public string Title { get; } = title;
+    public ObservableCollection<NavItem> Items { get; } = new(items);
+}
+
+public partial class NavItem : ObservableObject
+{
+    public NavItem(string name, string icon, Type viewModelType)
+    {
+        Name = name;
+        Icon = icon;
+        ViewModelType = viewModelType;
+    }
+
+    public string Name { get; }
+    public string Icon { get; }
+    public Type ViewModelType { get; }
+
+    [ObservableProperty] private bool _isSelected;
 }

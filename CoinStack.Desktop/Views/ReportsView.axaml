@@ -1,43 +1,75 @@
-<!-- File: CoinStack.Desktop/Views/ReportsView.axaml -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="CoinStack.Desktop.Views.ReportsView"
-             x:DataType="viewModels:ReportsViewModel">
-    <ScrollViewer Padding="0,0,0,20">
-        <StackPanel Spacing="20">
-            <TextBlock Text="Monthly Report" Classes="h1" TextWrapping="Wrap" />
-            
-            <Grid ColumnDefinitions="*, *" ColumnSpacing="20" RowSpacing="20">
-                <Border Classes="Card">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Income" Classes="body" FontSize="12" Foreground="#6B7280" />
-                        <TextBlock Text="{Binding IncomeThisMonth, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource SuccessBrush}" />
-                        <TextBlock Text="This Month" Classes="body" FontSize="11" Foreground="#9CA3AF" />
-                    </StackPanel>
-                </Border>
-                <Border Classes="Card">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Expenses" Classes="body" FontSize="12" Foreground="#6B7280" />
-                        <TextBlock Text="{Binding ExpensesThisMonth, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="{DynamicResource ErrorBrush}" />
-                        <TextBlock Text="This Month" Classes="body" FontSize="11" Foreground="#9CA3AF" />
-                    </StackPanel>
-                </Border>
-                <Border Classes="Card" Grid.Row="1">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Net Cashflow" Classes="body" FontSize="12" Foreground="#6B7280" />
-                        <TextBlock Text="{Binding NetCashflow, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="#3B82F6" />
-                        <TextBlock Text="Income - Expenses" Classes="body" FontSize="11" Foreground="#9CA3AF" />
-                    </StackPanel>
-                </Border>
-                <Border Classes="Card" Grid.Row="1" Grid.Column="1">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Savings Available" Classes="body" FontSize="12" Foreground="#6B7280" />
-                        <TextBlock Text="{Binding SavingsAvailable, StringFormat='${0:F2}'}" FontSize="28" FontWeight="Bold" Foreground="#10B981" />
-                        <TextBlock Text="Ready to Save" Classes="body" FontSize="11" Foreground="#9CA3AF" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </StackPanel>
-    </ScrollViewer>
+             x:DataType="vm:ReportsViewModel">
+    <StackPanel Spacing="24">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Reports" Classes="PageTitle" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <i:Icon Value="fa-solid fa-chart-line" FontSize="14" />
+                <TextBlock Text="{Binding PeriodLabel}" Classes="body" VerticalAlignment="Center" />
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Text="{Binding StatusMessage}" Classes="body"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <TextBlock Text="Current month" Classes="h2" />
+        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+            <Border Classes="StatCard">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Income" Classes="body" />
+                    <TextBlock Text="{Binding PeriodIncomeText}" Classes="Money"
+                               Foreground="{DynamicResource SuccessBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Expenses" Classes="body" />
+                    <TextBlock Text="{Binding PeriodExpenseText}" Classes="Money"
+                               Foreground="{DynamicResource DangerBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="2">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Net" Classes="body" />
+                    <TextBlock Text="{Binding PeriodNetText}" Classes="Money"
+                               Foreground="{Binding PeriodNetPositive, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <TextBlock Text="Lifetime" Classes="h2" />
+        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+            <Border Classes="StatCard">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Income" Classes="body" />
+                    <TextBlock Text="{Binding LifetimeIncomeText}" Classes="Money"
+                               Foreground="{DynamicResource SuccessBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Expenses" Classes="body" />
+                    <TextBlock Text="{Binding LifetimeExpenseText}" Classes="Money"
+                               Foreground="{DynamicResource DangerBrush}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="2">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Net" Classes="body" />
+                    <TextBlock Text="{Binding LifetimeNetText}" Classes="Money"
+                               Foreground="{Binding LifetimeNetPositive, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="3">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Savings available" Classes="body" />
+                    <TextBlock Text="{Binding SavingsAvailableText}" Classes="Money" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
 </UserControl>

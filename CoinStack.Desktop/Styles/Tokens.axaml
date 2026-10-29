@@ -1,0 +1,59 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <sys:Double x:Key="RadiusSm">8</sys:Double>
+    <sys:Double x:Key="RadiusMd">12</sys:Double>
+    <sys:Double x:Key="RadiusLg">20</sys:Double>
+    <CornerRadius x:Key="RadiusPill">999</CornerRadius>
+    <Thickness x:Key="CardPadding">20</Thickness>
+    <CornerRadius x:Key="CardCornerRadius">20</CornerRadius>
+
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <SolidColorBrush x:Key="CanvasBrush" Color="#F4F4F5" />
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#FAFAFA" />
+            <SolidColorBrush x:Key="BorderBrush" Color="#E4E4E7" />
+            <SolidColorBrush x:Key="BorderStrongBrush" Color="#D4D4D8" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#111111" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#71717A" />
+            <SolidColorBrush x:Key="TextMutedBrush" Color="#A1A1AA" />
+            <SolidColorBrush x:Key="PrimaryBrush" Color="#111111" />
+            <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#27272A" />
+            <SolidColorBrush x:Key="PrimaryForegroundBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="NavHoverBrush" Color="#F4F4F5" />
+            <SolidColorBrush x:Key="NavSelectedBrush" Color="#111111" />
+            <SolidColorBrush x:Key="NavSelectedForegroundBrush" Color="#FFFFFF" />
+            <SolidColorBrush x:Key="SuccessBrush" Color="#16A34A" />
+            <SolidColorBrush x:Key="WarnBrush" Color="#CA8A04" />
+            <SolidColorBrush x:Key="DangerBrush" Color="#DC2626" />
+            <SolidColorBrush x:Key="ProgressTrackBrush" Color="#E4E4E7" />
+            <SolidColorBrush x:Key="ProgressFillBrush" Color="#111111" />
+            <SolidColorBrush x:Key="BackgroundBrush" Color="#F4F4F5" />
+        </ResourceDictionary>
+
+        <ResourceDictionary x:Key="Dark">
+            <SolidColorBrush x:Key="CanvasBrush" Color="#09090B" />
+            <SolidColorBrush x:Key="SurfaceBrush" Color="#18181B" />
+            <SolidColorBrush x:Key="SurfaceMutedBrush" Color="#27272A" />
+            <SolidColorBrush x:Key="BorderBrush" Color="#27272A" />
+            <SolidColorBrush x:Key="BorderStrongBrush" Color="#3F3F46" />
+            <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FAFAFA" />
+            <SolidColorBrush x:Key="TextSecondaryBrush" Color="#A1A1AA" />
+            <SolidColorBrush x:Key="TextMutedBrush" Color="#71717A" />
+            <SolidColorBrush x:Key="PrimaryBrush" Color="#FAFAFA" />
+            <SolidColorBrush x:Key="PrimaryHoverBrush" Color="#E4E4E7" />
+            <SolidColorBrush x:Key="PrimaryForegroundBrush" Color="#111111" />
+            <SolidColorBrush x:Key="NavHoverBrush" Color="#27272A" />
+            <SolidColorBrush x:Key="NavSelectedBrush" Color="#FAFAFA" />
+            <SolidColorBrush x:Key="NavSelectedForegroundBrush" Color="#111111" />
+            <SolidColorBrush x:Key="SuccessBrush" Color="#22C55E" />
+            <SolidColorBrush x:Key="WarnBrush" Color="#EAB308" />
+            <SolidColorBrush x:Key="DangerBrush" Color="#F87171" />
+            <SolidColorBrush x:Key="ProgressTrackBrush" Color="#3F3F46" />
+            <SolidColorBrush x:Key="ProgressFillBrush" Color="#FAFAFA" />
+            <SolidColorBrush x:Key="BackgroundBrush" Color="#09090B" />
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

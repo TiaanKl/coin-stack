@@ -1,127 +1,133 @@
-<Window x:Name="RootWindow"
-        xmlns="https://github.com/avaloniaui"
+<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
-        xmlns:views="clr-namespace:CoinStack.Desktop.Views"
         xmlns:local="clr-namespace:CoinStack.Desktop"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
         x:Class="CoinStack.Desktop.Views.MainWindow"
+        x:Name="RootWindow"
         x:DataType="vm:MainViewModel"
         x:CompileBindings="True"
-        Title="CoinStack - Personal Finance"
-        Width="1400" Height="900"
-        MinWidth="1000" MinHeight="600">
-    
-    <Design.DataContext>
-        <vm:MainViewModel />
-    </Design.DataContext>
-    
+        Title="CoinStack"
+        Width="1440" Height="920"
+        MinWidth="1100" MinHeight="700"
+        Background="{DynamicResource CanvasBrush}">
+
     <Window.Resources>
         <local:ViewLocator x:Key="ViewLocator" />
     </Window.Resources>
-    
-    <Grid RowDefinitions="Auto, *">
-        <!-- Top Bar with Toggle -->
-        <Border Padding="12,8"
-                Background="White"
-                BorderBrush="#D0D0D0"
-                BorderThickness="0,0,0,1"
-                Grid.Row="0">
-            <Button Command="{Binding ToggleDrawerCommand}"
-                    Background="Transparent"
-                    Padding="8"
-                    CornerRadius="4"
-                    Width="40" Height="40"
-                    HorizontalAlignment="Left">
-                <TextBlock Text="&#xE700;"
-                           FontFamily="Segoe MDL2 Assets"
-                           FontSize="18"
-                           Foreground="#424242"
-                           TextAlignment="Center" />
-            </Button>
+
+    <Grid ColumnDefinitions="Auto,*" Margin="16">
+        <Border Classes="sidebar"
+                Classes.expanded="{Binding IsDrawerExpanded}"
+                Background="{DynamicResource SurfaceBrush}"
+                CornerRadius="24"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                ClipToBounds="True"
+                Margin="0,0,16,0">
+            <Border.Width>
+                <Binding Path="IsDrawerExpanded" Converter="{StaticResource BoolConverter}" ConverterParameter="268|72" />
+            </Border.Width>
+            <Border.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Width" Duration="0:0:0.22" />
+                </Transitions>
+            </Border.Transitions>
+
+            <DockPanel>
+                <Border DockPanel.Dock="Top"
+                        Padding="16,18,12,12"
+                        IsVisible="{Binding IsDrawerExpanded}">
+                    <Grid ColumnDefinitions="Auto,*,Auto">
+                        <Border Width="36" Height="36" CornerRadius="10"
+                                Background="{DynamicResource PrimaryBrush}"
+                                VerticalAlignment="Center">
+                            <i:Icon Value="fa-solid fa-coins" FontSize="16"
+                                    Foreground="{DynamicResource PrimaryForegroundBrush}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                            <TextBlock Text="CoinStack" FontSize="16" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" />
+                            <TextBlock Text="Personal finance" Classes="body" FontSize="11" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Classes="iconButton"
+                                Command="{Binding ToggleDrawerCommand}"
+                                ToolTip.Tip="Collapse sidebar">
+                            <i:Icon Value="fa-solid fa-bars" FontSize="14" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Border DockPanel.Dock="Top"
+                        Padding="0,16,0,8"
+                        IsVisible="{Binding !IsDrawerExpanded}">
+                    <Button Classes="iconButton"
+                            HorizontalAlignment="Center"
+                            Command="{Binding ToggleDrawerCommand}"
+                            ToolTip.Tip="Expand sidebar">
+                        <i:Icon Value="fa-solid fa-bars" FontSize="14" />
+                    </Button>
+                </Border>
+
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Sections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NavSection">
+                                <StackPanel Margin="0,6,0,2">
+                                    <TextBlock Text="{Binding Title}"
+                                               Classes="SectionLabel"
+                                               Margin="20,8,16,6"
+                                               IsVisible="{Binding #RootWindow.((vm:MainViewModel)DataContext).IsDrawerExpanded}" />
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:NavItem">
+                                                <Button Classes="navItem"
+                                                        Classes.selected="{Binding IsSelected}"
+                                                        Classes.rail="{Binding !#RootWindow.((vm:MainViewModel)DataContext).IsDrawerExpanded}"
+                                                        Command="{Binding #RootWindow.((vm:MainViewModel)DataContext).NavigateCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        ToolTip.Tip="{Binding Name}">
+                                                    <Panel>
+                                                        <StackPanel Orientation="Horizontal" Spacing="12"
+                                                                    IsVisible="{Binding #RootWindow.((vm:MainViewModel)DataContext).IsDrawerExpanded}">
+                                                            <i:Icon Value="{Binding Icon}" FontSize="15"
+                                                                    Width="20" Height="20"
+                                                                    VerticalAlignment="Center" />
+                                                            <TextBlock Text="{Binding Name}"
+                                                                       FontSize="13"
+                                                                       FontWeight="Medium"
+                                                                       VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <i:Icon Value="{Binding Icon}" FontSize="15"
+                                                                Width="20" Height="20"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"
+                                                                IsVisible="{Binding !#RootWindow.((vm:MainViewModel)DataContext).IsDrawerExpanded}" />
+                                                    </Panel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
         </Border>
 
-        <!-- Main Content Grid -->
-        <Grid ColumnDefinitions="Auto, *" Grid.Row="1">
-            <!-- Navigation Drawer -->
-            <Border Background="#F5F5F5"
-                    BorderBrush="#D0D0D0"
-                    BorderThickness="0,0,1,0">
-                <Border.Width>
-                    <Binding Path="IsDrawerExpanded" Converter="{StaticResource BoolConverter}" ConverterParameter="280|0" />
-                </Border.Width>
-                <Border.Transitions>
-                    <Transitions>
-                        <DoubleTransition Property="Width" Duration="0:0:0.3" />
-                    </Transitions>
-                </Border.Transitions>
-
-                <DockPanel>
-                    <!-- Drawer Header -->
-                    <Border DockPanel.Dock="Top"
-                            Padding="16,16"
-                            Background="#F5F5F5"
-                            BorderBrush="#D0D0D0"
-                            BorderThickness="0,0,0,1">
-                        <TextBlock Text="CoinStack"
-                                   FontSize="18"
-                                   FontWeight="Bold"
-                                   Foreground="#1976D2"
-                                   Opacity="{Binding IsDrawerExpanded, Converter={StaticResource BoolToOpacityConverter}}" />
-                    </Border>
-
-                    <!-- Navigation Items -->
-                    <ScrollViewer>
-                        <ItemsControl ItemsSource="{Binding MenuItems}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Command="{Binding DataContext.NavigateCommand, ElementName=RootWindow}"
-                                            CommandParameter="{Binding}"
-                                            Background="Transparent"
-                                            Padding="12,10"
-                                            HorizontalContentAlignment="Stretch"
-                                            VerticalContentAlignment="Center"
-                                            CornerRadius="0"
-                                            Margin="0"
-                                            Classes="navButton">
-                                        <Button.Styles>
-                                            <Style Selector="Button.navButton">
-                                                <Setter Property="Foreground" Value="#424242" />
-                                            </Style>
-                                            <Style Selector="Button.navButton:pointerover">
-                                                <Setter Property="Background" Value="#E8E8E8" />
-                                            </Style>
-                                            <Style Selector="Button.navButton:pressed">
-                                                <Setter Property="Background" Value="#DCDCDC" />
-                                            </Style>
-                                        </Button.Styles>
-                                        <StackPanel Orientation="Horizontal" Spacing="12">
-                                            <!-- Icon -->
-                                            <TextBlock Text="{Binding IconChar}"
-                                                       FontSize="16"
-                                                       FontFamily="Segoe MDL2 Assets"
-                                                       Foreground="#424242"
-                                                       VerticalAlignment="Center"
-                                                       Width="24"
-                                                       TextAlignment="Center" />
-                                            <!-- Label -->
-                                            <TextBlock Text="{Binding Name}"
-                                                       FontSize="13"
-                                                       Foreground="#424242"
-                                                       VerticalAlignment="Center"
-                                                       Opacity="{Binding DataContext.IsDrawerExpanded, ElementName=RootWindow, Converter={StaticResource BoolToOpacityConverter}}" />
-                                        </StackPanel>
-                                    </Button>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </DockPanel>
-            </Border>
-
-            <!-- Content Area -->
-            <ScrollViewer Grid.Column="1" Padding="24" Background="White">
-                <ContentControl Content="{Binding CurrentPage}" ContentTemplate="{StaticResource ViewLocator}" />
+        <Border Grid.Column="1"
+                Background="{DynamicResource SurfaceBrush}"
+                CornerRadius="24"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                ClipToBounds="True">
+            <ScrollViewer Padding="28" HorizontalScrollBarVisibility="Disabled">
+                <ContentControl Content="{Binding CurrentPage}"
+                                ContentTemplate="{StaticResource ViewLocator}" />
             </ScrollViewer>
-        </Grid>
+        </Border>
     </Grid>
 </Window>

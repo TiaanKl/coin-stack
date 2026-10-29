@@ -1,16 +1,45 @@
-<!-- File: CoinStack.Desktop/App.axaml -->
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:CoinStack.Desktop"
              x:Class="CoinStack.Desktop.App"
              RequestedThemeVariant="Light">
     <Application.Resources>
-        <local:BoolConverter x:Key="BoolConverter" />
-        <local:BoolToOpacityConverter x:Key="BoolToOpacityConverter" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://CoinStack.Desktop/Styles/Tokens.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+            <local:BoolConverter x:Key="BoolConverter" />
+            <local:BoolToOpacityConverter x:Key="BoolToOpacityConverter" />
+            <local:BoolToStatusBrushConverter x:Key="BoolToStatusBrushConverter" />
+            <FontFamily x:Key="GeistFont">avares://CoinStack.Desktop/Assets/Fonts/Geist-Regular.ttf#Geist</FontFamily>
+            <FontFamily x:Key="GeistMonoFont">avares://CoinStack.Desktop/Assets/Fonts/GeistMono-Regular.ttf#Geist Mono</FontFamily>
+        </ResourceDictionary>
     </Application.Resources>
-    
+
     <Application.Styles>
-        <FluentTheme />
+        <FluentTheme>
+            <FluentTheme.Palettes>
+                <ColorPaletteResources x:Key="Light"
+                                       Accent="#111111"
+                                       RegionColor="#F4F4F5"
+                                       BaseHigh="#111111"
+                                       BaseMediumHigh="#3F3F46"
+                                       BaseMedium="#71717A"
+                                       ChromeLow="#FFFFFF"
+                                       ChromeMedium="#E4E4E7"
+                                       ChromeHigh="#D4D4D8" />
+                <ColorPaletteResources x:Key="Dark"
+                                       Accent="#FAFAFA"
+                                       RegionColor="#09090B"
+                                       BaseHigh="#FAFAFA"
+                                       BaseMediumHigh="#E4E4E7"
+                                       BaseMedium="#A1A1AA"
+                                       ChromeLow="#18181B"
+                                       ChromeMedium="#27272A"
+                                       ChromeHigh="#3F3F46" />
+            </FluentTheme.Palettes>
+        </FluentTheme>
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml" />
         <StyleInclude Source="avares://CoinStack.Desktop/Styles/GlobalStyles.axaml" />
     </Application.Styles>
 </Application>

@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CoinStack\CoinStack.csproj" />
+    <ProjectReference Include="..\CoinStack.Core\CoinStack.Core.csproj" />
     <ProjectReference Include="..\CoinStack.Data\CoinStack.Data.csproj" />
   </ItemGroup>
 

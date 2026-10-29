@@ -1,51 +1,98 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="CoinStack.Desktop.Views.TransactionsView"
-             x:DataType="viewModels:TransactionsViewModel">
-    <ScrollViewer Padding="0,0,0,20">
-        <StackPanel Spacing="20">
-            <Grid ColumnDefinitions="*, Auto">
-                <TextBlock Text="Transactions" Classes="h1" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <Button Grid.Column="1" Classes="primary" VerticalAlignment="Center">+ Log Expense</Button>
-            </Grid>
+             x:DataType="vm:TransactionsViewModel">
+    <StackPanel Spacing="24">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Transactions" Classes="PageTitle" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="primary"
+                    Command="{Binding AddTransactionCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <i:Icon Value="fa-solid fa-plus" FontSize="12" />
+                    <TextBlock Text="Add transaction" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
 
-            <Border Classes="Card">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Recent Transactions" Classes="h2" TextWrapping="Wrap" />
-                    
-                    <!-- Transactions List -->
-                    <ItemsControl ItemsSource="{Binding Transactions}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="12,10" BorderBrush="#E5E7EB" BorderThickness="0,0,0,1">
-                                    <Grid ColumnDefinitions="Auto, *, Auto">
-                                        <!-- Left: Date -->
-                                        <StackPanel Width="80">
-                                            <TextBlock Text="{Binding Date, StringFormat='MMM dd'}" FontWeight="SemiBold" />
-                                            <TextBlock Text="{Binding Date, StringFormat='yyyy'}" FontSize="11" Foreground="#9CA3AF" />
-                                        </StackPanel>
-                                        
-                                        <!-- Middle: Description and Category -->
-                                        <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="4">
-                                            <TextBlock Text="{Binding Description}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                            <TextBlock Text="{Binding Category}" FontSize="12" Foreground="#6B7280" />
-                                        </StackPanel>
-                                        
-                                        <!-- Right: Amount and Type -->
-                                        <StackPanel Grid.Column="2" HorizontalAlignment="Right" Spacing="4">
-                                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" HorizontalAlignment="Right">
-                                                <Run Text="{Binding Amount, StringFormat='${0:F2}'}" Foreground="#1976D2" />
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding Type}" FontSize="11" Foreground="#9CA3AF" HorizontalAlignment="Right" />
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+        <TextBlock Text="{Binding StatusMessage}" Classes="body"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+            <Border Classes="StatCard">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Lifetime income" Classes="body" />
+                    <TextBlock Text="{Binding TotalIncomeText}" Classes="Money"
+                               Foreground="{DynamicResource SuccessBrush}" />
                 </StackPanel>
             </Border>
-        </StackPanel>
-    </ScrollViewer>
+            <Border Classes="StatCard" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Lifetime expenses" Classes="body" />
+                    <TextBlock Text="{Binding TotalExpenseText}" Classes="Money"
+                               Foreground="{DynamicResource DangerBrush}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="New transaction" Classes="h2" />
+                <Grid ColumnDefinitions="2*,*,Auto,Auto,Auto" ColumnSpacing="12">
+                    <TextBox PlaceholderText="Description" Text="{Binding NewDescription}" />
+                    <NumericUpDown Grid.Column="1" Width="168" Minimum="0"
+                                   FormatString="0.00"
+                                   Value="{Binding NewAmount}" />
+                    <ComboBox Grid.Column="2" MinWidth="120"
+                              ItemsSource="{Binding TypeOptions}"
+                              SelectedItem="{Binding NewType}" />
+                    <ComboBox Grid.Column="3" MinWidth="150"
+                              PlaceholderText="Category"
+                              ItemsSource="{Binding CategoryOptions}"
+                              SelectedItem="{Binding SelectedCategory}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CategoryOption">
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Grid.Column="4" Classes="secondary"
+                            Command="{Binding AddTransactionCommand}"
+                            Content="Create" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="All transactions" Classes="h2" />
+                <ItemsControl ItemsSource="{Binding Transactions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TransactionRow">
+                            <Border Padding="0,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="Auto,*,Auto">
+                                    <StackPanel Width="88" Spacing="2">
+                                        <TextBlock Text="{Binding DateText}" FontWeight="SemiBold" FontSize="12"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <TextBlock Text="{Binding TypeLabel}" Classes="body" FontSize="11" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="16,0" Spacing="2">
+                                        <TextBlock Text="{Binding Description}" FontWeight="Medium"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <TextBlock Text="{Binding Category}" Classes="body" FontSize="12" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2"
+                                               Text="{Binding AmountText}"
+                                               Classes="MoneySm"
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding IsIncome, Converter={StaticResource BoolToStatusBrushConverter}}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
 </UserControl>

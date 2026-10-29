@@ -1,42 +1,64 @@
-<!-- File: CoinStack.Desktop/Views/CategoriesView.axaml -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:viewModels="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="CoinStack.Desktop.Views.CategoriesView"
-             x:DataType="viewModels:CategoriesViewModel">
-    <ScrollViewer Padding="0,0,0,20">
-        <StackPanel Spacing="20">
-            <Grid ColumnDefinitions="*, Auto">
-                <TextBlock Text="Categories" Classes="h1" VerticalAlignment="Center" TextWrapping="Wrap" />
-                <Button Classes="primary" Grid.Column="1" VerticalAlignment="Center">+ Add Category</Button>
-            </Grid>
-            
-            <Border Classes="Card">
-                <StackPanel Spacing="12">
-                    <TextBlock Text="Category List" Classes="h2" TextWrapping="Wrap" />
-                    
-                    <!-- Categories Grid -->
-                    <ItemsControl ItemsSource="{Binding Categories}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <WrapPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Border Margin="0,0,12,12" CornerRadius="8" Padding="12" Width="180" 
-                                        BorderBrush="#E5E7EB" BorderThickness="1"
-                                        Background="#1976D2">
-                                    <StackPanel Spacing="6">
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" Foreground="White" />
-                                        <TextBlock Text="{Binding Scope}" FontSize="12" Foreground="#CCFFFFFF" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+             x:DataType="vm:CategoriesViewModel">
+    <StackPanel Spacing="24">
+        <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Categories" Classes="PageTitle" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="primary" Command="{Binding AddCategoryCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <i:Icon Value="fa-solid fa-tag" FontSize="12" />
+                    <TextBlock Text="Add category" VerticalAlignment="Center" />
                 </StackPanel>
-            </Border>
-        </StackPanel>
-    </ScrollViewer>
+            </Button>
+        </Grid>
+
+        <TextBlock Text="{Binding StatusMessage}" Classes="body"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <Border Classes="StatCard" HorizontalAlignment="Left" MinWidth="200">
+            <StackPanel Spacing="6">
+                <TextBlock Text="Total categories" Classes="body" />
+                <TextBlock Text="{Binding CategoryCount}" Classes="Money" />
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="New category" Classes="h2" />
+                <Grid ColumnDefinitions="2*,*,Auto" ColumnSpacing="12">
+                    <TextBox PlaceholderText="Name" Text="{Binding NewCategoryName}" />
+                    <ComboBox Grid.Column="1" MinWidth="140"
+                              ItemsSource="{Binding ScopeOptions}"
+                              SelectedItem="{Binding NewScope}" />
+                    <Button Grid.Column="2" Classes="secondary" Command="{Binding AddCategoryCommand}" Content="Create" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="All categories" Classes="h2" />
+                <ItemsControl ItemsSource="{Binding Categories}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CategoryRow">
+                            <Border Classes="Card" Width="200" Margin="0,0,12,12" Padding="16">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding ScopeText}" Classes="body" FontSize="12" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
 </UserControl>
