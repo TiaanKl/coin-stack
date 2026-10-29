@@ -32,11 +32,39 @@ public static class DatabaseInitializer
         await db.Database.MigrateAsync(cancellationToken);
         await SeedMissingDefaultCategoriesAsync(db, cancellationToken);
 
+        if (await RemoveLegacySyntheticMonthlyIncomeAsync(db, cancellationToken) > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         var achievementService = scope.ServiceProvider.GetRequiredService<IAchievementService>();
         await achievementService.SeedAchievementsAsync(cancellationToken);
 
         var levelService = scope.ServiceProvider.GetRequiredService<ILevelService>();
         await levelService.GetCurrentLevelAsync(cancellationToken); // ensures UserLevel row exists
+    }
+
+    /// <summary>
+    /// Marks the placeholder "Monthly Income" rows from the retired auto-income feature for deletion.
+    /// Candidates are narrowed in SQL, then matched exactly in memory so a genuine income named
+    /// "Monthly Income" survives. The caller saves.
+    /// </summary>
+    public static async Task<int> RemoveLegacySyntheticMonthlyIncomeAsync(CoinStackDbContext db, CancellationToken cancellationToken)
+    {
+        var candidates = await db.Transactions
+            .Where(t => t.Type == TransactionType.Income
+                        && t.Description == TransactionConventions.SyntheticMonthlyIncomeDescription
+                        && t.Source != TransactionConventions.BankSource)
+            .ToListAsync(cancellationToken);
+
+        var synthetics = candidates.Where(TransactionConventions.IsSyntheticMonthlyIncome).ToList();
+        if (synthetics.Count == 0)
+        {
+            return 0;
+        }
+
+        db.Transactions.RemoveRange(synthetics);
+        return synthetics.Count;
     }
 
     public static async Task SeedMissingDefaultCategoriesAsync(CoinStackDbContext db, CancellationToken cancellationToken)

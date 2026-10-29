@@ -386,8 +386,8 @@
                                                                     <div class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-gray-800">
                                                                         <div>
                                                                             <p class="text-sm font-medium text-gray-800 dark:text-white/90">Reset Data</p>
-                                                                            <p class="text-xs text-gray-500 dark:text-gray-400">Completely clears all data and resets
-                                                                                indexes/identities.</p>
+                                                                            <p class="text-xs text-gray-500 dark:text-gray-400">Clears all CoinStack data and settings.
+                                                                                A backup copy of the database is saved first; your sign-in account is kept.</p>
                                                                             </div>
                                                                             @if (_confirmResetData)
                                                                             {
@@ -436,7 +436,7 @@
                                                                                       d="M10 18.75C14.8325 18.75 18.75 14.8325 18.75 10C18.75 5.16751 14.8325 1.25 10 1.25C5.16751 1.25 1.25 5.16751 1.25 10C1.25 14.8325 5.16751 18.75 10 18.75ZM13.8534 8.35355C14.0487 8.15829 14.0487 7.84171 13.8534 7.64645C13.6582 7.45118 13.3416 7.45118 13.1464 7.64645L8.99988 11.7929L6.85343 9.64645C6.65817 9.45118 6.34159 9.45118 6.14632 9.64645C5.95106 9.84171 5.95106 10.1583 6.14632 10.3536L8.64632 12.8536C8.84159 13.0488 9.15817 13.0488 9.35343 12.8536L13.8534 8.35355Z"
                                                                                       fill="currentColor" />
                                                                             </svg>
-                                                                            <p class="text-sm font-medium text-success-700 dark:text-success-400">Settings saved successfully.</p>
+                                                                            <p class="text-sm font-medium text-success-700 dark:text-success-400">@(_savedMessage ?? "Settings saved successfully.")</p>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -466,6 +466,7 @@
     private bool _confirmReset;
     private bool _confirmResetData;
     private bool _saved;
+    private string? _savedMessage;
     private int _currentScore;
 
     private enum PersonalInterestType
@@ -478,6 +479,11 @@
     }
 
     protected override async Task OnInitializedAsync()
+    {
+        await LoadSettingsAsync();
+    }
+
+    private async Task LoadSettingsAsync()
     {
         _currentScore = await ScoringService.GetTotalScoreAsync();
 
@@ -560,35 +566,23 @@
 
     private async Task ConfirmResetDataAsync()
     {
-        await DataResetService.ResetAllDataAsync();
+        var backupPath = await DataResetService.ResetAllDataAsync();
 
-        _currency = "USD";
-        _monthStartDay = 1;
-        _monthlyIncome = 5000;
-        _currentBankBalance = 0;
-        _bankBalanceAsOfUtc = null;
-        _enableScoring = true;
-        _enableStreaks = true;
-        _enableToast = true;
-        _enableSounds = true;
-        _enableReflections = true;
-        _largeExpenseThreshold = 50;
-        _savingsIsPercent = false;
-        _monthlySavingsAmount = 0;
-        _monthlySavingsPercent = 0;
-        _savingsInterestRate = null;
-        _savingsInterestIsYearly = true;
-        _showReserveAwareBudget = false;
-        _enableEmergencyFallback = true;
+        // Show what the database now holds rather than guessing defaults (this used to show
+        // R5 000 income while the database held none).
+        await LoadSettingsAsync();
         _selectedInterestType = PersonalInterestType.Fixed;
-        _currentScore = 0;
         _confirmReset = false;
         _confirmResetData = false;
 
+        _savedMessage = backupPath is null
+            ? "All data cleared."
+            : $"All data cleared. Backup saved to {backupPath}";
         _saved = true;
         StateHasChanged();
-        await Task.Delay(2000);
+        await Task.Delay(6000);
         _saved = false;
+        _savedMessage = null;
         await InvokeAsync(StateHasChanged);
     }
 

@@ -292,10 +292,12 @@ public sealed class CashFlowProjectionTests
                     Currency = "ZAR"
                 });
 
-                // Only expense transactions recorded
+                // Only expense transactions recorded. Anchor to the 1st so the expense always
+                // lands in the previous (completed) month, whatever day the test runs on.
+                var now = DateTime.UtcNow;
                 db.Transactions.Add(new Transaction
                 {
-                    OccurredAtUtc = DateTime.UtcNow.AddMonths(-1).AddDays(5),
+                    OccurredAtUtc = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc).AddMonths(-1).AddDays(5),
                     Amount = 8000m,
                     Type = TransactionType.Expense,
                     Description = "Rent"

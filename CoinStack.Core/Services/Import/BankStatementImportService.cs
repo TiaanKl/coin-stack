@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using CoinStack.Data;
@@ -36,6 +37,9 @@ public sealed class ImportCandidate
     public bool IsPassThrough { get; set; }
 
     public string Fingerprint { get; set; } = "";
+
+    /// <summary>Direction as printed by the bank; unlike <see cref="Type"/> it never changes with classification rules.</summary>
+    public bool IsCredit { get; set; }
 
     public bool Include { get; set; } = true;
 
@@ -91,8 +95,14 @@ public sealed class StatementImportResult
     public int ImportedCount { get; set; }
     public int DuplicateCount { get; set; }
     public int TransferCount { get; set; }
-    public decimal ClosingBalance { get; set; }
+    public decimal? ClosingBalance { get; set; }
     public DateTime? BalanceAsOfUtc { get; set; }
+
+    /// <summary>False when the file had no balance, or a newer balance was already on file.</summary>
+    public bool BalanceUpdated { get; set; }
+
+    /// <summary>False when an older statement was imported, so income and payday were left alone.</summary>
+    public bool SettingsUpdated { get; set; }
     public decimal? DetectedMonthlySalary { get; set; }
     public int SyntheticIncomeRemoved { get; set; }
     public int SubscriptionsCreated { get; set; }
@@ -191,10 +201,10 @@ public sealed class BankStatementImportService : IBankStatementImportService
         // 2. Classify candidates using MerchantNormalizer
         foreach (var parsed in statement.Transactions)
         {
-            var candidate = Classify(parsed);
-            candidate.Fingerprint = BuildFingerprint(candidate);
-            preview.Candidates.Add(candidate);
+            preview.Candidates.Add(Classify(parsed));
         }
+
+        AssignFingerprints(preview.Candidates);
 
         // 3. Detect Pass-Throughs (e.g., 50,000 multicat in followed by 47,000 out to Pa on 07 Apr)
         DetectPassThroughs(preview.Candidates);
@@ -218,8 +228,12 @@ public sealed class BankStatementImportService : IBankStatementImportService
                 .FirstOrDefault();
         }
 
-        // 6. Check existing fingerprints in DB
-        var fingerprints = preview.Candidates.Select(c => c.Fingerprint).ToList();
+        // 6. Check existing fingerprints in DB (current scheme, plus the legacy scheme for older imports)
+        var fingerprints = preview.Candidates
+            .Select(c => c.Fingerprint)
+            .Concat(preview.Candidates.SelectMany(LegacyFingerprints))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -229,12 +243,10 @@ public sealed class BankStatementImportService : IBankStatementImportService
             .Select(t => t.ImportFingerprint!)
             .ToListAsync(cancellationToken);
 
-        var existing = existingFingerprints.ToHashSet(StringComparer.Ordinal);
+        MarkExisting(preview.Candidates, existingFingerprints);
 
         foreach (var candidate in preview.Candidates)
         {
-            candidate.AlreadyExists = existing.Contains(candidate.Fingerprint);
-
             if (candidate.AlreadyExists)
             {
                 candidate.Include = false;
@@ -369,8 +381,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
             AccountNumber = preview.AccountNumber,
             PeriodStartUtc = preview.PeriodStartUtc,
             PeriodEndUtc = preview.PeriodEndUtc,
-            OpeningBalance = preview.OpeningBalance ?? 0m,
-            ClosingBalance = preview.ClosingBalance ?? 0m,
+            OpeningBalance = preview.OpeningBalance,
+            ClosingBalance = preview.ClosingBalance,
             RowsParsed = preview.RowsParsed,
             Status = StatementImportStatus.Imported
         };
@@ -422,10 +434,22 @@ public sealed class BankStatementImportService : IBankStatementImportService
             .Select(g => g.Key)
             .FirstOrDefault();
 
-        var balanceAsOf = preview.PeriodEndUtc?.Date.AddDays(1).AddTicks(-1);
+        // Without a printed period end, the closing balance applies at the last transaction date, not "now".
+        var statementEnd = preview.PeriodEndUtc
+                           ?? (preview.Candidates.Count > 0 ? preview.Candidates.Max(c => c.DateUtc) : (DateTime?)null);
+        var balanceAsOf = statementEnd?.Date.AddDays(1).AddTicks(-1);
+
+        // Only the most recent statement may drive income and payday; an older one fills in history.
+        var newestOtherEnd = await db.StatementImports
+            .AsNoTracking()
+            .Where(i => i.Id != import.Id && i.Status == StatementImportStatus.Imported && i.PeriodEndUtc != null)
+            .MaxAsync(i => i.PeriodEndUtc, cancellationToken);
+        var isNewestStatement = newestOtherEnd is null || statementEnd is null || statementEnd.Value >= newestOtherEnd.Value;
 
         var syntheticsRemoved = await RemoveSyntheticMonthlyIncomeAsync(db, cancellationToken);
-        await SyncSettingsFromStatementAsync(db, preview.ClosingBalance, balanceAsOf, detectedSalary, payday, cancellationToken);
+        var balanceUpdated = await SyncSettingsFromStatementAsync(
+            db, preview.ClosingBalance, balanceAsOf, isNewestStatement ? detectedSalary : null,
+            isNewestStatement ? payday : 0, cancellationToken);
 
         var recurringStats = await ApplyRecurringProposalsAsync(db, preview.RecurringProposals, cancellationToken);
 
@@ -439,6 +463,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
             TransferCount = preview.TransferCount,
             ClosingBalance = import.ClosingBalance,
             BalanceAsOfUtc = balanceAsOf,
+            BalanceUpdated = balanceUpdated,
+            SettingsUpdated = isNewestStatement,
             DetectedMonthlySalary = detectedSalary,
             SyntheticIncomeRemoved = syntheticsRemoved,
             SubscriptionsCreated = recurringStats.Created,
@@ -481,19 +507,19 @@ public sealed class BankStatementImportService : IBankStatementImportService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        await RemoveSyntheticMonthlyIncomeAsync(db, cancellationToken);
-
+        // Legacy placeholder income is cleaned up once at startup (DatabaseInitializer), not per page view.
         var settings = await db.AppSettings.FirstOrDefaultAsync(cancellationToken);
+        // Files without a running balance store null; never turn that into an R0 bank balance.
         var latestImport = await db.StatementImports
             .AsNoTracking()
-            .Where(i => i.Status == StatementImportStatus.Imported)
+            .Where(i => i.Status == StatementImportStatus.Imported && i.ClosingBalance != null)
             .OrderByDescending(i => i.PeriodEndUtc ?? i.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (settings is not null && settings.BankBalanceAsOfUtc is null && latestImport is not null)
+        if (settings is not null && settings.BankBalanceAsOfUtc is null && latestImport?.ClosingBalance is { } closing)
         {
             var asOf = latestImport.PeriodEndUtc?.Date.AddDays(1).AddTicks(-1) ?? latestImport.CreatedAtUtc;
-            settings.CurrentBankBalance = latestImport.ClosingBalance;
+            settings.CurrentBankBalance = closing;
             settings.BankBalanceAsOfUtc = asOf;
         }
 
@@ -534,24 +560,15 @@ public sealed class BankStatementImportService : IBankStatementImportService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    private static async Task<int> RemoveSyntheticMonthlyIncomeAsync(CoinStackDbContext db, CancellationToken cancellationToken)
-    {
-        var synthetics = await db.Transactions
-            .Where(t => t.Type == TransactionType.Income
-                        && t.Description == TransactionConventions.SyntheticMonthlyIncomeDescription
-                        && t.Source != TransactionConventions.BankSource)
-            .ToListAsync(cancellationToken);
+    private static Task<int> RemoveSyntheticMonthlyIncomeAsync(CoinStackDbContext db, CancellationToken cancellationToken)
+        => DatabaseInitializer.RemoveLegacySyntheticMonthlyIncomeAsync(db, cancellationToken);
 
-        if (synthetics.Count == 0)
-        {
-            return 0;
-        }
-
-        db.Transactions.RemoveRange(synthetics);
-        return synthetics.Count;
-    }
-
-    private static async Task SyncSettingsFromStatementAsync(
+    /// <summary>
+    /// Applies the statement's closing balance only when it is newer than the balance already on file
+    /// (an earlier import or a manual "Update balance"). Returns whether the balance was applied.
+    /// Pass a null salary and payday 0 to leave income settings untouched.
+    /// </summary>
+    private static async Task<bool> SyncSettingsFromStatementAsync(
         CoinStackDbContext db,
         decimal? closingBalance,
         DateTime? balanceAsOfUtc,
@@ -566,10 +583,16 @@ public sealed class BankStatementImportService : IBankStatementImportService
             db.AppSettings.Add(settings);
         }
 
+        var balanceUpdated = false;
         if (closingBalance is not null)
         {
-            settings.CurrentBankBalance = closingBalance.Value;
-            settings.BankBalanceAsOfUtc = balanceAsOfUtc ?? DateTime.UtcNow;
+            var asOf = balanceAsOfUtc ?? DateTime.UtcNow;
+            if (settings.BankBalanceAsOfUtc is null || asOf > settings.BankBalanceAsOfUtc.Value)
+            {
+                settings.CurrentBankBalance = closingBalance.Value;
+                settings.BankBalanceAsOfUtc = asOf;
+                balanceUpdated = true;
+            }
         }
 
         if (detectedSalary is > 0)
@@ -581,6 +604,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
         {
             settings.MonthStartDay = payday;
         }
+
+        return balanceUpdated;
     }
 
     public async Task<int> ScanAndCreateRecurringAsync(CancellationToken cancellationToken = default)
@@ -748,6 +773,7 @@ public sealed class BankStatementImportService : IBankStatementImportService
         {
             DateUtc = parsed.DateUtc,
             Amount = Math.Abs(parsed.Amount),
+            IsCredit = parsed.IsCredit,
             Type = type,
             Description = merchant.CanonicalName,
             RawDescription = description,
@@ -769,10 +795,80 @@ public sealed class BankStatementImportService : IBankStatementImportService
                || description.Contains("Purchase Via eBucks.Com Pay In Eb", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static string BuildFingerprint(ImportCandidate candidate)
+    private const string FingerprintPrefix = "v2:";
+
+    /// <summary>
+    /// Fingerprints every candidate from the bank's own data only: date, direction, invariant-culture
+    /// amount and the raw description, so normaliser or classification changes never make a re-import
+    /// look new. Identical rows on the same day (two R35 coffees) get an occurrence number, so they
+    /// stay distinct and re-importing the same file still matches each one.
+    /// </summary>
+    internal static void AssignFingerprints(IEnumerable<ImportCandidate> candidates)
     {
-        var raw = $"{candidate.DateUtc:yyyyMMdd}|{candidate.Amount:F2}|{candidate.Type}|{candidate.Description.ToUpperInvariant()}";
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
-        return Convert.ToHexString(hash)[..32];
+        var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        foreach (var candidate in candidates.OrderBy(c => c.DateUtc))
+        {
+            var key = string.Join('|',
+                candidate.DateUtc.ToString("yyyyMMdd", CultureInfo.InvariantCulture),
+                candidate.IsCredit ? "C" : "D",
+                candidate.Amount.ToString("F2", CultureInfo.InvariantCulture),
+                NormalizeForFingerprint(candidate.RawDescription ?? candidate.Description));
+
+            var occurrence = occurrences.GetValueOrDefault(key) + 1;
+            occurrences[key] = occurrence;
+
+            candidate.Fingerprint = FingerprintPrefix + Hash($"{key}|#{occurrence}");
+        }
     }
+
+    /// <summary>
+    /// Marks candidates already in the database. Legacy fingerprints are matched as a multiset:
+    /// two stored rows with the same legacy hash cover at most two candidates, never three.
+    /// </summary>
+    internal static void MarkExisting(IEnumerable<ImportCandidate> candidates, IEnumerable<string> storedFingerprints)
+    {
+        var remaining = storedFingerprints
+            .GroupBy(f => f, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+
+        foreach (var candidate in candidates.OrderBy(c => c.DateUtc))
+        {
+            candidate.AlreadyExists = remaining.ContainsKey(candidate.Fingerprint);
+            if (candidate.AlreadyExists)
+            {
+                continue;
+            }
+
+            foreach (var legacy in LegacyFingerprints(candidate))
+            {
+                if (remaining.TryGetValue(legacy, out var count) && count > 0)
+                {
+                    remaining[legacy] = count - 1;
+                    candidate.AlreadyExists = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The pre-v2 scheme hashed the canonical merchant name and formatted the amount with whatever
+    /// culture was current, so both decimal separators are tried.
+    /// </summary>
+    private static IEnumerable<string> LegacyFingerprints(ImportCandidate candidate)
+    {
+        var date = candidate.DateUtc.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+        var dotAmount = candidate.Amount.ToString("F2", CultureInfo.InvariantCulture);
+        var description = candidate.Description.ToUpperInvariant();
+
+        yield return Hash($"{date}|{dotAmount}|{candidate.Type}|{description}");
+        yield return Hash($"{date}|{dotAmount.Replace('.', ',')}|{candidate.Type}|{description}");
+    }
+
+    private static string NormalizeForFingerprint(string description)
+        => string.Join(' ', description.ToUpperInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+
+    private static string Hash(string raw)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)))[..32];
 }

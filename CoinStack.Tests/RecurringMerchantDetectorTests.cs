@@ -75,15 +75,41 @@ public sealed class RecurringMerchantDetectorTests
     [Fact]
     public void Synthetic_Monthly_Income_Is_Identified()
     {
+        // Shape of the rows the retired auto-income feature generated: period start at midnight UTC.
         var tx = new Transaction
         {
             Type = TransactionType.Income,
             Description = TransactionConventions.SyntheticMonthlyIncomeDescription,
             Source = TransactionConventions.AutoSource,
-            Amount = 5000m
+            Amount = 5000m,
+            OccurredAtUtc = new DateTime(2026, 3, 25, 0, 0, 0, DateTimeKind.Utc)
         };
 
         Assert.True(TransactionConventions.IsSyntheticMonthlyIncome(tx));
+    }
+
+    [Fact]
+    public void Manual_Income_Named_Monthly_Income_Is_Not_Treated_As_Synthetic()
+    {
+        var logged = new Transaction
+        {
+            Type = TransactionType.Income,
+            Description = TransactionConventions.SyntheticMonthlyIncomeDescription,
+            Amount = 5000m,
+            OccurredAtUtc = new DateTime(2026, 3, 25, 14, 32, 7, DateTimeKind.Utc)
+        };
+
+        var categorised = new Transaction
+        {
+            Type = TransactionType.Income,
+            Description = TransactionConventions.SyntheticMonthlyIncomeDescription,
+            Amount = 5000m,
+            CategoryId = 9,
+            OccurredAtUtc = new DateTime(2026, 3, 25, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        Assert.False(TransactionConventions.IsSyntheticMonthlyIncome(logged));
+        Assert.False(TransactionConventions.IsSyntheticMonthlyIncome(categorised));
     }
 
     private static ImportCandidate Netflix(DateTime date, decimal amount) => new()

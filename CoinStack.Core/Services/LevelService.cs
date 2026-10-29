@@ -51,7 +51,7 @@ public sealed class LevelService : ILevelService
         }
 
         level.CurrentXp += xpAmount;
-        level.TotalXp += xpAmount;
+        level.TotalXp = Math.Max(0, level.TotalXp + xpAmount);
 
         while (level.CurrentXp >= GetXpRequiredForLevel(level.Level) && level.Level < 50)
         {
@@ -59,6 +59,16 @@ public sealed class LevelService : ILevelService
             level.Level++;
             level.Title = GetTitleForLevel(level.Level);
         }
+
+        // A negative amount reverses XP for an undone action, stepping back down a level if needed.
+        while (level.CurrentXp < 0 && level.Level > 1)
+        {
+            level.Level--;
+            level.CurrentXp += GetXpRequiredForLevel(level.Level);
+            level.Title = GetTitleForLevel(level.Level);
+        }
+
+        level.CurrentXp = Math.Max(0, level.CurrentXp);
 
         await db.SaveChangesAsync(ct);
         return level;

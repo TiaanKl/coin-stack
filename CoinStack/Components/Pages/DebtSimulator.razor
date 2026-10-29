@@ -235,7 +235,16 @@
                     </div>
 
                     <!-- Savings banner -->
-                    @if (!_simResult.IsUnpayable && _simPayment > _selectedDebt.MonthlyPaymentAmount)
+                    @if (!_simResult.IsUnpayable && _currentResult.IsUnpayable)
+                    {
+                        <div class="rounded-2xl border border-success-200 bg-success-50 p-5 dark:border-success-500/30 dark:bg-success-500/10">
+                            <p class="text-sm font-semibold text-success-700 dark:text-success-400">
+                                Your current @FormatC(_selectedDebt.MonthlyPaymentAmount) / month never clears this debt.
+                                At @FormatC(_simPayment) / month you'd be debt-free in @FormatTerm(_simResult), paying @FormatC(_simResult.TotalInterest, 0) in interest.
+                            </p>
+                        </div>
+                    }
+                    else if (!_simResult.IsUnpayable && _simPayment > _selectedDebt.MonthlyPaymentAmount)
                     {
                         var monthsSaved = (_currentResult.Months ?? 0) - (_simResult.Months ?? 0);
                         var interestSaved = _currentResult.TotalInterest - _simResult.TotalInterest;
@@ -379,6 +388,7 @@
         _settings = await SettingsService.GetAsync();
         _currencySymbol = MoneyFormatter.Symbol(_settings.Currency);
 
+        await DebtService.AccrueInterestAsync();
         _debts = (await DebtService.GetAllAsync())
             .Where(d => d.CurrentBalance > 0)
             .OrderBy(d => d.Name)
@@ -441,6 +451,10 @@
         var monthlyInterest = GetMonthlyInterest(debt);
         _sliderMin = Math.Max(1m, Math.Ceiling(monthlyInterest) + 1m);
         _sliderMax = Math.Max(debt.MonthlyPaymentAmount * 4m, debt.MonthlyPaymentAmount + 1000m);
+
+        // When the saved payment doesn't cover the interest, the minimum can exceed the default
+        // maximum; Math.Clamp throws if min > max, so always leave headroom above the minimum.
+        _sliderMax = Math.Max(_sliderMax, _sliderMin * 2m);
         _sliderStep = _sliderMax > 5000m ? 50m : _sliderMax > 1000m ? 10m : 5m;
 
         _simPayment = Math.Clamp(debt.MonthlyPaymentAmount, _sliderMin, _sliderMax);

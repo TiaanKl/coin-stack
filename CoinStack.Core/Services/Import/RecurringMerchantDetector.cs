@@ -22,13 +22,9 @@ public sealed class RecurringProposal
 
     public bool CreateBucket { get; set; } = true;
 
-    public decimal MonthlyAllocation => Cycle switch
-    {
-        SubscriptionCycle.Weekly => Math.Round(MedianAmount * 4.3m, 2, MidpointRounding.AwayFromZero),
-        SubscriptionCycle.Yearly => Math.Round(MedianAmount / 12m, 2, MidpointRounding.AwayFromZero),
-        SubscriptionCycle.Quarterly => Math.Round(MedianAmount / 3m, 2, MidpointRounding.AwayFromZero),
-        _ => MedianAmount
-    };
+    public decimal MonthlyAllocation => Cycle == SubscriptionCycle.Monthly
+        ? MedianAmount
+        : Math.Round(SubscriptionCosts.MonthlyEquivalent(Cycle, MedianAmount), 2, MidpointRounding.AwayFromZero);
 }
 
 public static class RecurringMerchantDetector

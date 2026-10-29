@@ -440,6 +440,9 @@ namespace FinanceManager.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("InterestAccruedThroughUtc")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("InterestRatePercent")
                         .HasPrecision(5, 2)
                         .HasColumnType("TEXT");
@@ -583,6 +586,9 @@ namespace FinanceManager.Data.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("FromEmergencyFund")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("TEXT");
 
@@ -595,6 +601,9 @@ namespace FinanceManager.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("TransactionId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("TEXT");
@@ -748,7 +757,7 @@ namespace FinanceManager.Data.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("ClosingBalance")
+                    b.Property<decimal?>("ClosingBalance")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
@@ -763,7 +772,7 @@ namespace FinanceManager.Data.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("OpeningBalance")
+                    b.Property<decimal?>("OpeningBalance")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 

@@ -115,6 +115,7 @@ public sealed class TransactionService : ITransactionService
         existing.DebtAccountId = transaction.DebtAccountId;
         existing.IsImpulse = transaction.IsImpulse;
         existing.ExpenseKind = transaction.ExpenseKind;
+        existing.AutoDeduct = transaction.AutoDeduct;
 
         if (oldDebtId.HasValue && oldDebtImpact > 0)
         {
@@ -138,6 +139,10 @@ public sealed class TransactionService : ITransactionService
         if (existing is null) return;
 
         await _gameLoop.RevertTransactionImpactAsync(existing, cancellationToken);
+
+        // The game loop restores automatic shortfall cover; a deleted expense also refunds the
+        // user's explicit force-majeure withdrawal.
+        await SavingsService.RestoreForTransactionAsync(db, existing.Id, includeExplicitWithdrawals: true, cancellationToken);
 
         var debtImpact = GetDebtPaymentImpact(existing);
         if (existing.DebtAccountId.HasValue && debtImpact > 0)
@@ -173,8 +178,7 @@ public sealed class TransactionService : ITransactionService
 
         var income = await db.Transactions
             .AsNoTracking()
-            .Where(t => t.Type == TransactionType.Income
-                        && t.Description != TransactionConventions.SyntheticMonthlyIncomeDescription)
+            .Where(t => t.Type == TransactionType.Income)
             .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
 
         var expense = await db.Transactions
@@ -213,8 +217,7 @@ public sealed class TransactionService : ITransactionService
             .AsNoTracking()
             .Where(t => t.OccurredAtUtc >= startUtc
                         && t.OccurredAtUtc < endUtc
-                        && t.Type == TransactionType.Income
-                        && t.Description != TransactionConventions.SyntheticMonthlyIncomeDescription)
+                        && t.Type == TransactionType.Income)
             .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
 
         var expense = await db.Transactions
@@ -392,20 +395,13 @@ public sealed class TransactionService : ITransactionService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var synthetics = await db.Transactions
-            .Where(t => t.Type == TransactionType.Income
-                        && t.Description == TransactionConventions.SyntheticMonthlyIncomeDescription
-                        && t.Source != TransactionConventions.BankSource)
-            .ToListAsync(cancellationToken);
-
-        if (synthetics.Count == 0)
+        var removed = await DatabaseInitializer.RemoveLegacySyntheticMonthlyIncomeAsync(db, cancellationToken);
+        if (removed > 0)
         {
-            return 0;
+            await db.SaveChangesAsync(cancellationToken);
         }
 
-        db.Transactions.RemoveRange(synthetics);
-        await db.SaveChangesAsync(cancellationToken);
-        return synthetics.Count;
+        return removed;
     }
 
     private static (DateTime StartUtc, DateTime EndUtc) GetBudgetPeriodBoundsUtc(int monthStartDay, DateTime utcNow)
@@ -440,17 +436,12 @@ public sealed class TransactionService : ITransactionService
             return;
         }
 
-        var nextBalance = debt.CurrentBalance + balanceDelta;
-        if (nextBalance < 0m)
-        {
-            nextBalance = 0m;
-        }
+        // Post any interest that has come due before the payment, so the balance reflects the lender's.
+        DebtInterestAccrual.Accrue(debt, DateTime.UtcNow);
 
-        if (nextBalance > debt.TotalAmount)
-        {
-            nextBalance = debt.TotalAmount;
-        }
-
-        debt.CurrentBalance = nextBalance;
+        // No clamping: capping at zero or at the original amount made reversals asymmetric
+        // (overpay R500 on R200, delete it, and the balance came back as R500). A negative
+        // balance is a genuine credit; the UI treats anything at or below zero as paid off.
+        debt.CurrentBalance += balanceDelta;
     }
 }

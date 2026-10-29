@@ -143,4 +143,37 @@ public sealed class TransactionServiceTests
         var exists = await verifyDb.Transactions.AnyAsync(t => t.Id == original.Id);
         Assert.False(exists);
     }
+
+    [Fact]
+    public async Task UpdateAsync_Persists_Turning_AutoDeduct_Off()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+
+        var options = new DbContextOptionsBuilder<CoinStackDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using (var setupDb = new CoinStackDbContext(options))
+        {
+            await setupDb.Database.EnsureCreatedAsync();
+        }
+
+        var service = new TransactionService(new TestDbContextFactory(options), new FakeGameLoopService());
+
+        var template = await service.CreateAsync(new Transaction
+        {
+            Description = "Gym",
+            Amount = 499m,
+            Type = TransactionType.Expense,
+            OccurredAtUtc = DateTime.UtcNow,
+            AutoDeduct = true
+        });
+
+        template.AutoDeduct = false;
+        await service.UpdateAsync(template);
+
+        await using var verifyDb = new CoinStackDbContext(options);
+        Assert.False((await verifyDb.Transactions.SingleAsync(t => t.Id == template.Id)).AutoDeduct);
+    }
 }

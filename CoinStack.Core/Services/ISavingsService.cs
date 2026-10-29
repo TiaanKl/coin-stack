@@ -17,8 +17,9 @@ public interface ISavingsService
     /// Explicitly withdraws up to <paramref name="amount"/> from available savings for a force-majeure
     /// expense. Does <b>not</b> require <see cref="SavingsState.FallbackEnabled"/>.
     /// Returns the amount actually deducted (may be less than requested if savings are insufficient).
+    /// Pass <paramref name="transactionId"/> so the withdrawal is refunded if that transaction is deleted.
     /// </summary>
-    Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, CancellationToken cancellationToken = default);
+    Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, int? transactionId = null, CancellationToken cancellationToken = default);
 
     /// <summary>Enables or disables savings fallback globally.</summary>
     Task SetFallbackEnabledAsync(bool enabled, CancellationToken cancellationToken = default);
@@ -53,7 +54,15 @@ public interface ISavingsService
     /// Applies reserve fallback in order: savings first, then emergency fund (if enabled).
     /// Returns how much was covered from each source.
     /// </summary>
-    Task<ReserveCoverageResult> ApplyReserveFallbackAsync(decimal amount, string reason, string sourceName, bool allowEmergencyFund, CancellationToken cancellationToken = default);
+    Task<ReserveCoverageResult> ApplyReserveFallbackAsync(decimal amount, string reason, string sourceName, bool allowEmergencyFund, int? transactionId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Puts back the savings / emergency-fund draws linked to <paramref name="transactionId"/> and removes
+    /// those events, returning the amount restored. Automatic shortfall cover is always restored (the game
+    /// loop re-applies it after an edit); the user's explicit force-majeure withdrawal only when
+    /// <paramref name="includeExplicitWithdrawals"/> is set, i.e. when the transaction is deleted.
+    /// </summary>
+    Task<decimal> RestoreForTransactionAsync(int transactionId, bool includeExplicitWithdrawals = false, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

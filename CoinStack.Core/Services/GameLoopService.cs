@@ -10,6 +10,7 @@ public sealed class GameLoopService : IGameLoopService
     private const int SavingsDipPenaltyPoints = 15;
     private const int EmergencyDipPenaltyPoints = SavingsDipPenaltyPoints * 2;
     private const string DailyCheckInDescription = "Daily check-in";
+    private const int TransactionXp = 5;
 
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
     private readonly IBucketService _bucketService;
@@ -191,7 +192,8 @@ public sealed class GameLoopService : IGameLoopService
                     linkedGoal.Status = GoalStatus.Completed;
                     if (settings.EnableScoring)
                     {
-                        await _scoringService.AddScoreEventAsync(50, ScoreChangeReason.GoalAchieved, $"Goal '{linkedGoal.Name}' Reached!", cancellationToken: cancellationToken);
+                        // Linked to the transaction so the bonus is withdrawn if the income is edited or deleted.
+                        await _scoringService.AddScoreEventAsync(50, ScoreChangeReason.GoalAchieved, $"Goal '{linkedGoal.Name}' Reached!", transaction.Id, transaction.BucketId, cancellationToken);
                         result.PointsChanged = 50;
                         result.Kind = FeedbackKind.GoalAchieved;
                         result.Message = $"Goal '{linkedGoal.Name}' Reached! +50 pts";
@@ -232,7 +234,13 @@ public sealed class GameLoopService : IGameLoopService
             result.PointsChanged = scoreAfter - scoreBefore;
         }
 
-        var shortfall = await GetNewMonthlyShortfallAsync(settings.MonthStartDay, settings.MonthlyIncome, transaction, cancellationToken);
+        // Force majeure is "no score impact": the Transactions page draws savings for it explicitly when
+        // the user opts in, so covering the shortfall here as well withdrew the money twice.
+        var isForceMajeure = transaction.ExpenseKind == ExpenseKind.ForceMajeure;
+
+        var shortfall = isForceMajeure
+            ? 0m
+            : await GetNewMonthlyShortfallAsync(settings.MonthStartDay, settings.MonthlyIncome, transaction, cancellationToken);
         if (shortfall > 0)
         {
             var reserveCoverage = await _savingsService.ApplyReserveFallbackAsync(
@@ -240,6 +248,7 @@ public sealed class GameLoopService : IGameLoopService
                 $"Budget shortfall after '{transaction.Description}'",
                 bucket.Name,
                 settings.EnableEmergencyFallback,
+                transaction.Id,
                 cancellationToken);
 
             if (settings.EnableScoring)
@@ -293,7 +302,7 @@ public sealed class GameLoopService : IGameLoopService
 
         var spentAfter = spentBefore + transaction.Amount;
 
-        if (settings.EnableReflections)
+        if (settings.EnableReflections && !isForceMajeure)
         {
             ReflectionTrigger? trigger = null;
 
@@ -344,8 +353,8 @@ public sealed class GameLoopService : IGameLoopService
             };
         }
 
-        // Award XP for logging a transaction
-        await _levelService.AddXpAsync(5, cancellationToken);
+        // Award XP for logging a transaction (reversed in RevertTransactionImpactAsync)
+        await _levelService.AddXpAsync(TransactionXp, cancellationToken);
 
         return result;
     }
@@ -374,17 +383,55 @@ public sealed class GameLoopService : IGameLoopService
         return monthlyOverride?.LimitAmount ?? defaultLimit;
     }
 
+    /// <summary>
+    /// Undoes everything <see cref="ProcessTransactionAsync"/> did for <paramref name="originalTransaction"/>
+    /// (pass the values as they were processed, before any edit). Edits revert then re-process, so they
+    /// are net-neutral; deletes leave no trace. Previously only score events were removed, so XP, goal
+    /// top-ups and savings draws were re-applied on every edit and kept after a delete.
+    /// </summary>
     public async Task RevertTransactionImpactAsync(Transaction originalTransaction, CancellationToken cancellationToken)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        // Score events, including the goal bonus and savings-dip penalties.
         var events = await db.ScoreEvents
             .Where(e => e.TransactionId == originalTransaction.Id)
             .ToListAsync(cancellationToken);
+        db.ScoreEvents.RemoveRange(events);
 
-        if (events.Count > 0)
+        // Unanswered reflection prompts; answered ones are the user's writing and stay.
+        var pendingReflections = await db.Reflections
+            .Where(r => r.TransactionId == originalTransaction.Id && !r.IsCompleted)
+            .ToListAsync(cancellationToken);
+        db.Reflections.RemoveRange(pendingReflections);
+
+        var bucket = originalTransaction.BucketId is { } bucketId
+            ? await _bucketService.GetByIdAsync(bucketId, cancellationToken)
+            : null;
+
+        // Goal top-up from income into a goal-linked savings bucket.
+        if (bucket is { IsSavings: true, GoalId: { } goalId } && originalTransaction.Type == TransactionType.Income)
         {
-            db.ScoreEvents.RemoveRange(events);
-            await db.SaveChangesAsync(cancellationToken);
+            var goal = await db.Goals.FirstOrDefaultAsync(g => g.Id == goalId, cancellationToken);
+            if (goal is not null)
+            {
+                goal.CurrentAmount = Math.Max(0m, goal.CurrentAmount - originalTransaction.Amount);
+                if (goal.Status == GoalStatus.Completed && goal.CurrentAmount < goal.TargetAmount)
+                {
+                    goal.Status = GoalStatus.Active;
+                }
+            }
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Automatic shortfall cover from savings / emergency fund (re-applied if this is an edit).
+        await _savingsService.RestoreForTransactionAsync(originalTransaction.Id, cancellationToken: cancellationToken);
+
+        // XP is only awarded for expenses that reached the end of the pipeline.
+        if (bucket is not null && originalTransaction.Type == TransactionType.Expense)
+        {
+            await _levelService.AddXpAsync(-TransactionXp, cancellationToken);
         }
     }
 

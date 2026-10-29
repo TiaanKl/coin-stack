@@ -62,7 +62,18 @@
                 {
                     <text> · @_result.TransferCount internal transfers excluded</text>
                 }
-                · Bank balance set to @Money(_result.ClosingBalance)
+                @if (_result.BalanceUpdated && _result.ClosingBalance is { } closingBalance)
+                {
+                    <text> · Bank balance set to @Money(closingBalance)</text>
+                }
+                else if (_result.ClosingBalance is not null)
+                {
+                    <text> · Bank balance kept — a newer balance is already on file</text>
+                }
+                @if (!_result.SettingsUpdated)
+                {
+                    <text> · Older statement: income and payday left unchanged</text>
+                }
                 @if (_result.DetectedMonthlySalary is > 0)
                 {
                     <text> · Base monthly salary anchored to @Money(_result.DetectedMonthlySalary.Value)</text>

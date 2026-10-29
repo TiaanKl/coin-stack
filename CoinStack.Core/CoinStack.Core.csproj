@@ -20,4 +20,8 @@
     <ProjectReference Include="..\CoinStack.Data\CoinStack.Data.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="CoinStack.Tests" />
+  </ItemGroup>
+
 </Project>

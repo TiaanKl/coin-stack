@@ -314,7 +314,6 @@
         _settings = await SettingsService.GetAsync();
         CurrencyFormatting.ApplyCurrency(_settings.Currency);
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
-        await TransactionService.RemoveSyntheticMonthlyIncomeAsync();
         _budgetSpent = await TransactionService.GetExpenseTotalForBudgetPeriodAsync(_settings.MonthStartDay, DateTime.UtcNow);
         _savingsState = await SavingsService.GetStateAsync();
 
@@ -491,15 +490,12 @@
             .DefaultIfEmpty(0m)
             .Average();
 
-        // Active subscriptions / scheduled debit orders
+        // Active subscriptions / scheduled debit orders, converted from their own cycle to per-month amounts
         var activeSubs = _subscriptions
-            .Where(s => s.Status == SubscriptionStatus.Active && s.DebitOrderDay.HasValue && s.Cost > 0)
+            .Where(s => s.Status == SubscriptionStatus.Active && s.Cost > 0)
             .ToList();
 
-        var totalMonthlySubscriptions = activeSubs.Sum(s => s.Cost);
-        var subscriptionByDay = activeSubs
-            .GroupBy(s => Math.Clamp(s.DebitOrderDay!.Value, 1, 28))
-            .ToDictionary(g => g.Key, g => g.Sum(s => s.Cost));
+        var totalMonthlySubscriptions = activeSubs.Sum(SubscriptionCosts.MonthlyEquivalent);
 
         var paydayConfigured = _settings.MonthStartDay is >= 1 and <= 31 ? _settings.MonthStartDay : 1;
         var monthlyIncome = Math.Max(0m, _settings.MonthlyIncome);
@@ -533,7 +529,7 @@
                 ? Math.Max(0m, rawDailyTrend - (totalMonthlySubscriptions / 30m))
                 : rawDailyTrend;
 
-            var daySubscriptions = subscriptionByDay.GetValueOrDefault(Math.Min(forecastDate.Day, 28), 0m);
+            var daySubscriptions = activeSubs.Sum(s => SubscriptionCosts.ForecastChargeOn(s, forecastDate));
             var projectedDailyExpense = dailyDiscretionary + daySubscriptions;
 
             projectedIncomeCum += dayIncome;

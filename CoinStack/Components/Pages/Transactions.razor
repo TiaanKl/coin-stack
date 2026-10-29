@@ -514,7 +514,6 @@
         var now = DateTime.UtcNow;
         _settings = await SettingsService.GetAsync();
         await TransactionService.ApplyAutoDeductionsForBudgetPeriodAsync(_settings.MonthStartDay, now);
-        await TransactionService.RemoveSyntheticMonthlyIncomeAsync();
 
         var items = await TransactionService.GetAllAsync();
         _buckets = await BucketService.GetAllAsync();
@@ -725,7 +724,8 @@
             {
                 var withdrawn = await SavingsService.WithdrawForEmergencyAsync(
                     created.Amount,
-                    $"Force majeure: {created.Description}");
+                    $"Force majeure: {created.Description}",
+                    created.Id);
 
                 var fromBucket = created.Amount - withdrawn;
                 _savingsAvailable -= withdrawn;

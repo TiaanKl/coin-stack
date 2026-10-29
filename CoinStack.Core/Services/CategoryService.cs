@@ -50,6 +50,7 @@ public sealed class CategoryService : ICategoryService
 
         existing.Name = category.Name;
         existing.ColorHex = category.ColorHex;
+        existing.Scope = category.Scope;
 
         await db.SaveChangesAsync(cancellationToken);
     }

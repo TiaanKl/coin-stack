@@ -15,8 +15,9 @@ public sealed class StatementImport : EntityBase
     public DateTime? PeriodStartUtc { get; set; }
     public DateTime? PeriodEndUtc { get; set; }
 
-    public decimal OpeningBalance { get; set; }
-    public decimal ClosingBalance { get; set; }
+    /// <summary>Null when the file carried no running balance (common for CSV/OFX exports).</summary>
+    public decimal? OpeningBalance { get; set; }
+    public decimal? ClosingBalance { get; set; }
 
     public int RowsParsed { get; set; }
     public int TransactionsImported { get; set; }

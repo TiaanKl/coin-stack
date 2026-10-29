@@ -627,6 +627,7 @@
     {
         _isDebtLoading = true;
 
+        await DebtService.AccrueInterestAsync();
         var debts = await DebtService.GetAllAsync();
         _savedDebts.Clear();
         _savedDebts.AddRange(debts.OrderByDescending(x => x.CreatedAtUtc));
@@ -693,11 +694,8 @@
             return;
         }
 
-        if (_debtFormCurrentBalance.Value > _debtFormTotalAmount.Value)
-        {
-            _debtFormError = "Current balance cannot exceed total amount.";
-            return;
-        }
+        // A current balance above the original amount is allowed: interest, fees and a capitalised
+        // initiation fee all grow a real statement balance past what was borrowed.
 
         if (!_debtFormMonthlyPayment.HasValue || _debtFormMonthlyPayment.Value <= 0)
         {

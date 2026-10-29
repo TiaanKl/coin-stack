@@ -4,5 +4,9 @@ public interface IDataResetService
 {
     event Action? DataResetCompleted;
 
-    Task ResetAllDataAsync(CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Backs up the database, then clears all CoinStack data (sign-in accounts are kept) and re-seeds defaults.
+    /// Returns the backup file path, or null when no file backup was possible.
+    /// </summary>
+    Task<string?> ResetAllDataAsync(CancellationToken cancellationToken = default);
 }

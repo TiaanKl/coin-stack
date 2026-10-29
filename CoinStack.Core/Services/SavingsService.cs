@@ -6,6 +6,9 @@ namespace CoinStack.Services;
 
 public sealed class SavingsService : ISavingsService
 {
+    /// <summary>Marks a withdrawal the user chose explicitly (force majeure), as opposed to automatic shortfall cover.</summary>
+    internal const string EmergencyWithdrawalSource = "Emergency Withdrawal";
+
     private readonly IDbContextFactory<CoinStackDbContext> _dbFactory;
 
     public SavingsService(IDbContextFactory<CoinStackDbContext> dbFactory)
@@ -106,7 +109,7 @@ public sealed class SavingsService : ISavingsService
         return summary;
     }
 
-    public async Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
+    public async Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, int? transactionId = null, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
@@ -124,7 +127,8 @@ public sealed class SavingsService : ISavingsService
             OccurredAtUtc = DateTime.UtcNow,
             AmountUsed = withdrawn,
             Reason = reason,
-            SourceName = "Emergency Withdrawal"
+            SourceName = EmergencyWithdrawalSource,
+            TransactionId = transactionId
         });
 
         await db.SaveChangesAsync(cancellationToken);
@@ -197,7 +201,7 @@ public sealed class SavingsService : ISavingsService
 
     public async Task<bool> ApplyFallbackAsync(decimal amount, string reason, string sourceName, CancellationToken cancellationToken = default)
     {
-        var result = await ApplyReserveFallbackAsync(amount, reason, sourceName, allowEmergencyFund: false, cancellationToken);
+        var result = await ApplyReserveFallbackAsync(amount, reason, sourceName, allowEmergencyFund: false, cancellationToken: cancellationToken);
         return result.TotalCovered >= amount;
     }
 
@@ -206,6 +210,7 @@ public sealed class SavingsService : ISavingsService
         string reason,
         string sourceName,
         bool allowEmergencyFund,
+        int? transactionId = null,
         CancellationToken cancellationToken = default)
     {
         var normalizedAmount = Math.Max(0m, amount);
@@ -234,7 +239,8 @@ public sealed class SavingsService : ISavingsService
                 OccurredAtUtc = DateTime.UtcNow,
                 AmountUsed = savingsUsed,
                 Reason = reason,
-                SourceName = string.IsNullOrWhiteSpace(sourceName) ? "Savings" : sourceName
+                SourceName = string.IsNullOrWhiteSpace(sourceName) ? "Savings" : sourceName,
+                TransactionId = transactionId
             });
         }
 
@@ -252,7 +258,9 @@ public sealed class SavingsService : ISavingsService
                     OccurredAtUtc = DateTime.UtcNow,
                     AmountUsed = emergencyUsed,
                     Reason = reason,
-                    SourceName = "Emergency Fund"
+                    SourceName = "Emergency Fund",
+                    FromEmergencyFund = true,
+                    TransactionId = transactionId
                 });
             }
         }
@@ -263,6 +271,55 @@ public sealed class SavingsService : ISavingsService
         }
 
         return new ReserveCoverageResult(savingsUsed, emergencyUsed);
+    }
+
+    public async Task<decimal> RestoreForTransactionAsync(
+        int transactionId,
+        bool includeExplicitWithdrawals = false,
+        CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var restored = await RestoreForTransactionAsync(db, transactionId, includeExplicitWithdrawals, cancellationToken);
+        if (restored > 0m)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return restored;
+    }
+
+    /// <summary>Shared by the service and by <see cref="TransactionService"/> on delete. The caller saves.</summary>
+    internal static async Task<decimal> RestoreForTransactionAsync(
+        CoinStackDbContext db,
+        int transactionId,
+        bool includeExplicitWithdrawals,
+        CancellationToken cancellationToken)
+    {
+        var events = await db.SavingsFallbackEvents
+            .Where(e => e.TransactionId == transactionId
+                        && (includeExplicitWithdrawals || e.SourceName != EmergencyWithdrawalSource))
+            .ToListAsync(cancellationToken);
+
+        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
+        if (events.Count == 0 || state is null)
+        {
+            return 0m;
+        }
+
+        foreach (var evt in events)
+        {
+            if (evt.FromEmergencyFund)
+            {
+                state.EmergencyAvailable += evt.AmountUsed;
+            }
+            else
+            {
+                state.Available += evt.AmountUsed;
+            }
+        }
+
+        db.SavingsFallbackEvents.RemoveRange(events);
+        return events.Sum(e => e.AmountUsed);
     }
 
     public async Task<List<SavingsMonthlySummary>> GetMonthlySummariesAsync(CancellationToken cancellationToken = default)

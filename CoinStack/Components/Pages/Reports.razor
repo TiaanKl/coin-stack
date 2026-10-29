@@ -189,6 +189,7 @@
 		_savingsAvailable = savings.Available;
 		_fallbackUsedThisMonth = await SavingsService.GetFallbackUsedThisMonthAsync();
 
+		await DebtService.AccrueInterestAsync();
 		var debts = await DebtService.GetAllAsync();
 		var openDebts = debts.Where(d => d.CurrentBalance > 0).ToList();
 		_openDebtCount = openDebts.Count;

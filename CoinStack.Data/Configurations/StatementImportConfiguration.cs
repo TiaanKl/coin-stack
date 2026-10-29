@@ -22,12 +22,10 @@ internal sealed class StatementImportConfiguration : IEntityTypeConfiguration<St
             .HasMaxLength(32);
 
         builder.Property(x => x.OpeningBalance)
-            .HasPrecision(18, 2)
-            .IsRequired();
+            .HasPrecision(18, 2);
 
         builder.Property(x => x.ClosingBalance)
-            .HasPrecision(18, 2)
-            .IsRequired();
+            .HasPrecision(18, 2);
 
         builder.Property(x => x.Status)
             .HasConversion<string>()

@@ -24,6 +24,15 @@ public static partial class FnbTransactionHistoryParser
     [GeneratedRegex(@"<(DTPOSTED|TRNAMT|MEMO|NAME|TRNTYPE)>([^<\r\n]+)", RegexOptions.IgnoreCase)]
     private static partial Regex OfxFieldRegex();
 
+    [GeneratedRegex(@"(?<sfx>CR|DR)\.?$", RegexOptions.IgnoreCase)]
+    private static partial Regex MoneySuffixRegex();
+
+    [GeneratedRegex(@"^(ZAR|R)", RegexOptions.IgnoreCase)]
+    private static partial Regex MoneyCurrencyPrefixRegex();
+
+    [GeneratedRegex(@"^\d{1,3}(,\d{3})+$")]
+    private static partial Regex CommaThousandsRegex();
+
     public static ParsedStatement Parse(Stream stream, string fileName)
     {
         if (fileName.EndsWith(".ofx", StringComparison.OrdinalIgnoreCase)
@@ -373,7 +382,13 @@ public static partial class FnbTransactionHistoryParser
         return false;
     }
 
-    private static bool TryParseMoney(string text, out decimal amount, out bool markedCredit)
+    /// <summary>
+    /// Parses a bank amount such as "1,234.56 Cr", "R -1 234,56", "(350.00)", "ZAR 100" or "1,500".
+    /// Suffixes and the currency prefix are stripped as anchored tokens (a blanket Replace("R")
+    /// used to eat the "r" of "Cr"). A comma is a decimal separator only when followed by one or
+    /// two trailing digits; "1,500" is fifteen hundred.
+    /// </summary>
+    internal static bool TryParseMoney(string text, out decimal amount, out bool markedCredit)
     {
         markedCredit = false;
         amount = 0;
@@ -382,29 +397,54 @@ public static partial class FnbTransactionHistoryParser
             return false;
         }
 
-        var trimmed = text.Trim().Trim('"');
-        markedCredit = trimmed.Contains("Cr", StringComparison.OrdinalIgnoreCase);
-        var markedDebit = trimmed.Contains("Dr", StringComparison.OrdinalIgnoreCase);
-        trimmed = trimmed.Replace("R", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("ZAR", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("Cr", "", StringComparison.OrdinalIgnoreCase)
-            .Replace("Dr", "", StringComparison.OrdinalIgnoreCase)
-            .Replace(" ", "")
-            .Trim();
+        // Drop quotes and every kind of space; char.IsWhiteSpace covers the non-breaking ones banks use as group separators.
+        var trimmed = new string(text.Where(c => c != '"' && !char.IsWhiteSpace(c)).ToArray());
 
-        var negative = trimmed.StartsWith('(') && trimmed.EndsWith(')');
-        trimmed = trimmed.Trim('(', ')');
-
-        if (trimmed.Contains(',') && trimmed.Contains('.'))
+        var markedDebit = false;
+        var suffix = MoneySuffixRegex().Match(trimmed);
+        if (suffix.Success)
         {
-            trimmed = trimmed.Replace(",", "");
-        }
-        else if (trimmed.Contains(',') && !trimmed.Contains('.'))
-        {
-            trimmed = trimmed.Replace(',', '.');
+            markedCredit = suffix.Groups["sfx"].Value.Equals("CR", StringComparison.OrdinalIgnoreCase);
+            markedDebit = !markedCredit;
+            trimmed = trimmed[..suffix.Index];
         }
 
-        if (!decimal.TryParse(trimmed, NumberStyles.Number, CultureInfo.InvariantCulture, out amount))
+        var negative = false;
+        if (trimmed.StartsWith('(') && trimmed.EndsWith(')'))
+        {
+            negative = true;
+            trimmed = trimmed[1..^1];
+        }
+
+        // The sign can sit either side of the currency: "-R100" or "R-100"; some exports trail it: "100.00-".
+        if (trimmed.StartsWith('-')) { negative = true; trimmed = trimmed[1..]; }
+        trimmed = MoneyCurrencyPrefixRegex().Replace(trimmed, "");
+        if (trimmed.StartsWith('-')) { negative = true; trimmed = trimmed[1..]; }
+        if (trimmed.EndsWith('-')) { negative = true; trimmed = trimmed[..^1]; }
+        if (trimmed.StartsWith('+')) { trimmed = trimmed[1..]; }
+
+        var lastComma = trimmed.LastIndexOf(',');
+        var lastDot = trimmed.LastIndexOf('.');
+        if (lastComma >= 0 && lastDot >= 0)
+        {
+            // Whichever separator comes last is the decimal point: "1,234.56" or "1.234,56".
+            trimmed = lastDot > lastComma
+                ? trimmed.Replace(",", "")
+                : trimmed.Replace(".", "").Replace(',', '.');
+        }
+        else if (lastComma >= 0)
+        {
+            trimmed = CommaThousandsRegex().IsMatch(trimmed)
+                ? trimmed.Replace(",", "")
+                : trimmed.Replace(',', '.');
+        }
+        else if (trimmed.Count(c => c == '.') > 1)
+        {
+            // "1.234.567" can only be grouping.
+            trimmed = trimmed.Replace(".", "");
+        }
+
+        if (!decimal.TryParse(trimmed, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount))
         {
             return false;
         }
