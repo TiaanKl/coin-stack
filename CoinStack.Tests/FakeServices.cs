@@ -269,6 +269,9 @@ internal sealed class FakeTransactionService : ITransactionService
     public Task<decimal> GetNetBalanceBeforeAsync(DateTime beforeUtc, CancellationToken cancellationToken = default)
         => Task.FromResult(0m);
 
+    public Task<decimal> GetEffectiveBankBalanceAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult(0m);
+
     public Task<(decimal Income, decimal Expense)> GetIncomeExpenseForPeriodAsync(
         DateTime startUtc,
         DateTime endUtc,

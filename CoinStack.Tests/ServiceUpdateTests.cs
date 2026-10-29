@@ -32,6 +32,33 @@ public sealed class ServiceUpdateTests
     }
 
     [Fact]
+    public async Task Renaming_A_Category_Carries_Its_Subscriptions_Along()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<CoinStackDbContext>().UseSqlite(connection).Options;
+
+        await using (var db = new CoinStackDbContext(options))
+        {
+            await db.Database.EnsureCreatedAsync();
+            db.Subscriptions.AddRange(
+                new Subscription { Name = "Netflix", Category = "Streaming", Cost = 199m },
+                new Subscription { Name = "Gym", Category = "Health", Cost = 450m });
+            await db.SaveChangesAsync();
+        }
+
+        var service = new CategoryService(new TestDbContextFactory(options));
+        var streaming = await service.CreateAsync(new Category { Name = "Streaming", ColorHex = "#A855F7", Scope = CategoryScope.Expense });
+
+        streaming.Name = "Entertainment & TV";
+        await service.UpdateAsync(streaming);
+
+        await using var verify = new CoinStackDbContext(options);
+        Assert.Equal("Entertainment & TV", (await verify.Subscriptions.SingleAsync(s => s.Name == "Netflix")).Category);
+        Assert.Equal("Health", (await verify.Subscriptions.SingleAsync(s => s.Name == "Gym")).Category);
+    }
+
+    [Fact]
     public async Task LevelService_Negative_Xp_Steps_Back_Down_A_Level()
     {
         using var connection = new SqliteConnection("Data Source=:memory:");

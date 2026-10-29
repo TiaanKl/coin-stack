@@ -320,8 +320,9 @@
         await ReloadBucketsAsync();
         _goals.Clear();
         _goals.AddRange((await GoalService.GetAllAsync()).Where(g => g.Status != GoalStatus.Abandoned));
+        // The same figure as the dashboard: what was spent this period plus what is in the bank now.
         _budgetLimit = settings.BankBalanceAsOfUtc is not null
-            ? Math.Max(0m, settings.CurrentBankBalance)
+            ? _budgetSpent + Math.Max(0m, await TransactionService.GetEffectiveBankBalanceAsync())
             : Math.Max(_totalAllocated, _budgetSpent);
         _isLoading = false;
     }

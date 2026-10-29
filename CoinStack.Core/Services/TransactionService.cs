@@ -218,6 +218,29 @@ public sealed class TransactionService : ITransactionService
         return income - expense;
     }
 
+    public async Task<decimal> GetEffectiveBankBalanceAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken) ?? new AppSettings();
+        if (settings.BankBalanceAsOfUtc is not { } asOf)
+        {
+            return settings.CurrentBankBalance;
+        }
+
+        // Transfers between the person's own accounts and the retired placeholder income don't move the bank balance.
+        var since = (await db.Transactions
+                .AsNoTracking()
+                .Where(t => t.OccurredAtUtc > asOf && t.Type != TransactionType.Transfer)
+                .ToListAsync(cancellationToken))
+            .Where(t => !TransactionConventions.IsSyntheticMonthlyIncome(t))
+            .ToList();
+
+        return settings.CurrentBankBalance
+               + since.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount)
+               - since.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+    }
+
     public async Task<(decimal Income, decimal Expense)> GetIncomeExpenseForPeriodAsync(
         DateTime startUtc,
         DateTime endUtc,

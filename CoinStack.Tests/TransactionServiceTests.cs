@@ -176,4 +176,38 @@ public sealed class TransactionServiceTests
         await using var verifyDb = new CoinStackDbContext(options);
         Assert.False((await verifyDb.Transactions.SingleAsync(t => t.Id == template.Id)).AutoDeduct);
     }
+
+    [Fact]
+    public async Task The_Bank_Balance_Is_The_Last_Balance_Plus_Everything_Since()
+    {
+        using var connection = new SqliteConnection("Data Source=:memory:");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<CoinStackDbContext>().UseSqlite(connection).Options;
+        var asOf = new DateTime(2026, 10, 1, 12, 0, 0);
+
+        await using (var db = new CoinStackDbContext(options))
+        {
+            await db.Database.EnsureCreatedAsync();
+            db.AppSettings.Add(new AppSettings { CurrentBankBalance = 5000m, BankBalanceAsOfUtc = asOf });
+            db.Transactions.AddRange(
+                new Transaction { Description = "Before the balance", Amount = 999m, Type = TransactionType.Expense, OccurredAtUtc = asOf.AddDays(-1) },
+                new Transaction { Description = "Salary", Amount = 20000m, Type = TransactionType.Income, OccurredAtUtc = asOf.AddDays(2) },
+                new Transaction { Description = "Rent", Amount = 8000m, Type = TransactionType.Expense, OccurredAtUtc = asOf.AddDays(3) },
+                new Transaction { Description = "To savings", Amount = 3000m, Type = TransactionType.Transfer, OccurredAtUtc = asOf.AddDays(4) });
+            await db.SaveChangesAsync();
+        }
+
+        var service = new TransactionService(new TestDbContextFactory(options), new FakeGameLoopService());
+
+        // The balance from the statement, plus the salary, minus the rent. Earlier rows and transfers don't count.
+        Assert.Equal(17000m, await service.GetEffectiveBankBalanceAsync());
+
+        await using (var db = new CoinStackDbContext(options))
+        {
+            (await db.AppSettings.SingleAsync()).BankBalanceAsOfUtc = null;
+            await db.SaveChangesAsync();
+        }
+
+        Assert.Equal(5000m, await service.GetEffectiveBankBalanceAsync());
+    }
 }

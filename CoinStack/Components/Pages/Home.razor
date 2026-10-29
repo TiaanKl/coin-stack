@@ -344,6 +344,7 @@
         _recentTransactions.Clear();
         _recentTransactions.AddRange(_transactions.OrderByDescending(x => x.OccurredAtUtc).Take(RecentTransactionCount));
 
+        _effectiveBankBalance = await TransactionService.GetEffectiveBankBalanceAsync();
         PrepareChartData();
         await LoadForecastAsync();
     }
@@ -358,7 +359,6 @@
         _forecastIsPlaceholder = false;
 
         var now = Clock.Today();
-        _effectiveBankBalance = CalculateEffectiveBankBalance(_transactions, _settings);
 
         var thirtyDaysAgo = now.AddDays(-30);
 
@@ -380,40 +380,10 @@
     private async Task OnBalanceSavedAsync(AppSettings updatedSettings)
     {
         _settings = updatedSettings;
-        _effectiveBankBalance = CalculateEffectiveBankBalance(_transactions, _settings);
+        _effectiveBankBalance = await TransactionService.GetEffectiveBankBalanceAsync();
         PrepareChartData();
         await LoadForecastAsync();
         await InvokeAsync(StateHasChanged);
-    }
-
-    /// <summary>
-    /// Live balance = user snapshot + net of income/expense transactions after the snapshot as-of time.
-    /// Excludes synthetic income and internal transfers to prevent double counting.
-    /// </summary>
-    private static decimal CalculateEffectiveBankBalance(IReadOnlyList<Transaction> transactions, AppSettings settings)
-    {
-        var balance = settings.CurrentBankBalance;
-        if (settings.BankBalanceAsOfUtc is null)
-        {
-            return balance;
-        }
-
-        var asOf = settings.BankBalanceAsOfUtc.Value;
-        foreach (var tx in transactions.Where(t => t.OccurredAtUtc > asOf 
-                                                  && !TransactionConventions.IsSyntheticMonthlyIncome(t)
-                                                  && t.Type != TransactionType.Transfer))
-        {
-            if (tx.Type == TransactionType.Income)
-            {
-                balance += tx.Amount;
-            }
-            else if (tx.Type == TransactionType.Expense)
-            {
-                balance -= tx.Amount;
-            }
-        }
-
-        return balance;
     }
 
     /// <summary>

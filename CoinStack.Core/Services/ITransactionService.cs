@@ -26,6 +26,12 @@ public interface ITransactionService
     Task<decimal> GetExpenseTotalForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default);
     Task<(decimal TotalIncome, decimal TotalExpense)> GetLifetimeTotalsAsync(CancellationToken cancellationToken = default);
     Task<decimal> GetNetBalanceBeforeAsync(DateTime beforeUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The bank balance now: the last balance from a statement or "Update balance", plus everything recorded
+    /// since. Every page that shows money in the bank uses this, so they agree.
+    /// </summary>
+    Task<decimal> GetEffectiveBankBalanceAsync(CancellationToken cancellationToken = default);
     Task<(decimal Income, decimal Expense)> GetIncomeExpenseForPeriodAsync(
         DateTime startUtc,
         DateTime endUtc,

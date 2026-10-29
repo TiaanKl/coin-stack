@@ -93,9 +93,15 @@ public partial class SubscriptionsViewModel : ViewModelBase, IAsyncInitializable
     [RelayCommand]
     private async Task AddSubscriptionAsync()
     {
-        if (string.IsNullOrWhiteSpace(NewName) || NewCost < 0)
+        if (string.IsNullOrWhiteSpace(NewName) || NewCost <= 0)
         {
-            StatusMessage = "Enter a name and cost.";
+            StatusMessage = "Enter a name and a cost of more than zero.";
+            return;
+        }
+
+        if (NewDebitDay is < 1 or > 31)
+        {
+            StatusMessage = "The debit order day must be between 1 and 31.";
             return;
         }
 

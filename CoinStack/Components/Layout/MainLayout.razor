@@ -214,10 +214,11 @@
             _currency = settings.Currency;
             CurrencyFormatting.ApplyCurrency(_currency);
 
-            var transactions = await TransactionService.GetAllAsync();
-            var totalIncome = transactions.Where(t => t.Type == TransactionType.Income && !TransactionConventions.IsSyntheticMonthlyIncome(t)).Sum(t => t.Amount);
-            _totalSpent = transactions.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
-            _netSaved = totalIncome - _totalSpent;
+            // Summed in the database: this runs on every page change, so it mustn't load every transaction.
+            // (The old placeholder "Monthly Income" rows are removed at startup, so they can't inflate it.)
+            var (totalIncome, totalSpent) = await TransactionService.GetLifetimeTotalsAsync();
+            _totalSpent = totalSpent;
+            _netSaved = totalIncome - totalSpent;
 
             var state = await GameLoop.GetCurrentStateAsync();
             var streak = state.Streaks.FirstOrDefault(s => s.Type == StreakType.DailyCheckIn);

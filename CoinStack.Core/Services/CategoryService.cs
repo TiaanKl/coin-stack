@@ -48,6 +48,15 @@ public sealed class CategoryService : ICategoryService
             return;
         }
 
+        // Subscriptions store their category by name, so a rename carries them along to the new one.
+        if (!string.Equals(existing.Name, category.Name, StringComparison.Ordinal))
+        {
+            var oldName = existing.Name;
+            await db.Subscriptions
+                .Where(s => s.Category == oldName)
+                .ExecuteUpdateAsync(s => s.SetProperty(x => x.Category, category.Name), cancellationToken);
+        }
+
         existing.Name = category.Name;
         existing.ColorHex = category.ColorHex;
         existing.Scope = category.Scope;

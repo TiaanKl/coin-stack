@@ -113,13 +113,10 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 
 ### Everyday usability gaps
 
-- **Transactions (S).** There's no date field, so you can't log yesterday's coffee or change a date. Amounts aren't validated, and delete has no confirmation.
-- **Budgets vs Home (S).** The two pages use different bank-balance figures, so they show different numbers.
-- **Payday (S).** It's limited to the 1st–28th; the 29th–31st silently becomes the 1st.
-- **Subscriptions (S).**
-  - Category is free text rather than a link to a category.
-  - Cost and debit day aren't validated.
-  - Logos send every subscription name to clearbit.com.
+- ~~**Transactions (S).**~~ Fixed: there was no date field, amounts weren't validated, and delete had no confirmation.
+- ~~**Budgets vs Home (S).**~~ Fixed: both (and Savings) now use one bank-balance figure.
+- ~~**Payday (S).**~~ Fixed in Phase 2: payday can be any day from the 1st to the 31st.
+- ~~**Subscriptions (S).**~~ Fixed: cost and debit day are checked, logos no longer go to clearbit.com, and renaming a category carries its subscriptions along. The category is still stored by name rather than as a link.
 - ~~**Merchant matching false positives (M).**~~ Fixed: "City Of Cape Town" was classed as OnlyFans, "MR DIY" as Mr D, and "Auto Spares" as Spar.
 - **Reports and Income disagree (S).** Income uses calendar months while Reports uses your payday period. Fallback History shows times in UTC.
 
@@ -140,7 +137,7 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 - **One budget-period helper (S).** The same calculation is currently copied into nine places.
 - **Accounts: decided.** Local-first with one person per install (see Progress), so the sign-in endpoints are removed.
 - **Mobile on CoinStack.Core (M–L).** The mobile app keeps its own copies of the services (`MobileFinanceService`), so every fix has to be made twice. Mobile already references CoinStack.Data and Core only builds on Data, so mobile can use Core directly. Add Android back to its targets at the same time.
-- **Small fixes (S).** The layout loads every transaction on each refresh, and the reconnect modal can't recover after a server restart.
+- **Small fixes (S).** ~~The layout loads every transaction on each refresh~~ (fixed: it sums in the database). The reconnect modal can't recover after a server restart.
 - **Tests (M).** Add coverage for the debt calculator, PDF parser, streaks, challenges, recap and achievements.
 
 ## Part 2: New functionality, ordered by value

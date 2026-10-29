@@ -4,6 +4,7 @@
 @using CoinStack.Services
 @inject ISavingsService SavingsService
 @inject ISettingsService SettingsService
+@inject ITransactionService TransactionService
 @inject IMoneyFormatter MoneyFormatter
 
 <PageTitle>Savings</PageTitle>
@@ -24,10 +25,10 @@
         </button>
     </div>
 
-    @if (_settings.BankBalanceAsOfUtc is not null && _settings.CurrentBankBalance < 0)
+    @if (IsOverdrawn)
     {
         <div class="rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
-            Your FNB current account is overdrawn (@FormatC(_settings.CurrentBankBalance)). "Apply This Month" will not add planned savings on top of that.
+            Your current account is overdrawn (@FormatC(_bankBalance)). "Apply This Month" will not add planned savings on top of that.
             <a href="/" class="ml-1 font-medium underline">See bank balance on the dashboard</a>
         </div>
     }
@@ -288,6 +289,8 @@
 @code {
     private SavingsState _state = new();
     private AppSettings _settings = new();
+    private decimal _bankBalance;
+    private bool IsOverdrawn => _settings.BankBalanceAsOfUtc is not null && _bankBalance < 0;
     private List<SavingsMonthlySummary> _history = [];
     private List<SavingsFallbackEvent> _fallbackEvents = [];
     private List<SavingsProjectionPoint> _projections = [];
@@ -314,6 +317,7 @@
     private async Task LoadAllAsync()
     {
         _settings = await SettingsService.GetAsync();
+        _bankBalance = await TransactionService.GetEffectiveBankBalanceAsync();
         _state = await SavingsService.GetStateAsync();
         _fallbackEnabled = _state.FallbackEnabled;
         _history = await SavingsService.GetMonthlySummariesAsync();
@@ -349,7 +353,7 @@
         _toast = "";
         StateHasChanged();
 
-        if (_settings.BankBalanceAsOfUtc is not null && _settings.CurrentBankBalance < 0)
+        if (IsOverdrawn)
         {
             _toast = "Skipped — your current account is overdrawn, so planned savings were not added.";
             _calculating = false;
