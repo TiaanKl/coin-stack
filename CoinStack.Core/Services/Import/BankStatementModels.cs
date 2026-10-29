@@ -67,6 +67,12 @@ public sealed class GroupedMerchantCandidate
     public string? FeeType { get; set; }
     public bool IsPassThrough { get; set; }
 
+    /// <summary>The category the app suggested for this merchant.</summary>
+    public string? SuggestedCategoryName { get; set; }
+
+    /// <summary>The category is the one the person chose for this merchant before.</summary>
+    public bool CategoryRemembered { get; set; }
+
     public List<MerchantMonthlySpend> MonthlyBreakdowns { get; } = [];
     public List<ImportCandidate> Items { get; } = [];
 
@@ -74,4 +80,10 @@ public sealed class GroupedMerchantCandidate
     public bool SomeIncluded => Items.Any(i => i.Include && !i.AlreadyExists);
     public int IncludedCount => Items.Count(i => i.Include && !i.AlreadyExists);
     public decimal IncludedAmount => Items.Where(i => i.Include && !i.AlreadyExists).Sum(i => i.Amount);
+
+    /// <summary>The whole merchant was moved to another category, so importing will remember it.</summary>
+    public bool WillRemember => CategoryName is not null
+                                && SuggestedCategoryName is not null
+                                && !string.Equals(CategoryName, SuggestedCategoryName, StringComparison.OrdinalIgnoreCase)
+                                && Items.All(i => string.Equals(i.CategoryName, CategoryName, StringComparison.OrdinalIgnoreCase));
 }

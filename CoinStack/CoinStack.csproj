@@ -24,4 +24,19 @@
     <ProjectReference Include="..\CoinStack.Data\CoinStack.Data.csproj" />
   </ItemGroup>
 
+  <!--
+    wwwroot/tailadmin/style.css is built by Tailwind from the classes used in Components. It is committed,
+    so the app builds without Node. After `npm install` in this folder, every build regenerates it when a
+    .razor file or the Tailwind source has changed, so a new class can't go missing again.
+  -->
+  <ItemGroup>
+    <Content Remove="package.json;package-lock.json" />
+    <TailwindInput Include="Components/**/*.razor;wwwroot/tailadmin/src/css/style.css" />
+  </ItemGroup>
+
+  <Target Name="BuildTailwindCss" BeforeTargets="BeforeBuild" Condition="Exists('node_modules')"
+          Inputs="@(TailwindInput)" Outputs="wwwroot/tailadmin/style.css">
+    <Exec Command="npm run css --silent" />
+  </Target>
+
 </Project>

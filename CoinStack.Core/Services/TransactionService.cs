@@ -1,5 +1,6 @@
 using CoinStack.Data;
 using CoinStack.Data.Entities;
+using CoinStack.Services.Import;
 using Microsoft.EntityFrameworkCore;
 
 namespace CoinStack.Services;
@@ -106,6 +107,14 @@ public sealed class TransactionService : ITransactionService
         var oldDebtImpact = GetDebtPaymentImpact(existing);
         var newDebtId = transaction.DebtAccountId;
         var newDebtImpact = GetDebtPaymentImpact(transaction);
+
+        // Moving a bank transaction to another category teaches the next import where that merchant goes.
+        if (existing.Source == TransactionConventions.BankSource
+            && existing.CategoryId != transaction.CategoryId
+            && transaction.CategoryId is { } newCategoryId)
+        {
+            await MerchantRuleBook.RememberAsync(db, MerchantRuleBook.KeyOf(existing), existing.Description, newCategoryId, cancellationToken);
+        }
 
         existing.OccurredAtUtc = transaction.OccurredAtUtc;
         existing.Amount = transaction.Amount;

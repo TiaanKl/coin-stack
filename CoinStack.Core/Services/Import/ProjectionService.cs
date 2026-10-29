@@ -132,9 +132,8 @@ public sealed partial class ProjectionService : IProjectionService
                             || (t.Notes is not null && TransactionConventions.LooksLikeSalary(t.Notes))))
             .ToList();
 
-        var detectedSalary = salaryTransactions.Count > 0
-            ? Math.Round(salaryTransactions.Average(t => t.Amount), 2, MidpointRounding.AwayFromZero)
-            : 0m;
+        // The usual salary per month, so fortnightly or weekly pay counts in full.
+        var detectedSalary = MonthlyTotals.Typical(salaryTransactions.Select(t => (t.OccurredAtUtc, t.Amount)));
 
         // 4. Completed months vs ongoing partial month. A finished month that a bank statement only
         //    partly covers (a statement starting on the 18th) is partial too: its totals are too low.

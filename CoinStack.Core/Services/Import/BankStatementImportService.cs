@@ -46,6 +46,12 @@ public sealed class ImportCandidate
     public bool AlreadyExists { get; set; }
 
     public string SkipReason { get; set; } = "";
+
+    /// <summary>The category the app suggested. Moving the whole merchant to another one at import is remembered.</summary>
+    public string? SuggestedCategoryName { get; set; }
+
+    /// <summary>The category is the one the person chose for this merchant before.</summary>
+    public bool CategoryRemembered { get; set; }
 }
 
 /// <summary>Everything the UI needs to review one statement before committing.</summary>
@@ -86,6 +92,19 @@ public sealed class StatementImportPreview
     public int ExpenseCount => Candidates.Count(c => c.Type == TransactionType.Expense);
     public int NewCount => Candidates.Count(c => !c.AlreadyExists);
     public int DuplicateCount => Candidates.Count(c => c.AlreadyExists);
+
+    /// <summary>How many months the statement covers, so a three-month statement's totals can be shown per month.</summary>
+    public int MonthsCovered
+    {
+        get
+        {
+            var first = PeriodStartUtc ?? (Candidates.Count > 0 ? Candidates.Min(c => c.DateUtc) : null);
+            var last = PeriodEndUtc ?? (Candidates.Count > 0 ? Candidates.Max(c => c.DateUtc) : null);
+            return first is { } from && last is { } to ? MonthlyTotals.MonthsCovered(from, to) : 1;
+        }
+    }
+
+    public decimal PerMonth(decimal total) => Math.Round(total / MonthsCovered, 2, MidpointRounding.AwayFromZero);
 }
 
 /// <summary>Outcome of committing a preview to the database.</summary>
@@ -236,12 +255,9 @@ public sealed class BankStatementImportService : IBankStatementImportService
 
         if (salaryCandidates.Count > 0)
         {
-            preview.DetectedSalaryAmount = Math.Round(salaryCandidates.Average(c => c.Amount), 2, MidpointRounding.AwayFromZero);
-            preview.DetectedSalaryPayday = salaryCandidates
-                .GroupBy(c => c.DateUtc.Day)
-                .OrderByDescending(g => g.Count())
-                .Select(g => g.Key)
-                .FirstOrDefault();
+            // Per month, not per payment: three months of salary is one salary, and so are two fortnightly payments.
+            preview.DetectedSalaryAmount = MonthlyTotals.Typical(salaryCandidates.Select(c => (c.DateUtc, c.Amount)));
+            preview.DetectedSalaryPayday = BudgetPeriod.DetectPayday(salaryCandidates.Select(c => c.DateUtc));
         }
 
         // 6. Check existing fingerprints in DB (current scheme, plus the legacy scheme for older imports)
@@ -273,6 +289,19 @@ public sealed class BankStatementImportService : IBankStatementImportService
                 candidate.Include = false;
                 candidate.SkipReason = "Transfer between own accounts";
             }
+        }
+
+        // The person's own categories for merchants they moved before win over the defaults.
+        var rules = await MerchantRuleBook.LoadAsync(db, cancellationToken);
+        foreach (var candidate in preview.Candidates.Where(c => c.Type != TransactionType.Transfer))
+        {
+            if (rules.CategoryFor(candidate.NormalizedKey) is { } remembered)
+            {
+                candidate.CategoryName = remembered;
+                candidate.CategoryRemembered = true;
+            }
+
+            candidate.SuggestedCategoryName = candidate.CategoryName;
         }
 
         // 7. Aggregate into Grouped Merchant Views
@@ -417,6 +446,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
                 MerchantName = first.MerchantName,
                 NormalizedKey = first.NormalizedKey,
                 CategoryName = first.CategoryName,
+                SuggestedCategoryName = first.SuggestedCategoryName,
+                CategoryRemembered = first.CategoryRemembered,
                 IconClass = first.MerchantIcon,
                 Type = first.Type,
                 TotalAmount = g.Sum(c => c.Amount),
@@ -504,18 +535,31 @@ public sealed class BankStatementImportService : IBankStatementImportService
         import.DuplicatesSkipped = preview.DuplicateCount;
         import.TransfersSkipped = preview.TransferCount;
 
+        // A merchant moved to another category as a whole is remembered for the next import. Changing
+        // one row of a merchant is treated as a one-off.
+        foreach (var merchant in toImport.Where(c => c.Type != TransactionType.Transfer).GroupBy(c => c.NormalizedKey))
+        {
+            var chosen = merchant.Select(c => c.CategoryName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var suggested = merchant.First().SuggestedCategoryName;
+            if (chosen is [{ } name]
+                && suggested is not null
+                && !string.Equals(name, suggested, StringComparison.OrdinalIgnoreCase)
+                && categoryByName.TryGetValue(name, out var chosenCategoryId))
+            {
+                await MerchantRuleBook.RememberAsync(db, merchant.Key, merchant.First().MerchantName, chosenCategoryId, cancellationToken);
+            }
+        }
+
         // Saved now so the recurring step below finds these rows and links them to their subscriptions.
         await db.SaveChangesAsync(cancellationToken);
 
-        var salaryAmounts = toImport
+        var salaryPayments = toImport
             .Concat(preview.Candidates.Where(c => c.AlreadyExists))
             .Where(c => c.Type == TransactionType.Income && TransactionConventions.LooksLikeSalary(c.RawDescription ?? c.Description))
-            .Select(c => c.Amount)
+            .Select(c => (c.DateUtc, c.Amount))
             .ToList();
 
-        var detectedSalary = salaryAmounts.Count > 0
-            ? Math.Round(salaryAmounts.Average(), 2, MidpointRounding.AwayFromZero)
-            : (decimal?)null;
+        var detectedSalary = salaryPayments.Count > 0 ? MonthlyTotals.Typical(salaryPayments) : (decimal?)null;
 
         var payday = BudgetPeriod.DetectPayday(toImport
             .Concat(preview.Candidates.Where(c => c.AlreadyExists))
@@ -632,12 +676,12 @@ public sealed class BankStatementImportService : IBankStatementImportService
             var salaries = salaryAmounts
                 .Where(t => TransactionConventions.LooksLikeSalary(t.Description)
                             || (t.Notes is not null && TransactionConventions.LooksLikeSalary(t.Notes)))
-                .Select(t => t.Amount)
+                .Select(t => (t.OccurredAtUtc, t.Amount))
                 .ToList();
 
             if (salaries.Count > 0)
             {
-                settings.MonthlyIncome = Math.Round(salaries.Average(), 2, MidpointRounding.AwayFromZero);
+                settings.MonthlyIncome = MonthlyTotals.Typical(salaries);
 
                 var payday = BudgetPeriod.DetectPayday(salaryAmounts
                     .Where(t => TransactionConventions.LooksLikeSalary(t.Description)

@@ -1,10 +1,14 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap")
 layer(base);
 
-@import "tailwindcss";
+/* Built with `npm run css` in CoinStack/ (and on every build once `npm install` has run there).
+   Only classes found in these files end up in style.css, so a class used nowhere else needs a rebuild. */
+@import "tailwindcss" source(none);
+@source "../../../../Components";
+@source "../../*.js";
+@source "../../../*.js";
 
 @plugin '@tailwindcss/forms';
-@plugin 'autoprefixer';
 
 @custom-variant dark (&:is(.dark *));
 

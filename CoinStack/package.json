@@ -1,0 +1,14 @@
+{
+  "name": "coinstack-web-styles",
+  "private": true,
+  "description": "Builds wwwroot/tailadmin/style.css from the Tailwind classes used in Components. The output is committed, so building the app doesn't need Node.",
+  "scripts": {
+    "css": "tailwindcss -i ./wwwroot/tailadmin/src/css/style.css -o ./wwwroot/tailadmin/style.css --minify",
+    "css:watch": "tailwindcss -i ./wwwroot/tailadmin/src/css/style.css -o ./wwwroot/tailadmin/style.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.3",
+    "@tailwindcss/forms": "0.5.11",
+    "tailwindcss": "4.3.3"
+  }
+}

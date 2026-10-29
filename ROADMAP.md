@@ -39,6 +39,17 @@ Also fixed along the way, from the lists below: payday 29th–31st, Reports and 
 
 Not done in Phase 2: the mobile screens still lack the web's goal withdraw/abandon, waitlist "Didn't buy" and import screens. Android only builds; it hasn't been run on a device. iOS needs a Mac to build.
 
+**Smarter import, part 1: learning (2026-10-29).**
+
+- **Merchant matching** works on whole words, and the longest match wins, which fixes the false positives listed below. Personal payees are no longer built in. Common South African merchants (streaming, fuel, telcos, fast food, Uber vs Uber Eats) are recognised.
+- **Learning from your choices** (`MerchantRule`, migration `MerchantRules`):
+  - Moving a whole merchant to another category in the import preview is remembered for every later import.
+  - So is changing a bank transaction's category on the Transactions page, which also offers to move that merchant's earlier transactions.
+  - A shop the app doesn't know follows the choice made for its other branches.
+- **Income per month:** a multi-month statement shows income and spending per month, and salary is the usual total per month rather than the average per payment, so fortnightly pay counts in full.
+- **Styling:** the web app's CSS is now built by Tailwind from the pages (`npm run css` in `CoinStack/`), so classes no longer go missing.
+- **Next:** reading any bank's statement (Part 2, item 4).
+
 ## Part 1: Improve what already exists
 
 ### Calculations that are still wrong (highest priority)
@@ -101,7 +112,7 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
   - Category is free text rather than a link to a category.
   - Cost and debit day aren't validated.
   - Logos send every subscription name to clearbit.com.
-- **Merchant matching false positives (M).** "City Of Cape Town" is classed as OnlyFans, "MR DIY" as Mr D, and "Auto Spares" as Spar.
+- ~~**Merchant matching false positives (M).**~~ Fixed: "City Of Cape Town" was classed as OnlyFans, "MR DIY" as Mr D, and "Auto Spares" as Spar.
 - **Reports and Income disagree (S).** Income uses calendar months while Reports uses your payday period. Fallback History shows times in UTC.
 
 ### Gamification integrity (M)

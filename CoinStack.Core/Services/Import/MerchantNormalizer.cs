@@ -12,9 +12,11 @@ public sealed record MerchantInfo(
     string? FeeType = null);
 
 /// <summary>
-/// Intelligent merchant and service normalizer for bank transaction descriptions.
-/// Maps variants (e.g., "Onlyfans*J", "Of", "Onlyfans.Com*") to canonical merchants ("OnlyFans"),
-/// and identifies service icons, categories, pass-throughs, and avoidable bank fees.
+/// Turns a bank's transaction description into a merchant: a readable name, a key that groups its
+/// variants ("Onlyfans*J", "Of" and "Onlyfans.Com*" are all OnlyFans), a category and an icon.
+/// Merchants are matched on whole words, and when several match the longest phrase wins, so
+/// "City Of Cape Town" isn't OnlyFans, "MR DIY" isn't Mr D and "Auto Spares" isn't Spar.
+/// The person's own choices (<see cref="MerchantCategoryMemory"/>) take priority over the categories here.
 /// </summary>
 public static partial class MerchantNormalizer
 {
@@ -27,420 +29,156 @@ public static partial class MerchantNormalizer
     [GeneratedRegex(@"\s+")]
     private static partial Regex MultipleWhitespaceRegex();
 
+    /// <summary>A merchant this app recognises. A phrase starting with "=" must be the whole description.</summary>
+    private sealed record KnownMerchant(string Name, string Key, string Category, string Icon, params string[] Phrases)
+    {
+        /// <summary>Only matches money in (salary, refunds) or only money out; null matches both.</summary>
+        public TransactionType? Only { get; init; }
+
+        public bool IsAvoidableFee { get; init; }
+
+        public string? FeeType { get; init; }
+    }
+
+    private static readonly KnownMerchant[] Known =
+    [
+        // Bank fees (FNB's wording)
+        new("FNB Unpaid Item Fee", "FNB_UNPAID_FEE", "Banking Fees", "fa-solid fa-triangle-exclamation", "ITEM PAID NO FUNDS")
+            { IsAvoidableFee = true, FeeType = "Unpaid Item (Insufficient Funds)" },
+        new("FNB Declined Transaction Fee", "FNB_DECLINED_FEE", "Banking Fees", "fa-solid fa-circle-xmark",
+            "DEBIT CARD POS UNSUCCESSFUL", "DECLINED PURCH", "DECLINED FOREIGN")
+            { IsAvoidableFee = true, FeeType = "Declined Card Fee" },
+        new("FNB Service & Foreign Fees", "FNB_SERVICE_FEES", "Banking Fees", "fa-solid fa-building-columns",
+            "SERVICE FEES", "PAYMENTS BUNDLE FEE"),
+        new("FNB Monthly Account Fee", "FNB_ACCOUNT_FEE", "Banking Fees", "fa-solid fa-building-columns",
+            "MONTHLY ACCOUNT FEE", "MONTHLYACCOUNTFEE"),
+
+        // Money in
+        new("Salary", "SALARY", "Salary", "fa-solid fa-money-bill-wave", "SALARY", "SALARIS", "WAGES") { Only = TransactionType.Income },
+        new("Refund / Fee Reversal", "REFUND", TransactionConventions.RefundsCategoryName, "fa-solid fa-rotate-left", "REFUND", "REVERSAL")
+            { Only = TransactionType.Income },
+
+        // Subscriptions and online services
+        new("OnlyFans", "ONLYFANS", "Entertainment", "fa-solid fa-heart", "ONLYFANS", "=OF"),
+        new("Steam", "STEAM", "Entertainment", "fa-brands fa-steam", "STEAM", "STEAMGAMES", "STEAMPOWERED"),
+        new("Google Play & Services", "GOOGLE", "Entertainment", "fa-brands fa-google", "GOOGLE"),
+        new("YouTube", "YOUTUBE", "Entertainment", "fa-brands fa-youtube", "YOUTUBE"),
+        new("Microsoft", "MICROSOFT", "Entertainment", "fa-brands fa-microsoft", "MICROSOFT", "XBOX"),
+        new("Netflix", "NETFLIX", "Entertainment", "fa-solid fa-film", "NETFLIX"),
+        new("Spotify", "SPOTIFY", "Entertainment", "fa-brands fa-spotify", "SPOTIFY"),
+        new("DStv", "DSTV", "Entertainment", "fa-solid fa-tv", "DSTV", "MULTICHOICE"),
+        new("Showmax", "SHOWMAX", "Entertainment", "fa-solid fa-tv", "SHOWMAX"),
+        new("Disney+", "DISNEY_PLUS", "Entertainment", "fa-solid fa-film", "DISNEY PLUS", "DISNEYPLUS"),
+        new("Apple", "APPLE", "Entertainment", "fa-brands fa-apple", "APPLE.COM", "ITUNES"),
+        new("Gumroad", "GUMROAD", "Entertainment", "fa-solid fa-bag-shopping", "GUMROAD"),
+        new("Patreon", "PATREON", "Entertainment", "fa-brands fa-patreon", "PATREON"),
+        new("ComfyOrg", "COMFYORG", "Entertainment", "fa-solid fa-palette", "COMFY.ORG", "COMFYORG"),
+        new("WeMod", "WEMOD", "Entertainment", "fa-solid fa-gamepad", "WEMOD"),
+        new("PayPal", "PAYPAL", "Entertainment", "fa-brands fa-paypal", "PAYPAL"),
+        new("Gaming & In-App Purchases", "GAMING_CREDITS", "Entertainment", "fa-solid fa-dice", "GAME CREDITS", "COMEWELCOM", "TOTEM CORE"),
+        new("IONOS Hosting", "IONOS", "Utilities", "fa-solid fa-server", "IONOS"),
+        new("RunPod GPU", "RUNPOD", "Utilities", "fa-solid fa-microchip", "RUNPOD"),
+        new("Cursor AI", "CURSOR", "Utilities", "fa-solid fa-code", "CURSOR"),
+        new("OpenAI", "OPENAI", "Utilities", "fa-solid fa-robot", "OPENAI", "CHATGPT"),
+        new("OpenRouter", "OPENROUTER", "Utilities", "fa-solid fa-network-wired", "OPENROUTER"),
+        new("TensorDock", "TENSORDOCK", "Utilities", "fa-solid fa-server", "TENSORDOCK"),
+        new("GitHub", "GITHUB", "Utilities", "fa-brands fa-github", "GITHUB"),
+
+        // Groceries
+        new("Pick n Pay", "PICK_N_PAY", "Groceries", "fa-solid fa-basket-shopping", "PICK N PAY", "PICKNPAY", "PNP"),
+        new("Spar", "SPAR", "Groceries", "fa-solid fa-basket-shopping", "SPAR", "SUPERSPAR", "KWIKSPAR"),
+        new("Groceries & Convenience", "GROCERIES_OTHER", "Groceries", "fa-solid fa-cart-shopping",
+            "OK MINI MARK", "OK MINIMARK", "OK FOODS", "CHECKERS", "SHOPRITE", "WOOLWORTHS", "WOOLIES", "FOOD LOVERS"),
+
+        // Health
+        new("Dis-Chem", "DIS_CHEM", "Health", "fa-solid fa-prescription-bottle-medical", "DIS-CHEM", "DISCHEM", "DIS CHEM"),
+        new("Clicks", "CLICKS", "Health", "fa-solid fa-pills", "CLICKS"),
+        new("Pharmacy & Medication", "PHARMACY", "Health", "fa-solid fa-prescription-bottle-medical", "PHARMACY", "PHARMA", "APTEEK", "MEDICATION"),
+        new("Gym", "GYM", "Health", "fa-solid fa-dumbbell", "VIRGIN ACTIVE", "PLANET FITNESS", "GYM"),
+
+        // Eating out
+        new("Mr D Food", "MR_D_FOOD", "Dining", "fa-solid fa-utensils", "MR D FOOD", "MR D", "MRD"),
+        new("Uber Eats", "UBER_EATS", "Dining", "fa-solid fa-utensils", "UBER EATS", "UBEREATS"),
+        new("Sushi", "YUKI_SUSHI", "Dining", "fa-solid fa-utensils", "SUSHI"),
+        new("Nando's", "NANDOS", "Dining", "fa-solid fa-drumstick-bite", "NANDOS", "NANDO S"),
+        new("KFC", "KFC", "Dining", "fa-solid fa-drumstick-bite", "KFC"),
+        new("McDonald's", "MCDONALDS", "Dining", "fa-solid fa-burger", "MCDONALDS", "MC DONALDS", "MCD"),
+        new("Steers", "STEERS", "Dining", "fa-solid fa-burger", "STEERS"),
+        new("Wimpy", "WIMPY", "Dining", "fa-solid fa-burger", "WIMPY"),
+        new("Spur", "SPUR", "Dining", "fa-solid fa-utensils", "SPUR"),
+        new("Debonairs", "DEBONAIRS", "Dining", "fa-solid fa-pizza-slice", "DEBONAIRS"),
+        new("Roman's Pizza", "ROMANS_PIZZA", "Dining", "fa-solid fa-pizza-slice", "ROMANS PIZZA"),
+        new("Coffee", "COFFEE", "Dining", "fa-solid fa-mug-hot", "STARBUCKS", "VIDA E CAFFE", "MUGG & BEAN", "MUGG AND BEAN", "SEATTLE COFFEE"),
+
+        // Getting around
+        new("Uber", "UBER", "Transport", "fa-brands fa-uber", "UBER"),
+        new("Bolt", "BOLT", "Transport", "fa-solid fa-taxi", "BOLT.EU", "BOLT"),
+        new("Fuel", "FUEL", "Transport", "fa-solid fa-gas-pump", "ENGEN", "SHELL", "SASOL", "CALTEX", "ASTRON", "BP"),
+
+        // Phone, internet and electricity
+        new("Vodacom", "VODACOM", "Utilities", "fa-solid fa-mobile-screen", "VODACOM"),
+        new("MTN", "MTN", "Utilities", "fa-solid fa-mobile-screen", "MTN"),
+        new("Cell C", "CELL_C", "Utilities", "fa-solid fa-mobile-screen", "CELL C", "CELLC"),
+        new("Telkom", "TELKOM", "Utilities", "fa-solid fa-phone", "TELKOM"),
+        new("Rain", "RAIN", "Utilities", "fa-solid fa-wifi", "RAIN MOBILE", "RAIN.CO.ZA"),
+        new("Electricity", "ELECTRICITY", "Utilities", "fa-solid fa-bolt", "ESKOM", "PREPAID ELEC", "PREPAID ELECTRICITY"),
+
+        // Debt and vehicle finance
+        new("WesBank Vehicle Finance", "WESBANK", "Debt", "fa-solid fa-car", "WESBANK"),
+        new("FNB Credit Card", "FNB_CREDIT_CARD", "Debt", "fa-solid fa-credit-card", "FNBCC", "TRANSFER TO CREDIT"),
+
+        // Shopping
+        new("Takealot", "TAKEALOT", "Shopping", "fa-solid fa-box", "TAKEALOT"),
+        new("Makro", "MAKRO", "Shopping", "fa-solid fa-store", "MAKRO"),
+        new("Mr Price", "MR_PRICE", "Shopping", "fa-solid fa-shirt", "MR PRICE", "MRP"),
+        new("Pep", "PEP", "Shopping", "fa-solid fa-shirt", "PEP", "PEP STORES"),
+        new("Ackermans", "ACKERMANS", "Shopping", "fa-solid fa-shirt", "ACKERMANS"),
+        new("Builders", "BUILDERS", "Shopping", "fa-solid fa-hammer", "BUILDERS WAREHOUSE", "BUILDERS EXPRESS", "BUILDERS"),
+        new("Wootware Computers", "WOOTWARE", "Shopping", "fa-solid fa-desktop", "WOOTWARE"),
+        new("Tobacconist", "TOBACCONIST", "Entertainment", "fa-solid fa-smoking", "TOBACCONIST"),
+
+        // Between the person's own accounts
+        new("Internal Savings Transfer", "INTERNAL_SAVINGS", "Transfer", "fa-solid fa-piggy-bank",
+            "INVEST SAVINGS", "PAYMENT TO SAVINGS", "INVESTMENT SAVINGS"),
+    ];
+
+    private static readonly HashSet<string> KnownKeys = Known.Select(m => m.Key).ToHashSet(StringComparer.Ordinal);
+
+    /// <summary>Whether the key belongs to a merchant this app recognises, rather than one made from the description.</summary>
+    public static bool IsKnownKey(string normalizedKey) => KnownKeys.Contains(normalizedKey);
+
     public static MerchantInfo Normalize(string rawDescription, TransactionType type)
     {
         var cleaned = CleanDescription(rawDescription);
         var upper = cleaned.ToUpperInvariant();
 
-        // 1. Bank fees and avoidable charges
-        if (upper.Contains("#ITEM PAID NO FUNDS") || upper.Contains("ITEM PAID NO FUNDS"))
+        KnownMerchant? best = null;
+        var bestLength = 0;
+        foreach (var merchant in Known)
         {
-            return new MerchantInfo(
-                "FNB Unpaid Item Fee",
-                "FNB_UNPAID_FEE",
-                "Banking Fees",
-                "fa-solid fa-triangle-exclamation",
-                IsAvoidableFee: true,
-                FeeType: "Unpaid Item (Insufficient Funds)");
-        }
-
-        if (upper.Contains("#DEBIT CARD POS UNSUCCESSFUL") || upper.Contains("DECLINED PURCH") || upper.Contains("DECLINED FOREIGN"))
-        {
-            return new MerchantInfo(
-                "FNB Declined Transaction Fee",
-                "FNB_DECLINED_FEE",
-                "Banking Fees",
-                "fa-solid fa-circle-xmark",
-                IsAvoidableFee: true,
-                FeeType: "Declined Card Fee");
-        }
-
-        if (upper.Contains("#SERVICE FEES") || upper.Contains("PAYMENTS BUNDLE FEE") || upper.Contains("SERVICE FEES #INT PYMT"))
-        {
-            return new MerchantInfo(
-                "FNB Service & Foreign Fees",
-                "FNB_SERVICE_FEES",
-                "Banking Fees",
-                "fa-solid fa-building-columns");
-        }
-
-        if (upper.Contains("MONTHLY ACCOUNT FEE") || upper.Contains("MONTHLYACCOUNTFEE"))
-        {
-            return new MerchantInfo(
-                "FNB Monthly Account Fee",
-                "FNB_ACCOUNT_FEE",
-                "Banking Fees",
-                "fa-solid fa-building-columns");
-        }
-
-        // 2. Salary & Inflow Sources
-        if (type == TransactionType.Income)
-        {
-            if (upper.Contains("SALARY") || upper.Contains("MULTICAT SALARY"))
+            if (merchant.Only is { } only && only != type)
             {
-                return new MerchantInfo(
-                    "Salary (Multicat)",
-                    "SALARY",
-                    "Salary",
-                    "fa-solid fa-money-bill-wave");
+                continue;
             }
 
-            if (upper.Contains("MULTICAT"))
+            foreach (var phrase in merchant.Phrases)
             {
-                return new MerchantInfo(
-                    "Multicat Payment",
-                    "MULTICAT_PAYMENT",
-                    "Freelance",
-                    "fa-solid fa-briefcase");
-            }
-
-            if (upper.Contains("PAYMENT FROM PA") || upper.Contains("FROM PA PNP"))
-            {
-                return new MerchantInfo(
-                    "Payment from Pa",
-                    "FAMILY_PA",
-                    "Personal",
-                    "fa-solid fa-user-group");
-            }
-
-            if (upper.Contains("PAYMENT FROM MA") || upper.Contains("FROM MA"))
-            {
-                return new MerchantInfo(
-                    "Payment from Ma",
-                    "FAMILY_MA",
-                    "Personal",
-                    "fa-solid fa-user-group");
-            }
-
-            if (upper.Contains("PAYSHAP CREDIT") || upper.Contains("HOLTSHOUSEN"))
-            {
-                return new MerchantInfo(
-                    "PayShap Transfer",
-                    "PAYSHAP_IN",
-                    "Freelance",
-                    "fa-solid fa-bolt");
-            }
-
-            if (upper.Contains("REFUND") || upper.Contains("REVERSAL"))
-            {
-                return new MerchantInfo(
-                    "Refund / Fee Reversal",
-                    "REFUND",
-                    TransactionConventions.RefundsCategoryName,
-                    "fa-solid fa-rotate-left");
+                var length = Matches(upper, phrase) ? phrase.TrimStart('=').Length : 0;
+                if (length > bestLength)
+                {
+                    best = merchant;
+                    bestLength = length;
+                }
             }
         }
 
-        // 3. Digital Subscriptions & Services (Group OnlyFans / OF, Steam, etc.)
-        if (upper.Contains("ONLYFANS") || upper.Equals("OF") || upper.StartsWith("OF ") || upper.EndsWith(" OF") || upper.Contains(" OF "))
+        if (best is not null)
         {
-            return new MerchantInfo(
-                "OnlyFans",
-                "ONLYFANS",
-                "Entertainment",
-                "fa-solid fa-heart");
+            return new MerchantInfo(best.Name, best.Key, best.Category, best.Icon, best.IsAvoidableFee, best.FeeType);
         }
 
-        if (upper.Contains("STEAM") || upper.Contains("STEAMGAMES"))
-        {
-            return new MerchantInfo(
-                "Steam",
-                "STEAM",
-                "Entertainment",
-                "fa-brands fa-steam");
-        }
-
-        if (upper.Contains("GOOGLE"))
-        {
-            return new MerchantInfo(
-                "Google Play & Services",
-                "GOOGLE",
-                "Entertainment",
-                "fa-brands fa-google");
-        }
-
-        if (upper.Contains("MICROSOFT") || upper.Contains("XBOX"))
-        {
-            return new MerchantInfo(
-                "Microsoft",
-                "MICROSOFT",
-                "Entertainment",
-                "fa-brands fa-microsoft");
-        }
-
-        if (upper.Contains("GUMROAD"))
-        {
-            return new MerchantInfo(
-                "Gumroad",
-                "GUMROAD",
-                "Entertainment",
-                "fa-solid fa-bag-shopping");
-        }
-
-        if (upper.Contains("PATREON"))
-        {
-            return new MerchantInfo(
-                "Patreon",
-                "PATREON",
-                "Entertainment",
-                "fa-brands fa-patreon");
-        }
-
-        if (upper.Contains("IONOS"))
-        {
-            return new MerchantInfo(
-                "IONOS Hosting",
-                "IONOS",
-                "Utilities",
-                "fa-solid fa-server");
-        }
-
-        if (upper.Contains("RUNPOD"))
-        {
-            return new MerchantInfo(
-                "RunPod GPU",
-                "RUNPOD",
-                "Utilities",
-                "fa-solid fa-microchip");
-        }
-
-        if (upper.Contains("CURSOR"))
-        {
-            return new MerchantInfo(
-                "Cursor AI",
-                "CURSOR",
-                "Utilities",
-                "fa-solid fa-code");
-        }
-
-        if (upper.Contains("OPENAI"))
-        {
-            return new MerchantInfo(
-                "OpenAI",
-                "OPENAI",
-                "Utilities",
-                "fa-solid fa-robot");
-        }
-
-        if (upper.Contains("OPENROUTER"))
-        {
-            return new MerchantInfo(
-                "OpenRouter",
-                "OPENROUTER",
-                "Utilities",
-                "fa-solid fa-network-wired");
-        }
-
-        if (upper.Contains("TENSORDOCK"))
-        {
-            return new MerchantInfo(
-                "TensorDock",
-                "TENSORDOCK",
-                "Utilities",
-                "fa-solid fa-server");
-        }
-
-        if (upper.Contains("COMFY.ORG") || upper.Contains("COMFYORG"))
-        {
-            return new MerchantInfo(
-                "ComfyOrg",
-                "COMFYORG",
-                "Entertainment",
-                "fa-solid fa-palette");
-        }
-
-        if (upper.Contains("WEMOD"))
-        {
-            return new MerchantInfo(
-                "WeMod",
-                "WEMOD",
-                "Entertainment",
-                "fa-solid fa-gamepad");
-        }
-
-        if (upper.Contains("GITHUB"))
-        {
-            return new MerchantInfo(
-                "GitHub",
-                "GITHUB",
-                "Utilities",
-                "fa-brands fa-github");
-        }
-
-        if (upper.Contains("PAYPAL"))
-        {
-            return new MerchantInfo(
-                "PayPal",
-                "PAYPAL",
-                "Entertainment",
-                "fa-brands fa-paypal");
-        }
-
-        if (upper.Contains("GAME CREDITS") || upper.Contains("COMEWELCOM") || upper.Contains("TOTEM CORE"))
-        {
-            return new MerchantInfo(
-                "Gaming & In-App Purchases",
-                "GAMING_CREDITS",
-                "Entertainment",
-                "fa-solid fa-dice");
-        }
-
-        // 4. Retail & Groceries
-        if (upper.Contains("PICK N PAY") || upper.Contains("PNP"))
-        {
-            return new MerchantInfo(
-                "Pick n Pay",
-                "PICK_N_PAY",
-                "Groceries",
-                "fa-solid fa-basket-shopping");
-        }
-
-        if (upper.Contains("SPAR"))
-        {
-            return new MerchantInfo(
-                "Spar",
-                "SPAR",
-                "Groceries",
-                "fa-solid fa-basket-shopping");
-        }
-
-        if (upper.Contains("OK MINI MARK") || upper.Contains("OK MINIMARK") || upper.Contains("CHECKERS") || upper.Contains("SHOPRITE") || upper.Contains("WOOLWORTHS"))
-        {
-            return new MerchantInfo(
-                "Groceries & Convenience",
-                "GROCERIES_OTHER",
-                "Groceries",
-                "fa-solid fa-cart-shopping");
-        }
-
-        // 5. Health & Pharmacy
-        if (upper.Contains("DIS-CHEM") || upper.Contains("DISCHEM"))
-        {
-            return new MerchantInfo(
-                "Dis-Chem",
-                "DIS_CHEM",
-                "Health",
-                "fa-solid fa-prescription-bottle-medical");
-        }
-
-        if (upper.Contains("CLICKS"))
-        {
-            return new MerchantInfo(
-                "Clicks",
-                "CLICKS",
-                "Health",
-                "fa-solid fa-pills");
-        }
-
-        if (upper.Contains("UITZICHT PHARMA") || upper.Contains("PHARMA") || upper.Contains("MEDICATION"))
-        {
-            return new MerchantInfo(
-                "Pharmacy & Medication",
-                "PHARMACY",
-                "Health",
-                "fa-solid fa-prescription-bottle-medical");
-        }
-
-        // 6. Food & Dining
-        if (upper.Contains("MR D FOOD") || upper.Contains("MR D"))
-        {
-            return new MerchantInfo(
-                "Mr D Food",
-                "MR_D_FOOD",
-                "Dining",
-                "fa-solid fa-utensils");
-        }
-
-        if (upper.Contains("YUKI SUSHI") || upper.Contains("SUSHI"))
-        {
-            return new MerchantInfo(
-                "Yuki Sushi",
-                "YUKI_SUSHI",
-                "Dining",
-                "fa-solid fa-utensils");
-        }
-
-        // 7. Debt & Vehicle Finance
-        if (upper.Contains("WESBANK"))
-        {
-            return new MerchantInfo(
-                "WesBank Vehicle Finance",
-                "WESBANK",
-                "Debt",
-                "fa-solid fa-car");
-        }
-
-        if (upper.Contains("FNBCC") || upper.Contains("TRANSFER TO CREDIT"))
-        {
-            return new MerchantInfo(
-                "FNB Credit Card",
-                "FNB_CREDIT_CARD",
-                "Debt",
-                "fa-solid fa-credit-card");
-        }
-
-        // 8. Shopping & Personal
-        if (upper.Contains("WOOTWARE"))
-        {
-            return new MerchantInfo(
-                "Wootware Computers",
-                "WOOTWARE",
-                "Shopping",
-                "fa-solid fa-desktop");
-        }
-
-        if (upper.Contains("TOBACCONIST"))
-        {
-            return new MerchantInfo(
-                "T's Tobacconist & Vape",
-                "TOBACCONIST",
-                "Entertainment",
-                "fa-solid fa-smoking");
-        }
-
-        if (upper.Contains("PAYMENT TO PA") || upper.Contains("TO PA TIAAN"))
-        {
-            return new MerchantInfo(
-                "Payment to Pa",
-                "FAMILY_PA_OUT",
-                "Personal",
-                "fa-solid fa-user-group");
-        }
-
-        if (upper.Contains("PAYMENT TO MARCEL") || upper.Contains("TO MARCEL"))
-        {
-            return new MerchantInfo(
-                "Payment to Marcel",
-                "MARCEL_OUT",
-                "Personal",
-                "fa-solid fa-user");
-        }
-
-        if (upper.Contains("PAYSHAP") || upper.Contains("AURORA"))
-        {
-            return new MerchantInfo(
-                "PayShap: Aurora",
-                "PAYSHAP_AURORA",
-                "Personal",
-                "fa-solid fa-paper-plane");
-        }
-
-        if (upper.Contains("INVEST SAVINGS") || upper.Contains("PAYMENT TO SAVINGS") || upper.Contains("INVESTMENT SAVINGS"))
-        {
-            return new MerchantInfo(
-                "Internal Savings Transfer",
-                "INTERNAL_SAVINGS",
-                "Transfer",
-                "fa-solid fa-piggy-bank");
-        }
-
-        // Default fallback: clean readable merchant description
-        var fallbackName = cleaned;
-        if (fallbackName.Length > 30)
-        {
-            fallbackName = fallbackName[..30] + "…";
-        }
-
+        // Not a merchant we know: a readable version of the description, and a key made from it.
+        var fallbackName = cleaned.Length > 30 ? cleaned[..30] + "…" : cleaned;
         var fallbackKey = upper.Replace(" ", "_");
         if (fallbackKey.Length > 24)
         {
@@ -452,6 +190,33 @@ public static partial class MerchantNormalizer
             fallbackKey,
             type == TransactionType.Income ? "Freelance" : "Shopping",
             type == TransactionType.Income ? "fa-solid fa-arrow-down-left" : "fa-solid fa-bag-shopping");
+    }
+
+    /// <summary>
+    /// Whether the phrase appears as whole words: "SPAR" is in "SPAR SANDTON" but not "AUTO SPARES",
+    /// and "MR D" is in "MR D FOOD" but not "MR DIY". "=OF" means the description is exactly "OF".
+    /// </summary>
+    private static bool Matches(string upper, string phrase)
+    {
+        if (phrase.StartsWith('='))
+        {
+            return upper == phrase[1..];
+        }
+
+        for (var index = upper.IndexOf(phrase, StringComparison.Ordinal);
+             index >= 0;
+             index = upper.IndexOf(phrase, index + 1, StringComparison.Ordinal))
+        {
+            var end = index + phrase.Length;
+            var startsWord = index == 0 || !char.IsLetterOrDigit(upper[index - 1]);
+            var endsWord = end == upper.Length || !char.IsLetterOrDigit(upper[end]);
+            if (startsWord && endsWord)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static string CleanDescription(string description)

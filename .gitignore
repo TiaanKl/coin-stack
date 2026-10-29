@@ -51,3 +51,6 @@ appsettings.*.Development.json
 *.Publish.xml
 _ReSharper*/
 *.DotSettings.user
+
+# Node (Tailwind CSS build for the web app)
+node_modules/

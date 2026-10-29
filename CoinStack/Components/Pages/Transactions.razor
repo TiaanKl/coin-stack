@@ -11,6 +11,7 @@
 @inject ISavingsService SavingsService
 @inject IGameFeedbackService GameFeedbackService
 @inject IWaitlistService WaitlistService
+@inject IMerchantRuleService MerchantRules
 @inject IMoneyFormatter MoneyFormatter
 @inject NavigationManager Navigation
 
@@ -26,6 +27,38 @@
             Log Expense
         </button>
     </div>
+
+    <!-- Learned merchant category -->
+    @if (_merchantFollowUp is { } followUp)
+    {
+        <div class="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-700 dark:border-brand-500/30 dark:bg-brand-500/10 dark:text-brand-300">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>
+                @if (_followUpMoved is { } moved)
+                {
+                    <text>Moved @moved earlier @followUp.MerchantName @(moved == 1 ? "transaction" : "transactions") to @followUp.CategoryName.</text>
+                }
+                else
+                {
+                    <text>Future imports will put @followUp.MerchantName in @followUp.CategoryName.</text>
+                    @if (followUp.OtherTransactions > 0)
+                    {
+                        @($" {followUp.OtherTransactions} earlier {(followUp.OtherTransactions == 1 ? "one is" : "ones are")} still in another category.")
+                    }
+                }
+            </span>
+            @if (_followUpMoved is null && followUp.OtherTransactions > 0)
+            {
+                <button type="button" @onclick="MoveEarlierAsync" disabled="@_movingEarlier"
+                        class="rounded-full bg-brand-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-600 disabled:opacity-50">
+                    Move them too
+                </button>
+            }
+            <button type="button" @onclick="() => _merchantFollowUp = null" class="ml-auto text-brand-500 hover:text-brand-700" aria-label="Dismiss">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    }
 
     <!-- Game Result Toast -->
     @if (_gameResult is not null && (_gameResult.PointsChanged != 0 || !string.IsNullOrWhiteSpace(_gameResult.Message)))
@@ -490,6 +523,12 @@
     private GameTransactionResult? _gameResult;
     private AppSettings _settings = new();
 
+    // After a bank transaction moves category: what the next import will do, and the merchant's earlier rows.
+    private MerchantFollowUp? _merchantFollowUp;
+    private int _followUpTransactionId;
+    private int? _followUpMoved;
+    private bool _movingEarlier;
+
     private int? _editingId;
     private string _formDescription = "";
     private decimal _formAmount;
@@ -679,6 +718,7 @@
             var existing = _transactions.FirstOrDefault(t => t.Id == _editingId.Value);
             if (existing is not null)
             {
+                var categoryChanged = existing.CategoryId != _formCategoryId;
                 existing.Description = _formDescription.Trim();
                 existing.Amount = _formAmount;
                 existing.Type = _formType;
@@ -690,6 +730,13 @@
                 existing.IsImpulse = _formIsImpulse;
                 existing.Notes = string.IsNullOrWhiteSpace(_formNotes) ? null : _formNotes.Trim();
                 await TransactionService.UpdateAsync(existing);
+
+                if (categoryChanged)
+                {
+                    _merchantFollowUp = await MerchantRules.GetFollowUpAsync(existing.Id);
+                    _followUpTransactionId = existing.Id;
+                    _followUpMoved = null;
+                }
             }
         }
         else
@@ -745,6 +792,26 @@
 
         ResetFormFields();
         _showModal = false;
+    }
+
+    private async Task MoveEarlierAsync()
+    {
+        if (_movingEarlier)
+        {
+            return;
+        }
+
+        _movingEarlier = true;
+        try
+        {
+            _followUpMoved = await MerchantRules.ApplyToMerchantAsync(_followUpTransactionId);
+            _transactions.Clear();
+            _transactions.AddRange(await TransactionService.GetAllAsync());
+        }
+        finally
+        {
+            _movingEarlier = false;
+        }
     }
 
     private void ResetFormFields()

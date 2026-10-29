@@ -41,6 +41,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBankStatementImportService, BankStatementImportService>();
         services.AddScoped<IProjectionService, ProjectionService>();
         services.AddScoped<IForecastService, ForecastService>();
+        services.AddScoped<IMerchantRuleService, MerchantRuleService>();
 
         return services;
     }

@@ -450,10 +450,18 @@
                 <div>
                     <p class="text-[11px] text-gray-400 uppercase">New income</p>
                     <p class="text-sm font-semibold text-success-600 dark:text-success-400">@Money(_preview.TotalIncome)</p>
+                    @if (_preview.MonthsCovered > 1)
+                    {
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">≈ @Money(_preview.PerMonth(_preview.TotalIncome)) a month over @_preview.MonthsCovered months</p>
+                    }
                 </div>
                 <div>
                     <p class="text-[11px] text-gray-400 uppercase">New expenses</p>
                     <p class="text-sm font-semibold text-error-600 dark:text-error-400">@Money(_preview.TotalExpenses)</p>
+                    @if (_preview.MonthsCovered > 1)
+                    {
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">≈ @Money(_preview.PerMonth(_preview.TotalExpenses)) a month</p>
+                    }
                 </div>
                 <div>
                     <p class="text-[11px] text-gray-400 uppercase">Transfers</p>
@@ -500,7 +508,7 @@
                                class="w-44 rounded-full border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white sm:w-56" />
                     </div>
 
-                    <select @bind="_typeFilter" class="rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                    <select @bind="_typeFilter" class="rounded-full border border-gray-200 bg-white py-1.5 pl-3 pr-8 text-xs text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                         <option value="All">All Types</option>
                         <option value="Expense">Expenses Only</option>
                         <option value="Income">Income Only</option>
@@ -554,6 +562,14 @@
                                                     Pass-Through
                                                 </span>
                                             }
+
+                                            @if (group.CategoryRemembered && !group.WillRemember)
+                                            {
+                                                <span class="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600 dark:bg-brand-500/10 dark:text-brand-400"
+                                                      title="You put @group.MerchantName in @group.CategoryName before, so it goes there again.">
+                                                    <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Your category
+                                                </span>
+                                            }
                                         </div>
 
                                         <!-- Monthly Breakdown Badges -->
@@ -573,19 +589,29 @@
                                     <!-- Bulk Category Reassigner -->
                                     <div class="hidden sm:block">
                                         <select value="@(group.CategoryName ?? "")" @onchange="(e) => ChangeGroupCategory(group, e.Value?.ToString())"
-                                                class="rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                                class="rounded-lg border border-gray-200 bg-white py-1 pl-2.5 pr-8 text-xs text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                                             <option value="">Uncategorized</option>
                                             @foreach (var cat in _availableCategories)
                                             {
                                                 <option value="@cat.Name">@cat.Name</option>
                                             }
                                         </select>
+                                        @if (group.WillRemember)
+                                        {
+                                            <p class="mt-1 text-[10px] text-brand-600 dark:text-brand-400">
+                                                <i class="fa-solid fa-check mr-0.5"></i>Remembered for next time
+                                            </p>
+                                        }
                                     </div>
 
                                     <div class="text-right">
                                         <p class="text-sm font-bold @(group.Type == TransactionType.Income ? "text-success-600 dark:text-success-400" : "text-gray-900 dark:text-white")">
                                             @(group.Type == TransactionType.Income ? "+" : "-")@Money(group.TotalAmount)
                                         </p>
+                                        @if (_preview.MonthsCovered > 1)
+                                        {
+                                            <p class="text-[11px] text-gray-500 dark:text-gray-400">≈ @Money(_preview.PerMonth(group.TotalAmount)) a month</p>
+                                        }
                                         <p class="text-[11px] text-gray-400">
                                             @group.IncludedCount of @group.TransactionCount included
                                         </p>
@@ -630,7 +656,7 @@
                                                     </td>
                                                     <td class="py-2">
                                                         <select value="@(item.CategoryName ?? "")" @onchange="(e) => item.CategoryName = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value.ToString()"
-                                                                class="rounded border border-gray-200 bg-white px-2 py-0.5 text-[11px] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                                                class="rounded border border-gray-200 bg-white py-0.5 pl-2 pr-7 text-[11px] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                                                             <option value="">None</option>
                                                             @foreach (var cat in _availableCategories)
                                                             {

@@ -495,6 +495,41 @@ namespace FinanceManager.Data.Migrations
                     b.ToTable("Goals", (string)null);
                 });
 
+            modelBuilder.Entity("CoinStack.Data.Entities.MerchantRule", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MerchantName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NormalizedKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("NormalizedKey")
+                        .IsUnique();
+
+                    b.ToTable("MerchantRules", (string)null);
+                });
+
             modelBuilder.Entity("CoinStack.Data.Entities.Reflection", b =>
                 {
                     b.Property<int>("Id")
@@ -1165,6 +1200,17 @@ namespace FinanceManager.Data.Migrations
                         .HasForeignKey("TransactionId");
 
                     b.Navigation("Transaction");
+                });
+
+            modelBuilder.Entity("CoinStack.Data.Entities.MerchantRule", b =>
+                {
+                    b.HasOne("CoinStack.Data.Entities.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Category");
                 });
 
             modelBuilder.Entity("CoinStack.Data.Entities.Reflection", b =>
