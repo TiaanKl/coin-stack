@@ -65,11 +65,14 @@
                                             <div
                                                 class="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full text-sm font-semibold text-white"
                                                 style="background-color:@(GetSubscriptionColor(subscription));">
-                                                @GetInitial(subscription.Name)
-                                                <img src="@GetLogoUrl(subscription.Name)"
-                                                     class="absolute inset-0 h-full w-full object-contain bg-white"
-                                                     onerror="this.style.display='none'"
-                                                     alt="@subscription.Name" />
+                                                @if (GetMerchantIcon(subscription.Name) is { } icon)
+                                                {
+                                                    <i class="@icon" aria-hidden="true"></i>
+                                                }
+                                                else
+                                                {
+                                                    @GetInitial(subscription.Name)
+                                                }
                                             </div>
                                             <div class="text-sm font-medium text-gray-800 dark:text-white/90">@subscription.Name</div>
                                         </div>
@@ -319,30 +322,14 @@
         return char.ToUpperInvariant(name.Trim()[0]).ToString();
     }
 
-    private static string GetLogoUrl(string name)
+    /// <summary>
+    /// The app's own icon for a merchant it recognises. Logos used to be fetched from clearbit.com, which
+    /// sent every subscription's name to an outside service; nothing leaves the device now.
+    /// </summary>
+    private static string? GetMerchantIcon(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
-            return "";
-
-        // specific mappings
-        if (name.Equals("Xbox", StringComparison.OrdinalIgnoreCase) || name.Contains("Xbox Game Pass", StringComparison.OrdinalIgnoreCase))
-            return "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Xbox_one_logo.svg/2048px-Xbox_one_logo.svg.png";
-
-        if (name.Equals("Playstation", StringComparison.OrdinalIgnoreCase) || name.Contains("PS Plus", StringComparison.OrdinalIgnoreCase))
-            return "https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/PlayStation_logo.svg/2560px-PlayStation_logo.svg.png";
-
-        if (name.Contains("Office 365", StringComparison.OrdinalIgnoreCase) || name.Contains("Microsoft 365", StringComparison.OrdinalIgnoreCase))
-            return "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0e/Microsoft_365_%282022%29.svg/240px-Microsoft_365_%282022%29.svg.png";
-
-        if (name.Contains("GitHub Copilot", StringComparison.OrdinalIgnoreCase) || name.Contains("Copilot", StringComparison.OrdinalIgnoreCase))
-            return "https://upload.wikimedia.org/wikipedia/commons/2/2a/Microsoft_365_Copilot_Icon.svg"; // Fallback to Copilot icon if needed, or simply GitHub logic below
-
-        if (name.Contains("GitHub", StringComparison.OrdinalIgnoreCase))
-            return "https://github.com/fluidicon.png";
-
-        // Simple heuristic: remove spaces and append .com
-        var domain = new string(name.Where(c => char.IsLetterOrDigit(c)).ToArray()).ToLowerInvariant() + ".com";
-        return $"https://logo.clearbit.com/{domain}";
+        var merchant = MerchantNormalizer.Normalize(name, TransactionType.Expense);
+        return MerchantNormalizer.IsKnownKey(merchant.NormalizedKey) ? merchant.IconClass : null;
     }
 
     private static string GetSubscriptionColor(Subscription subscription)

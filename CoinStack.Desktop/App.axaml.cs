@@ -63,6 +63,7 @@ public partial class App : Application
 
         services.AddFinanceManagerData($"Data Source={dbPath}");
         services.AddFinanceManagerAppServices();
+        services.AddSingleton<CoinStack.Desktop.Services.IFileDialogs, CoinStack.Desktop.Services.FileDialogs>();
 
         services.AddSingleton<MainViewModel>();
         services.AddTransient<DashboardViewModel>();

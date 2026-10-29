@@ -75,5 +75,67 @@
                 </Grid>
             </StackPanel>
         </Border>
+
+        <!-- The data is only on this computer: a password-locked backup file keeps it safe and moves it. -->
+        <Border Classes="Card">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Backup &amp; restore" Classes="h2" />
+                <TextBlock Classes="body" TextWrapping="Wrap"
+                           Text="Your data is only on this computer. A backup is one file, locked with a password you choose. Keep it somewhere safe, such as OneDrive or a USB stick, and restore it here or in the CoinStack phone or web app." />
+
+                <TextBlock Text="Back up" Classes="body" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <TextBox PasswordChar="•" PlaceholderText="Password (at least 8 characters)" Text="{Binding BackupPassword}" />
+                    <TextBox Grid.Column="1" PasswordChar="•" PlaceholderText="The same password again" Text="{Binding BackupConfirm}" />
+                </Grid>
+                <TextBlock Classes="body" TextWrapping="Wrap" Foreground="#B54708"
+                           Text="If you forget this password, the backup can't be opened. Nobody can recover it." />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Classes="primary" Command="{Binding BackUpCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <i:Icon Value="fa-solid fa-download" FontSize="12" />
+                            <TextBlock Text="Save backup…" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="{Binding BackupMessage}" Classes="body" VerticalAlignment="Center" TextWrapping="Wrap"
+                               IsVisible="{Binding BackupMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </StackPanel>
+
+                <Separator />
+
+                <TextBlock Text="Restore" Classes="body" FontWeight="SemiBold" />
+                <TextBlock Classes="body" TextWrapping="Wrap"
+                           Text="Replaces everything on this computer with the backup. A copy of what's here now is saved first." />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Classes="secondary" Command="{Binding ChooseBackupCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <i:Icon Value="fa-solid fa-folder-open" FontSize="12" />
+                            <TextBlock Text="Choose a backup…" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Text="{Binding RestoreFileName}" Classes="body" VerticalAlignment="Center" />
+                </StackPanel>
+
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
+                      IsVisible="{Binding RestoreFileName, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <TextBox PasswordChar="•" PlaceholderText="The backup's password" Text="{Binding RestorePassword}" />
+                    <Button Grid.Column="1" Classes="secondary" Command="{Binding OpenBackupCommand}" Content="Open backup" />
+                </Grid>
+
+                <StackPanel Spacing="12" IsVisible="{Binding RestoreSummary, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <TextBlock Text="{Binding RestoreSummary}" Classes="body" TextWrapping="Wrap" />
+                    <Button Classes="secondary" Command="{Binding AskToRestoreCommand}" Content="Replace everything with this backup"
+                            IsVisible="{Binding !ConfirmingRestore}" />
+                    <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding ConfirmingRestore}">
+                        <TextBlock Text="Replace all data on this computer?" Classes="body" VerticalAlignment="Center" Foreground="#D92D20" />
+                        <Button Classes="primary" Command="{Binding RestoreCommand}" Content="Yes, restore" />
+                        <Button Classes="secondary" Command="{Binding CancelRestoreCommand}" Content="Cancel" />
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock Text="{Binding RestoreMessage}" Classes="body" TextWrapping="Wrap"
+                           IsVisible="{Binding RestoreMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            </StackPanel>
+        </Border>
     </StackPanel>
 </UserControl>

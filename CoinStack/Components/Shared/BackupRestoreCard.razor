@@ -1,0 +1,237 @@
+@using CoinStack.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject IBackupService Backups
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@* Encrypted backup and restore. The data lives only on this device, so this is how it's kept safe and moved. *@
+<div class="mb-6 rounded-2xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/3">
+    <div class="border-b border-gray-100 px-6 py-5 dark:border-gray-800">
+        <h3 class="text-base font-medium text-gray-800 dark:text-white/90">Backup &amp; Restore</h3>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Your data is only on this device. A backup is one file, locked with a password you choose. Keep it somewhere safe,
+            such as iCloud Drive, Google Drive, OneDrive or a USB stick, and restore it here or in the CoinStack phone or desktop app.
+        </p>
+    </div>
+
+    <div class="space-y-6 p-6">
+        <div>
+            <p class="text-sm font-medium text-gray-800 dark:text-white/90">Back up</p>
+            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <input type="password" @bind="_backupPassword" @bind:event="oninput" autocomplete="new-password"
+                       placeholder="Password (at least 8 characters)" aria-label="Backup password"
+                       class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:text-white/90 dark:placeholder:text-gray-500" />
+                <input type="password" @bind="_backupConfirm" @bind:event="oninput" autocomplete="new-password"
+                       placeholder="The same password again" aria-label="Confirm backup password"
+                       class="h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:text-white/90 dark:placeholder:text-gray-500" />
+            </div>
+            <p class="mt-2 text-xs text-warning-700 dark:text-warning-400">
+                <i class="fa-solid fa-key mr-1"></i>If you forget this password, the backup can't be opened. Nobody can recover it.
+            </p>
+            @if (_backupConfirm.Length > 0 && _backupConfirm != _backupPassword)
+            {
+                <p class="mt-1 text-xs text-error-600 dark:text-error-400">The two passwords don't match.</p>
+            }
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <button type="button" @onclick="BackUpAsync" disabled="@(!CanBackUp)"
+                        class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">
+                    <i class="fa-solid @(_busy ? "fa-spinner fa-spin" : "fa-download")"></i>
+                    Download backup
+                </button>
+                @if (_backupMessage is not null)
+                {
+                    <span class="text-xs @(_backupFailed ? "text-error-600 dark:text-error-400" : "text-success-600 dark:text-success-400")">@_backupMessage</span>
+                }
+            </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-5 dark:border-gray-800">
+            <p class="text-sm font-medium text-gray-800 dark:text-white/90">Restore</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Replaces everything on this device with the backup. A copy of what's here now is saved first.
+            </p>
+
+            <label class="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="fa-solid fa-folder-open"></i>
+                Choose a backup file
+                <InputFile OnChange="OnFileChosenAsync" accept=".coinstack" class="hidden" />
+            </label>
+
+            @if (_restoreFile is not null)
+            {
+                <div class="mt-4 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+                    <p class="text-sm text-gray-700 dark:text-gray-300"><i class="fa-solid fa-file-shield mr-1.5 text-gray-400"></i>@_restoreFileName</p>
+
+                    @if (_restoreSummary is null)
+                    {
+                        <div class="mt-3 flex flex-wrap items-center gap-3">
+                            <input type="password" @bind="_restorePassword" @bind:event="oninput" autocomplete="current-password"
+                                   placeholder="The backup's password" aria-label="Backup password"
+                                   class="h-11 w-full max-w-xs rounded-lg border border-gray-300 bg-transparent px-4 text-sm text-gray-800 placeholder:text-gray-400 dark:border-gray-700 dark:text-white/90 dark:placeholder:text-gray-500" />
+                            <button type="button" @onclick="OpenBackupAsync" disabled="@(_busy || _restorePassword.Length == 0)"
+                                    class="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                                <i class="fa-solid @(_busy ? "fa-spinner fa-spin" : "fa-unlock")"></i>
+                                Open backup
+                            </button>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                            Made @_restoreSummary.CreatedUtc.ToLocalTime().ToString("d MMM yyyy, HH:mm") ·
+                            @_restoreSummary.Transactions @(_restoreSummary.Transactions == 1 ? "transaction" : "transactions")
+                            @if (_restoreSummary.FirstTransactionUtc is { } first && _restoreSummary.LastTransactionUtc is { } last)
+                            {
+                                <text> from @first.ToLocalTime().ToString("d MMM yyyy") to @last.ToLocalTime().ToString("d MMM yyyy")</text>
+                            }
+                        </p>
+                        <button type="button" @onclick="RestoreAsync" disabled="@_busy"
+                                class="mt-3 inline-flex items-center gap-2 rounded-full border border-error-300 bg-white px-5 py-2.5 text-sm font-medium text-error-600 hover:bg-error-50 disabled:opacity-50 dark:border-error-500/30 dark:bg-gray-800 dark:text-error-500 dark:hover:bg-error-500/10">
+                            <i class="fa-solid @(_busy ? "fa-spinner fa-spin" : "fa-clock-rotate-left")"></i>
+                            Replace everything with this backup
+                        </button>
+                    }
+                </div>
+            }
+
+            @if (_restoreMessage is not null)
+            {
+                <p class="mt-3 text-xs @(_restoreFailed ? "text-error-600 dark:text-error-400" : "text-success-600 dark:text-success-400")">@_restoreMessage</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _backupPassword = "";
+    private string _backupConfirm = "";
+    private string? _backupMessage;
+    private bool _backupFailed;
+
+    private byte[]? _restoreFile;
+    private string? _restoreFileName;
+    private string _restorePassword = "";
+    private BackupManifest? _restoreSummary;
+    private string? _restoreMessage;
+    private bool _restoreFailed;
+
+    private bool _busy;
+
+    private bool CanBackUp => !_busy && _backupPassword.Length >= 8 && _backupPassword == _backupConfirm;
+
+    private async Task BackUpAsync()
+    {
+        if (!CanBackUp)
+        {
+            return;
+        }
+
+        _busy = true;
+        _backupMessage = null;
+        try
+        {
+            var file = await Backups.CreateAsync(_backupPassword);
+            using var stream = new MemoryStream(file);
+            using var streamReference = new DotNetStreamReference(stream);
+            await JS.InvokeVoidAsync("coinstackFiles.download", Backups.SuggestedFileName, streamReference);
+
+            _backupMessage = $"Backup saved as {Backups.SuggestedFileName}. Keep it somewhere other than this device.";
+            _backupFailed = false;
+            _backupPassword = _backupConfirm = "";
+        }
+        catch (BackupException exception)
+        {
+            _backupMessage = exception.Message;
+            _backupFailed = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task OnFileChosenAsync(InputFileChangeEventArgs e)
+    {
+        _restoreFile = null;
+        _restoreSummary = null;
+        _restorePassword = "";
+        _restoreMessage = null;
+
+        try
+        {
+            await using var stream = e.File.OpenReadStream(BackupService.MaxBackupBytes);
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            _restoreFile = buffer.ToArray();
+            _restoreFileName = e.File.Name;
+        }
+        catch (IOException)
+        {
+            _restoreMessage = "That file is too large to be a CoinStack backup.";
+            _restoreFailed = true;
+        }
+    }
+
+    private async Task OpenBackupAsync()
+    {
+        if (_restoreFile is null)
+        {
+            return;
+        }
+
+        _busy = true;
+        _restoreMessage = null;
+        try
+        {
+            _restoreSummary = await Backups.ReadAsync(_restoreFile, _restorePassword);
+        }
+        catch (BackupException exception)
+        {
+            _restoreMessage = exception.Message;
+            _restoreFailed = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task RestoreAsync()
+    {
+        if (_restoreFile is null || _restoreSummary is null)
+        {
+            return;
+        }
+
+        if (!await JS.InvokeAsync<bool>("confirm", "Replace everything on this device with this backup? A copy of the current data is saved first."))
+        {
+            return;
+        }
+
+        _busy = true;
+        try
+        {
+            var safetyCopy = await Backups.RestoreAsync(_restoreFile, _restorePassword);
+            _restoreMessage = safetyCopy is null
+                ? "Restored. Reloading…"
+                : $"Restored. Your previous data was saved to {safetyCopy}. Reloading…";
+            _restoreFailed = false;
+            _restoreFile = null;
+            _restoreSummary = null;
+            StateHasChanged();
+
+            // Every page reads the restored data from a fresh start.
+            await Task.Delay(2500);
+            Navigation.NavigateTo("/", forceLoad: true);
+        }
+        catch (BackupException exception)
+        {
+            _restoreMessage = exception.Message;
+            _restoreFailed = true;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

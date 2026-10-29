@@ -495,4 +495,17 @@ public sealed class MobileFinanceService : IMobileFinanceService, IDisposable
 
     public async Task<IReadOnlyList<ScoreEvent>> GetRecentScoreEventsAsync(int count = 20, CancellationToken cancellationToken = default)
         => await Get<IScoringService>().GetRecentEventsAsync(count, cancellationToken);
+
+    // ── Backup & restore ──
+
+    public string BackupFileName => Get<IBackupService>().SuggestedFileName;
+
+    public Task<byte[]> CreateBackupAsync(string password, CancellationToken cancellationToken = default)
+        => Get<IBackupService>().CreateAsync(password, cancellationToken);
+
+    public Task<BackupManifest> ReadBackupAsync(byte[] backup, string password, CancellationToken cancellationToken = default)
+        => Get<IBackupService>().ReadAsync(backup, password, cancellationToken);
+
+    public Task<string?> RestoreBackupAsync(byte[] backup, string password, CancellationToken cancellationToken = default)
+        => Get<IBackupService>().RestoreAsync(backup, password, cancellationToken);
 }

@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using CoinStack.Data.Entities;
+using CoinStack.Desktop.Services;
 using CoinStack.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -32,9 +33,136 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
     public ObservableCollection<int> StartDays { get; } =
         [.. Enumerable.Range(1, BudgetPeriod.LastPayday)];
 
-    public SettingsViewModel(ISettingsService settings)
+    // Backup & restore
+    private readonly IBackupService _backups;
+    private readonly IFileDialogs _files;
+    private byte[]? _restoreFile;
+
+    [ObservableProperty] private string _backupPassword = "";
+    [ObservableProperty] private string _backupConfirm = "";
+    [ObservableProperty] private string? _backupMessage;
+    [ObservableProperty] private string? _restoreFileName;
+    [ObservableProperty] private string _restorePassword = "";
+    [ObservableProperty] private string? _restoreSummary;
+    [ObservableProperty] private bool _confirmingRestore;
+    [ObservableProperty] private string? _restoreMessage;
+
+    public SettingsViewModel(ISettingsService settings, IBackupService backups, IFileDialogs files)
     {
         _settings = settings;
+        _backups = backups;
+        _files = files;
+    }
+
+    [RelayCommand]
+    private async Task BackUpAsync()
+    {
+        if (BackupPassword != BackupConfirm)
+        {
+            BackupMessage = "The two passwords don't match.";
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var backup = await _backups.CreateAsync(BackupPassword);
+            if (await _files.SaveAsync(_backups.SuggestedFileName, backup))
+            {
+                BackupMessage = "Backup saved. Keep it somewhere other than this computer.";
+                BackupPassword = BackupConfirm = "";
+            }
+        }
+        catch (BackupException ex)
+        {
+            BackupMessage = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task ChooseBackupAsync()
+    {
+        var file = await _files.OpenAsync(BackupService.MaxBackupBytes);
+        if (file is not { } chosen)
+        {
+            return;
+        }
+
+        _restoreFile = chosen.Content;
+        RestoreFileName = chosen.Name;
+        RestorePassword = "";
+        RestoreSummary = null;
+        ConfirmingRestore = false;
+        RestoreMessage = null;
+    }
+
+    [RelayCommand]
+    private async Task OpenBackupAsync()
+    {
+        if (_restoreFile is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var manifest = await _backups.ReadAsync(_restoreFile, RestorePassword);
+            RestoreSummary = $"Made {manifest.CreatedUtc.ToLocalTime():d MMM yyyy, HH:mm} · {manifest.Transactions} transactions"
+                             + (manifest.FirstTransactionUtc is { } first && manifest.LastTransactionUtc is { } last
+                                 ? $" from {first.ToLocalTime():d MMM yyyy} to {last.ToLocalTime():d MMM yyyy}"
+                                 : "");
+            RestoreMessage = null;
+        }
+        catch (BackupException ex)
+        {
+            RestoreMessage = ex.Message;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    private void AskToRestore() => ConfirmingRestore = RestoreSummary is not null;
+
+    [RelayCommand]
+    private void CancelRestore() => ConfirmingRestore = false;
+
+    [RelayCommand]
+    private async Task RestoreAsync()
+    {
+        if (_restoreFile is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var safetyCopy = await _backups.RestoreAsync(_restoreFile, RestorePassword);
+            RestoreMessage = "Restored. Every page shows the restored data when you open it."
+                             + (safetyCopy is null ? "" : $" Your previous data was saved to {safetyCopy}.");
+            _restoreFile = null;
+            RestoreFileName = null;
+            RestoreSummary = null;
+            RestorePassword = "";
+            await InitializeAsync();
+        }
+        catch (BackupException ex)
+        {
+            RestoreMessage = ex.Message;
+        }
+        finally
+        {
+            ConfirmingRestore = false;
+            IsBusy = false;
+        }
     }
 
     public async Task InitializeAsync()

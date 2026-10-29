@@ -76,6 +76,12 @@ public interface IMobileFinanceService
 
     // ── Score Events ──
     Task<IReadOnlyList<ScoreEvent>> GetRecentScoreEventsAsync(int count = 20, CancellationToken cancellationToken = default);
+
+    // ── Backup & restore ──
+    string BackupFileName { get; }
+    Task<byte[]> CreateBackupAsync(string password, CancellationToken cancellationToken = default);
+    Task<BackupManifest> ReadBackupAsync(byte[] backup, string password, CancellationToken cancellationToken = default);
+    Task<string?> RestoreBackupAsync(byte[] backup, string password, CancellationToken cancellationToken = default);
 }
 
 public sealed record MobileDashboardSnapshot(

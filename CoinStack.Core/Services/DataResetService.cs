@@ -34,7 +34,7 @@ public sealed class DataResetService : IDataResetService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var backupPath = await BackupAsync(db, cancellationToken);
+        var backupPath = await DatabaseSnapshots.SaveCopyAsync(db, "reset", cancellationToken);
 
         await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
         {
@@ -77,33 +77,6 @@ public sealed class DataResetService : IDataResetService
         await _levelService.GetCurrentLevelAsync(cancellationToken); // recreates the UserLevel row
 
         DataResetCompleted?.Invoke();
-        return backupPath;
-    }
-
-    /// <summary>
-    /// Writes a consistent copy of the SQLite file next to it, under <c>backups/</c>.
-    /// Returns the path, or null for in-memory or non-SQLite databases.
-    /// </summary>
-    private static async Task<string?> BackupAsync(CoinStackDbContext db, CancellationToken cancellationToken)
-    {
-        if (!db.Database.IsSqlite())
-        {
-            return null;
-        }
-
-        var dataSource = db.Database.GetDbConnection().DataSource;
-        if (string.IsNullOrWhiteSpace(dataSource) || dataSource.Contains(":memory:", StringComparison.OrdinalIgnoreCase))
-        {
-            return null;
-        }
-
-        var directory = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(dataSource)) ?? ".", "backups");
-        Directory.CreateDirectory(directory);
-
-        var backupPath = Path.Combine(directory, $"coinstack-before-reset-{DateTime.UtcNow:yyyyMMdd-HHmmss}.db");
-
-        // VACUUM INTO takes any string expression, so the path goes in as a bound parameter.
-        await db.Database.ExecuteSqlAsync($"VACUUM INTO {backupPath}", cancellationToken);
         return backupPath;
     }
 }

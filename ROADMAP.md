@@ -50,6 +50,14 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 - **Styling:** the web app's CSS is now built by Tailwind from the pages (`npm run css` in `CoinStack/`), so classes no longer go missing.
 - **Next:** reading any bank's statement (Part 2, item 4).
 
+**Encrypted backup and restore (2026-10-29)**, Part 2 item 11:
+
+- **Backup file:** one `.coinstack` file holding the whole database, compressed and encrypted with the person's password. It uses AES-256 with an HMAC check, and keys from PBKDF2-SHA256 at 600 000 rounds.
+- **In each app:** on the web it downloads, desktop uses the save dialog, and mobile uses the share sheet (Files, iCloud Drive, Google Drive). Any of the apps can restore it, after showing what the backup holds.
+- **Safety:** a wrong password, a damaged file or a backup from a newer app version is refused before anything changes. Restoring saves a copy of the current data first.
+- **Privacy:** subscription logos no longer come from clearbit.com, which received every subscription's name; known merchants use the app's own icons.
+- **Not done:** automatic scheduled backups to a chosen folder. The web app still loads its fonts and icons from Google Fonts and cdnjs; bundling them would make it fully offline.
+
 ## Part 1: Improve what already exists
 
 ### Calculations that are still wrong (highest priority)
@@ -157,7 +165,7 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
     - 13th cheque and bonus handling.
     - A "last working day" payday.
     - Debts linked to the prime rate.
-11. **Encrypted backup and restore (S–M).** One file, encrypted with a password the person picks, saved through the system's save dialog or share sheet. Those already offer iCloud Drive, Google Drive, OneDrive and local folders, so no cloud-provider code is needed. Covers iPhone to Android, phone to PC, and the desktop app. Reset already makes a local backup.
+11. **Encrypted backup and restore (S–M). Done (2026-10-29).** One file, encrypted with a password the person picks, saved through the system's save dialog or share sheet. Those already offer iCloud Drive, Google Drive, OneDrive and local folders, so no cloud-provider code is needed. Covers iPhone to Android, phone to PC, and the desktop app. Reset already makes a local backup.
 12. **Gamification v2 (M).** One reversible reward ledger, auto-checked challenges (a no-spend day verified against your transactions), a streak freeze, and celebrations.
 13. **Sync between devices (L).** No server. Each device writes encrypted change files to a folder in the person's own cloud storage and merges the others' changes. It needs change tracking and conflict rules, so it comes after backup and restore.
 
@@ -165,4 +173,4 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 
 1. **Phase 1:** the remaining calculation bugs and the half-working features. These are small and make the existing numbers trustworthy.
 2. **Phase 2:** the foundations, in this order: one period helper, remove sign-in, mobile on CoinStack.Core (so the rest is only done once), time zones, the daily catch-up, then one forecast.
-3. **Phase 3:** encrypted backup and restore (item 11), then new features 1–5, in that order.
+3. **Phase 3:** encrypted backup and restore (item 11, done), then new features 1–5, in that order.

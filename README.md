@@ -78,7 +78,7 @@ It combines budgeting features with gamified feedback (score/streaks/reflections
 
 CoinStack is local-first: every install belongs to one person and keeps its data on that device. There are no accounts and no server, so no financial data is collected.
 
-- Encrypted backup and restore: one file, saved wherever the person chooses (iCloud Drive, Google Drive, OneDrive or a local folder)
+- Encrypted backup and restore (done, in Settings): one file, saved wherever the person chooses (iCloud Drive, Google Drive, OneDrive or a local folder)
 - Later, sync between devices through the person's own cloud storage, still with no server
 
 See [ROADMAP.md](ROADMAP.md) for the full plan.
@@ -259,7 +259,7 @@ dotnet build CoinStack.slnx -c Release
 ## Known Gaps / Open Work
 
 - Reconnect UX still requires final manual scenario verification
-- Backup and restore, and sync between devices, are planned (see ROADMAP.md)
+- Sync between devices is planned (see ROADMAP.md). Encrypted backup and restore is in Settings in every app.
 - Mobile parity is strong but still under active QA and UX refinement
 
 ## License
