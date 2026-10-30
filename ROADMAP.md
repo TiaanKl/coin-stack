@@ -58,6 +58,18 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 - **Privacy:** subscription logos no longer come from clearbit.com, which received every subscription's name; known merchants use the app's own icons.
 - **Not done:** automatic scheduled backups to a chosen folder. The web app still loads its fonts and icons from Google Fonts and cdnjs; bundling them would make it fully offline.
 
+**Accounts and transfers (2026-10-30)**, Part 2 item 1. Migrations `Accounts` and `SavingsAccounts`; 40 new tests (366 in total).
+
+- **Accounts:** cheque, savings, emergency fund and credit card. Each account's balance is its last statement or "Update balance" plus everything on it since. A transfer moves money from one account to another and is neither spending nor income.
+- **Upgrade:** the single bank balance becomes the main account, and every existing transaction and import is put on it, so the money shown stays the same. Savings and the emergency fund become accounts holding what their figures showed. An existing database is copied to `backups/` before any upgrade.
+- **Money in the bank** is the cheque accounts. Budgets, the forecast and "cash vs spending" start from it, and card purchases stay out of cash spending.
+- **Savings are real money:** "Move into reserves" and the monthly savings move money out of the main account; shortfall cover and force-majeure withdrawals move it back. Interest is added to savings without counting as income. Goals still set money aside inside savings. The "reserve-aware budget" setting is gone.
+- **Credit cards** are linked to their debt: purchases on the card are spending and raise the debt, paying the card is a transfer that lowers it, and monthly interest is charged to the card.
+- **Imports** go to the account with the statement's number (or ask which account it is). Duplicates are checked per account, the closing balance sets only that account, files from two accounts aren't combined, and transfers between your own accounts are recorded once, from whichever statement shows them first. OFX files give their account number and balance.
+- **Desktop and mobile** have an Accounts page, accounts and transfers on Transactions, and money in the bank on the dashboard.
+- **Decisions:** card purchases are logged on the card (paying the card isn't spending); goals stay as money set aside inside savings; savings interest isn't income.
+- **Not done:** the desktop app wasn't run against a real database (it builds and its service code is tested), and Android still hasn't been run on a device. Card statement PDFs can't be read yet, so card purchases are logged by hand or from a card CSV.
+
 **Still open (checked against the code, 2026-10-30):**
 
 - **Gamification integrity** (Part 1): five of its six problems. Only the repeated check-in was fixed, in Phase 2.
@@ -66,7 +78,7 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 - **Tests:** streak counting and the FNB PDF statement parser.
 - **Backup:** automatic scheduled backups, and bundling the web app's fonts and icons.
 - **Smarter import** (Part 2, item 4): the parts not yet done are listed under that item.
-- **Part 2:** every other item except 11. Next in the suggested order is item 1, accounts and transfers.
+- **Part 2:** every other item except 1 and 11. Next in the suggested order is item 2, the multi-debt payoff planner.
 
 ## Part 1: Improve what already exists
 
@@ -154,21 +166,21 @@ Only the check-in fix is done; the other five are still open.
 
 ## Part 2: New functionality, ordered by value
 
-1. **Accounts and transfers (L).** Cheque, savings and credit card accounts with real transfers. Savings and the emergency fund become real money, and net worth becomes possible. Adding this would resolve more of the issues above than anything else.
-2. **Multi-debt payoff planner (M–L).** Avalanche or snowball ordering, rolling freed-up payments into the next debt, extra and lump-sum payments, and one debt-free date. Imported FNB card and WesBank payments would reduce the right debt automatically.
+1. ~~**Accounts and transfers (L).** Cheque, savings and credit card accounts with real transfers. Savings and the emergency fund become real money, and net worth becomes possible.~~ **Done (2026-10-30)**, see Progress.
+2. **Multi-debt payoff planner (M–L).** Avalanche or snowball ordering, rolling freed-up payments into the next debt, extra and lump-sum payments, and one debt-free date. Card payments already lower a card that is linked to its debt; imported WesBank (loan) payments still need linking to their debt.
 3. **Budget history and envelope rollover (M).** Per-period allocations, carrying unspent money forward, and alerts at 80% and 100% of a bucket.
 4. **Smarter import (M–L). Partly done:** rows already imported are skipped, and the category you choose for a merchant is learned (see Progress).
    - Your own merchant rules. They are learned, but there's no page yet to see or edit them.
    - A review screen that lists skipped rows with reasons. The reasons already show next to each row in the preview.
    - A check that opening balance + transactions = closing balance. Today only the FNB PDF parser checks the running balance row by row, and it only warns.
-   - Matching imported rows against ones you logged manually.
-   - ~~Guards against importing the same file twice~~ (done) or mixing two accounts. Combining several files keeps the first file's account number without checking the others.
+   - Matching imported rows against ones you logged manually. Transfers are matched already; spending and income aren't.
+   - ~~Guards against importing the same file twice or mixing two accounts~~ (done: each statement goes to its own account, and files from two accounts aren't combined).
    - Reading other banks' statements. Only FNB is read today: PDF statements, and CSV or OFX transaction history.
 5. **Subscription renewals (M).** Next billing date, a monthly total, and alerts for price changes or missed debit orders.
 6. **Goal planning (S–M).** Required monthly contribution, an on-track or overdue status, and contribution history.
 7. **Reports upgrade (M).** A past-period picker, category trends, year-over-year comparison and CSV export.
 8. **Reminders (M).** Upcoming debit orders, a waitlist cool-off finishing, and budget thresholds.
-9. **Net worth over time (M, needs item 1).** Assets minus debts, charted month by month.
+9. **Net worth over time (M; item 1 is done).** Assets minus debts, charted month by month. The Accounts page already shows today's total.
 10. **South African touches (S each).**
     - A TFSA contribution tracker against the annual and lifetime caps.
     - A tax-year view (March to February).
@@ -183,4 +195,4 @@ Only the check-in fix is done; the other five are still open.
 
 1. **Phase 1 (done):** the remaining calculation bugs and the half-working features. These are small and make the existing numbers trustworthy.
 2. **Phase 2 (done):** the foundations, in this order: one period helper, remove sign-in, mobile on CoinStack.Core (so the rest is only done once), time zones, the daily catch-up, then one forecast.
-3. **Phase 3:** encrypted backup and restore (item 11, done), then new features 1–5, in that order. Item 4 is partly done, so item 1 is next.
+3. **Phase 3:** encrypted backup and restore (item 11, done), then new features 1–5, in that order. Item 1 is done and item 4 partly, so item 2 is next.
