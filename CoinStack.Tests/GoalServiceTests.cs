@@ -105,7 +105,7 @@ public sealed class GoalServiceTests
 
             await using var check = new CoinStackDbContext(options);
             Assert.Null(await check.Goals.FindAsync(secondId));
-            Assert.Equal(5000m, (await check.SavingsState.SingleAsync()).Available);
+            Assert.Equal(5000m, (await SavingsService.GetSnapshotAsync(check, CancellationToken.None)).Available);
             Assert.Null((await check.Buckets.SingleAsync()).GoalId);
         }
     }
@@ -137,10 +137,10 @@ public sealed class GoalServiceTests
         return goal.Id;
     }
 
-    private static async Task<(Goal Goal, SavingsState Savings)> LoadAsync(DbContextOptions<CoinStackDbContext> options, int goalId)
+    private static async Task<(Goal Goal, SavingsSnapshot Savings)> LoadAsync(DbContextOptions<CoinStackDbContext> options, int goalId)
     {
         await using var db = new CoinStackDbContext(options);
-        return (await db.Goals.SingleAsync(g => g.Id == goalId), await db.SavingsState.SingleAsync());
+        return (await db.Goals.SingleAsync(g => g.Id == goalId), await SavingsService.GetSnapshotAsync(db, CancellationToken.None));
     }
 
     private static async Task<(SqliteConnection Connection, DbContextOptions<CoinStackDbContext> Options)> CreateDatabaseAsync(decimal savingsAvailable)
@@ -154,7 +154,9 @@ public sealed class GoalServiceTests
 
         await using var db = new CoinStackDbContext(options);
         await db.Database.EnsureCreatedAsync();
-        db.SavingsState.Add(new SavingsState { Total = savingsAvailable, Available = savingsAvailable });
+        // Goal money never leaves the savings account; a goal only sets part of it aside.
+        db.Accounts.Add(new Account { Name = "Savings", Type = AccountType.Savings, Balance = savingsAvailable, BalanceAsOfUtc = DateTime.UtcNow.AddDays(-1) });
+        db.SavingsState.Add(new SavingsState());
         await db.SaveChangesAsync();
         return (connection, options);
     }

@@ -64,7 +64,7 @@ public partial class ReportsViewModel : ViewModelBase, IAsyncInitializable
             LifetimeNetText = _money.Format(currency, lifetimeNet);
             LifetimeNetPositive = lifetimeNet >= 0;
 
-            var savings = await _savings.GetStateAsync();
+            var savings = await _savings.GetSnapshotAsync();
             SavingsAvailableText = _money.Format(currency, savings.Available);
         }
         catch (Exception ex)

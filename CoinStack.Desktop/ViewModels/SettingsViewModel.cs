@@ -22,7 +22,6 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
     [ObservableProperty] private int _monthStartDay = 1;
     [ObservableProperty] private decimal _monthlyIncome;
     [ObservableProperty] private decimal _currentBankBalance;
-    [ObservableProperty] private bool _showReserveAwareBudget;
     [ObservableProperty] private bool _enableEmergencyFallback;
     [ObservableProperty] private bool _enableScoring = true;
     [ObservableProperty] private bool _enableStreaks = true;
@@ -183,7 +182,6 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
             var main = (await _accounts.GetBalancesAsync()).FirstOrDefault(a => a.Account.IsDefault);
             CurrentBankBalance = main?.Balance ?? 0m;
             _loadedBankBalance = CurrentBankBalance;
-            ShowReserveAwareBudget = settings.ShowReserveAwareBudget;
             EnableEmergencyFallback = settings.EnableEmergencyFallback;
             EnableScoring = settings.EnableScoring;
             EnableStreaks = settings.EnableStreaks;
@@ -218,7 +216,6 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
                 await _accounts.SetBalanceAsync(main.Id, CurrentBankBalance, DateTime.UtcNow);
                 _loadedBankBalance = CurrentBankBalance;
             }
-            settings.ShowReserveAwareBudget = ShowReserveAwareBudget;
             settings.EnableEmergencyFallback = EnableEmergencyFallback;
             settings.EnableScoring = EnableScoring;
             settings.EnableStreaks = EnableStreaks;

@@ -21,13 +21,13 @@
         <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto" ColumnSpacing="16" RowSpacing="16">
             <Border Classes="StatCard">
                 <StackPanel Spacing="6">
-                    <TextBlock Text="Total saved" Classes="body" />
+                    <TextBlock Text="In savings" Classes="body" />
                     <TextBlock Text="{Binding TotalSavedText}" Classes="Money" />
                 </StackPanel>
             </Border>
             <Border Classes="StatCard" Grid.Column="1">
                 <StackPanel Spacing="6">
-                    <TextBlock Text="Available" Classes="body" />
+                    <TextBlock Text="Free" Classes="body" />
                     <TextBlock Text="{Binding AvailableText}" Classes="Money" />
                 </StackPanel>
             </Border>
@@ -45,14 +45,14 @@
             </Border>
             <Border Classes="StatCard" Grid.Row="1" Grid.Column="1">
                 <StackPanel Spacing="6">
-                    <TextBlock Text="Emergency total" Classes="body" />
-                    <TextBlock Text="{Binding EmergencyTotalText}" Classes="Money" />
+                    <TextBlock Text="Emergency fund" Classes="body" />
+                    <TextBlock Text="{Binding EmergencyFundText}" Classes="Money" />
                 </StackPanel>
             </Border>
             <Border Classes="StatCard" Grid.Row="1" Grid.Column="2">
                 <StackPanel Spacing="6">
-                    <TextBlock Text="Emergency available" Classes="body" />
-                    <TextBlock Text="{Binding EmergencyAvailableText}" Classes="Money" />
+                    <TextBlock Text="Set aside for goals" Classes="body" />
+                    <TextBlock Text="{Binding ReservedText}" Classes="Money" />
                 </StackPanel>
             </Border>
         </Grid>

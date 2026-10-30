@@ -14,4 +14,10 @@ public sealed class SavingsFallbackEvent : EntityBase
 
     /// <summary>The transaction that caused the draw, so it can be refunded on edit or delete.</summary>
     public int? TransactionId { get; set; }
+
+    /// <summary>
+    /// The transfer that moved the money out of savings or the emergency fund. Undoing the draw deletes it.
+    /// Null on draws made before accounts existed, which only lowered a figure.
+    /// </summary>
+    public int? TransferTransactionId { get; set; }
 }

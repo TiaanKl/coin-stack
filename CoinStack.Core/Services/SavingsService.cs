@@ -18,11 +18,27 @@ public sealed class SavingsService : ISavingsService
         _clock = clock ?? TimeProvider.System;
     }
 
-    public async Task<SavingsState> GetStateAsync(CancellationToken cancellationToken = default)
+    public async Task<SavingsSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        return await db.SavingsState.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
-               ?? new SavingsState();
+        return await GetSnapshotAsync(db, cancellationToken);
+    }
+
+    /// <summary>
+    /// Savings now: the balances of the savings and emergency-fund accounts (the first open one of each,
+    /// which is where savings moves money), and how much of savings goals have set aside.
+    /// </summary>
+    internal static async Task<SavingsSnapshot> GetSnapshotAsync(CoinStackDbContext db, CancellationToken cancellationToken)
+    {
+        var balances = await AccountService.GetBalancesAsync(db, cancellationToken);
+        var state = await db.SavingsState.AsNoTracking().FirstOrDefaultAsync(cancellationToken) ?? new SavingsState();
+
+        return new SavingsSnapshot(
+            FirstBalance(balances, AccountType.Savings),
+            state.Reserved,
+            FirstBalance(balances, AccountType.EmergencyFund),
+            state.FallbackEnabled,
+            state.LastCalculatedMonth);
     }
 
     public async Task<SavingsMonthlySummary?> CalculateMonthAsync(CancellationToken cancellationToken = default)
@@ -32,6 +48,7 @@ public sealed class SavingsService : ISavingsService
         var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
                        ?? new AppSettings();
 
+        var now = _clock.GetUtcNow().UtcDateTime;
         var currentMonth = _clock.Today().ToString("yyyy-MM");
 
         var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
@@ -65,9 +82,10 @@ public sealed class SavingsService : ISavingsService
             ? income * (settings.MonthlySavingsPercent / 100m)
             : settings.MonthlySavingsAmount;
 
-        // Interest is earned on the money still in savings, including what is set aside for goals
-        // (Reserved). Total is everything ever paid in and never goes down, so it would overstate it.
-        decimal currentBalance = (state?.Available ?? 0m) + (state?.Reserved ?? 0m);
+        // Interest is earned on everything in the savings account, including what is set aside for goals.
+        var main = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
+        var savingsAccount = await AccountService.GetOrCreateOfTypeAsync(db, AccountType.Savings, now, cancellationToken);
+        var currentBalance = (await GetSnapshotAsync(db, cancellationToken)).SavingsBalance;
 
         decimal interest = 0m;
         if (settings.SavingsInterestRate.HasValue && settings.SavingsInterestRate.Value > 0)
@@ -79,23 +97,24 @@ public sealed class SavingsService : ISavingsService
             interest = FinancialEngine.RoundCurrency((currentBalance + baseSavings) * monthlyRate);
         }
 
-        var totalAdded = baseSavings + interest;
+        // This month's saving leaves the main account for savings.
+        if (baseSavings > 0m)
+        {
+            AccountService.AddTransfer(db, main.Id, savingsAccount.Id, baseSavings, now,
+                $"Monthly savings {currentMonth}", TransactionConventions.AutoSource);
+        }
+
+        // Interest grows the savings balance without being recorded as income, so it doesn't count as
+        // earnings in budgets, reports, recaps or the forecast. The monthly summary keeps it.
+        savingsAccount.Balance += interest;
 
         if (state is null)
         {
-            state = new SavingsState
-            {
-                Total = totalAdded,
-                Available = totalAdded,
-                Reserved = 0,
-                LastCalculatedMonth = currentMonth
-            };
+            state = new SavingsState { LastCalculatedMonth = currentMonth };
             db.SavingsState.Add(state);
         }
         else
         {
-            state.Total += totalAdded;
-            state.Available += totalAdded;
             state.LastCalculatedMonth = currentMonth;
         }
 
@@ -104,9 +123,9 @@ public sealed class SavingsService : ISavingsService
             Month = currentMonth,
             Base = baseSavings,
             Interest = interest,
-            Total = totalAdded,
-            // The balance after this month: what is actually in savings, goal money included.
-            RunningTotal = state.Available + state.Reserved
+            Total = baseSavings + interest,
+            // The balance after this month: what is in the savings account, goal money included.
+            RunningTotal = currentBalance + baseSavings + interest
         };
         db.SavingsMonthlySummaries.Add(summary);
 
@@ -118,29 +137,30 @@ public sealed class SavingsService : ISavingsService
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
-        if (state is null || state.Available <= 0)
+        var withdrawn = Math.Min(Math.Max(0m, amount), (await GetSnapshotAsync(db, cancellationToken)).Available);
+        if (withdrawn <= 0m)
         {
             return 0m;
         }
 
-        var withdrawn = Math.Min(amount, state.Available);
-        state.Available -= withdrawn;
-
-        db.SavingsFallbackEvents.Add(new SavingsFallbackEvent
-        {
-            OccurredAtUtc = DateTime.UtcNow,
-            AmountUsed = withdrawn,
-            Reason = reason,
-            SourceName = EmergencyWithdrawalSource,
-            TransactionId = transactionId
-        });
-
-        await db.SaveChangesAsync(cancellationToken);
+        await using var dbTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await DrawToMainAsync(db, AccountType.Savings, withdrawn, reason, EmergencyWithdrawalSource, transactionId, cancellationToken);
+        await dbTransaction.CommitAsync(cancellationToken);
         return withdrawn;
     }
 
-    public async Task<ReserveTransferResult> AddToSavingsAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
+    public Task<ReserveTransferResult> AddToSavingsAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
+        => MoveFromMainAsync(AccountType.Savings, amount, string.IsNullOrWhiteSpace(reason) ? "Moved to savings" : reason, cancellationToken);
+
+    public Task<ReserveTransferResult> AddToEmergencyFundAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
+        => MoveFromMainAsync(AccountType.EmergencyFund, amount, string.IsNullOrWhiteSpace(reason) ? "Moved to the emergency fund" : reason, cancellationToken);
+
+    /// <summary>A transfer from the main account into savings or the emergency fund.</summary>
+    private async Task<ReserveTransferResult> MoveFromMainAsync(
+        AccountType type,
+        decimal amount,
+        string description,
+        CancellationToken cancellationToken)
     {
         var normalizedAmount = Math.Max(0m, amount);
         if (normalizedAmount == 0m)
@@ -149,41 +169,16 @@ public sealed class SavingsService : ISavingsService
         }
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
-        if (state is null)
-        {
-            state = new SavingsState();
-            db.SavingsState.Add(state);
-        }
+        var now = _clock.GetUtcNow().UtcDateTime;
+        var main = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
+        var target = await AccountService.GetOrCreateOfTypeAsync(db, type, now, cancellationToken);
 
-        state.Total += normalizedAmount;
-        state.Available += normalizedAmount;
-
+        AccountService.AddTransfer(db, main.Id, target.Id, normalizedAmount, now, description);
         await db.SaveChangesAsync(cancellationToken);
-        return new ReserveTransferResult(normalizedAmount, 0m);
-    }
 
-    public async Task<ReserveTransferResult> AddToEmergencyFundAsync(decimal amount, string reason, CancellationToken cancellationToken = default)
-    {
-        var normalizedAmount = Math.Max(0m, amount);
-        if (normalizedAmount == 0m)
-        {
-            return new ReserveTransferResult(0m, 0m);
-        }
-
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
-        if (state is null)
-        {
-            state = new SavingsState();
-            db.SavingsState.Add(state);
-        }
-
-        state.EmergencyTotal += normalizedAmount;
-        state.EmergencyAvailable += normalizedAmount;
-
-        await db.SaveChangesAsync(cancellationToken);
-        return new ReserveTransferResult(0m, normalizedAmount);
+        return type == AccountType.EmergencyFund
+            ? new ReserveTransferResult(0m, normalizedAmount)
+            : new ReserveTransferResult(normalizedAmount, 0m);
     }
 
     public async Task SetFallbackEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
@@ -204,12 +199,6 @@ public sealed class SavingsService : ISavingsService
         await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<bool> ApplyFallbackAsync(decimal amount, string reason, string sourceName, CancellationToken cancellationToken = default)
-    {
-        var result = await ApplyReserveFallbackAsync(amount, reason, sourceName, allowEmergencyFund: false, cancellationToken: cancellationToken);
-        return result.TotalCovered >= amount;
-    }
-
     public async Task<ReserveCoverageResult> ApplyReserveFallbackAsync(
         decimal amount,
         string reason,
@@ -226,56 +215,71 @@ public sealed class SavingsService : ISavingsService
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
-        if (state is null || !state.FallbackEnabled)
+        var snapshot = await GetSnapshotAsync(db, cancellationToken);
+        if (!snapshot.FallbackEnabled)
         {
             return new ReserveCoverageResult(0m, 0m);
         }
 
-        var remaining = normalizedAmount;
-        var savingsUsed = Math.Min(remaining, state.Available);
+        // Free savings first, then the emergency fund; money set aside for goals is left alone.
+        var savingsUsed = Math.Min(normalizedAmount, snapshot.Available);
+        var emergencyUsed = allowEmergencyFund
+            ? Math.Min(normalizedAmount - savingsUsed, Math.Max(0m, snapshot.EmergencyBalance))
+            : 0m;
+
+        if (savingsUsed <= 0m && emergencyUsed <= 0m)
+        {
+            return new ReserveCoverageResult(0m, 0m);
+        }
+
+        await using var dbTransaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
         if (savingsUsed > 0m)
         {
-            state.Available -= savingsUsed;
-            remaining -= savingsUsed;
-
-            db.SavingsFallbackEvents.Add(new SavingsFallbackEvent
-            {
-                OccurredAtUtc = DateTime.UtcNow,
-                AmountUsed = savingsUsed,
-                Reason = reason,
-                SourceName = string.IsNullOrWhiteSpace(sourceName) ? "Savings" : sourceName,
-                TransactionId = transactionId
-            });
+            await DrawToMainAsync(db, AccountType.Savings, savingsUsed, reason,
+                string.IsNullOrWhiteSpace(sourceName) ? "Savings" : sourceName, transactionId, cancellationToken);
         }
 
-        var emergencyUsed = 0m;
-        if (allowEmergencyFund && remaining > 0m)
+        if (emergencyUsed > 0m)
         {
-            emergencyUsed = Math.Min(remaining, state.EmergencyAvailable);
-            if (emergencyUsed > 0m)
-            {
-                state.EmergencyAvailable -= emergencyUsed;
-                remaining -= emergencyUsed;
-
-                db.SavingsFallbackEvents.Add(new SavingsFallbackEvent
-                {
-                    OccurredAtUtc = DateTime.UtcNow,
-                    AmountUsed = emergencyUsed,
-                    Reason = reason,
-                    SourceName = "Emergency Fund",
-                    FromEmergencyFund = true,
-                    TransactionId = transactionId
-                });
-            }
+            await DrawToMainAsync(db, AccountType.EmergencyFund, emergencyUsed, reason, "Emergency Fund", transactionId, cancellationToken);
         }
 
-        if (savingsUsed > 0m || emergencyUsed > 0m)
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
+        await dbTransaction.CommitAsync(cancellationToken);
         return new ReserveCoverageResult(savingsUsed, emergencyUsed);
+    }
+
+    /// <summary>
+    /// Moves money from savings or the emergency fund to the main account to cover spending, and logs the
+    /// draw with the transfer that made it, so undoing the draw removes the transfer.
+    /// </summary>
+    private async Task DrawToMainAsync(
+        CoinStackDbContext db,
+        AccountType from,
+        decimal amount,
+        string reason,
+        string sourceName,
+        int? transactionId,
+        CancellationToken cancellationToken)
+    {
+        var now = _clock.GetUtcNow().UtcDateTime;
+        var main = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
+        var source = await AccountService.GetOrCreateOfTypeAsync(db, from, now, cancellationToken);
+
+        var transfer = AccountService.AddTransfer(db, source.Id, main.Id, amount, now, reason, TransactionConventions.AutoSource);
+        await db.SaveChangesAsync(cancellationToken);
+
+        db.SavingsFallbackEvents.Add(new SavingsFallbackEvent
+        {
+            OccurredAtUtc = now,
+            AmountUsed = amount,
+            Reason = reason,
+            SourceName = sourceName,
+            FromEmergencyFund = from == AccountType.EmergencyFund,
+            TransactionId = transactionId,
+            TransferTransactionId = transfer.Id
+        });
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<decimal> RestoreForTransactionAsync(
@@ -293,7 +297,11 @@ public sealed class SavingsService : ISavingsService
         return restored;
     }
 
-    /// <summary>Shared by the service and by <see cref="TransactionService"/> on delete. The caller saves.</summary>
+    /// <summary>
+    /// Undoes the draws linked to a transaction: each draw's transfer is deleted, which puts the money back.
+    /// A draw from before accounts existed only lowered a figure, so undoing it raises the account's balance
+    /// the same way. Shared by the service and by <see cref="TransactionService"/> on delete. The caller saves.
+    /// </summary>
     internal static async Task<decimal> RestoreForTransactionAsync(
         CoinStackDbContext db,
         int transactionId,
@@ -305,27 +313,39 @@ public sealed class SavingsService : ISavingsService
                         && (includeExplicitWithdrawals || e.SourceName != EmergencyWithdrawalSource))
             .ToListAsync(cancellationToken);
 
-        var state = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
-        if (events.Count == 0 || state is null)
+        if (events.Count == 0)
         {
             return 0m;
         }
 
         foreach (var evt in events)
         {
-            if (evt.FromEmergencyFund)
+            if (evt.TransferTransactionId is { } transferId)
             {
-                state.EmergencyAvailable += evt.AmountUsed;
+                var transfer = await db.Transactions.FirstOrDefaultAsync(t => t.Id == transferId, cancellationToken);
+                if (transfer is not null)
+                {
+                    db.Transactions.Remove(transfer);
+                }
             }
             else
             {
-                state.Available += evt.AmountUsed;
+                var account = await AccountService.GetOrCreateOfTypeAsync(
+                    db, evt.FromEmergencyFund ? AccountType.EmergencyFund : AccountType.Savings, DateTime.UtcNow, cancellationToken);
+                account.Balance += evt.AmountUsed;
             }
         }
 
         db.SavingsFallbackEvents.RemoveRange(events);
         return events.Sum(e => e.AmountUsed);
     }
+
+    private static decimal FirstBalance(List<AccountBalance> balances, AccountType type)
+        => balances
+            .Where(b => b.Account.Type == type && !b.Account.IsArchived)
+            .OrderBy(b => b.Account.Id)
+            .Select(b => b.Balance)
+            .FirstOrDefault();
 
     public async Task<List<SavingsMonthlySummary>> GetMonthlySummariesAsync(CancellationToken cancellationToken = default)
     {
@@ -362,8 +382,7 @@ public sealed class SavingsService : ISavingsService
 
         var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
                        ?? new AppSettings();
-        var state = await db.SavingsState.AsNoTracking().FirstOrDefaultAsync(cancellationToken)
-                    ?? new SavingsState();
+        var snapshot = await GetSnapshotAsync(db, cancellationToken);
 
         decimal income = settings.MonthlyIncome;
         decimal baseMonthly = settings.SavingsIsPercent
@@ -375,8 +394,8 @@ public sealed class SavingsService : ISavingsService
         var annualRate = GetAnnualRateFraction(settings, includeInterest);
 
         var result = new List<SavingsProjectionPoint>(months);
-        // Project from what is in savings now (goal money included); Total still counts withdrawals.
-        var openingBalance = state.Available + state.Reserved;
+        // Project from what is in the savings account now, goal money included.
+        var openingBalance = snapshot.SavingsBalance;
         var now = _clock.Today();
 
         for (var i = 1; i <= months; i++)

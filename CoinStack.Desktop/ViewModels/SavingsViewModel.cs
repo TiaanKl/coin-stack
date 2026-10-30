@@ -19,8 +19,7 @@ public partial class SavingsViewModel : ViewModelBase, IAsyncInitializable
     [ObservableProperty] private string _totalSavedText = "";
     [ObservableProperty] private string _availableText = "";
     [ObservableProperty] private string _reservedText = "";
-    [ObservableProperty] private string _emergencyTotalText = "";
-    [ObservableProperty] private string _emergencyAvailableText = "";
+    [ObservableProperty] private string _emergencyFundText = "";
     [ObservableProperty] private string _thisMonthText = "";
     [ObservableProperty] private string _interestEarnedText = "";
     [ObservableProperty] private bool _fallbackEnabled;
@@ -46,12 +45,11 @@ public partial class SavingsViewModel : ViewModelBase, IAsyncInitializable
             var settings = await _settings.GetAsync();
             _currency = settings.Currency;
 
-            var state = await _savings.GetStateAsync();
-            TotalSavedText = _money.Format(_currency, state.Total);
+            var state = await _savings.GetSnapshotAsync();
+            TotalSavedText = _money.Format(_currency, state.SavingsBalance);
             AvailableText = _money.Format(_currency, state.Available);
             ReservedText = _money.Format(_currency, state.Reserved);
-            EmergencyTotalText = _money.Format(_currency, state.EmergencyTotal);
-            EmergencyAvailableText = _money.Format(_currency, state.EmergencyAvailable);
+            EmergencyFundText = _money.Format(_currency, state.EmergencyBalance);
             FallbackEnabled = state.FallbackEnabled;
             LastCalculatedMonth = string.IsNullOrWhiteSpace(state.LastCalculatedMonth)
                 ? "—"

@@ -61,7 +61,8 @@ public sealed class MobileFinanceServiceTests : IAsyncLifetime
     {
         await using (var db = await NewContextAsync())
         {
-            db.SavingsState.Add(new SavingsState { Total = 1000m, Available = 1000m });
+            var savingsAccount = await AccountService.GetOrCreateOfTypeAsync(db, AccountType.Savings, DateTime.UtcNow, CancellationToken.None);
+            savingsAccount.Balance = 1000m;
             await db.SaveChangesAsync();
         }
 

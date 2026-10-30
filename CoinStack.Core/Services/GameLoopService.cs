@@ -228,6 +228,21 @@ public sealed class GameLoopService : IGameLoopService
             if (linkedGoal != null)
             {
                 linkedGoal.CurrentAmount += transaction.Amount;
+
+                // Money arriving in the savings account for a goal is set aside for it, as an "Add" on the
+                // Goals page would, so withdrawing it later doesn't release another goal's money.
+                if (await IsSavingsAccountAsync(goalDb, transaction.AccountId, cancellationToken))
+                {
+                    var savings = await goalDb.SavingsState.FirstOrDefaultAsync(cancellationToken);
+                    if (savings is null)
+                    {
+                        savings = new SavingsState();
+                        goalDb.SavingsState.Add(savings);
+                    }
+
+                    savings.Reserved += transaction.Amount;
+                }
+
                 if (linkedGoal.CurrentAmount >= linkedGoal.TargetAmount && linkedGoal.Status != GoalStatus.Completed)
                 {
                     linkedGoal.Status = GoalStatus.Completed;
@@ -461,6 +476,12 @@ public sealed class GameLoopService : IGameLoopService
                 {
                     goal.Status = GoalStatus.Active;
                 }
+
+                if (await IsSavingsAccountAsync(db, originalTransaction.AccountId, cancellationToken)
+                    && await db.SavingsState.FirstOrDefaultAsync(cancellationToken) is { } savings)
+                {
+                    savings.Reserved = Math.Max(0m, savings.Reserved - originalTransaction.Amount);
+                }
             }
         }
 
@@ -475,6 +496,10 @@ public sealed class GameLoopService : IGameLoopService
             await _levelService.AddXpAsync(-TransactionXp, cancellationToken);
         }
     }
+
+    private static async Task<bool> IsSavingsAccountAsync(CoinStackDbContext db, int? accountId, CancellationToken cancellationToken)
+        => accountId is { } id
+           && await db.Accounts.AnyAsync(a => a.Id == id && a.Type == AccountType.Savings, cancellationToken);
 
     private async Task<decimal> GetNewMonthlyShortfallAsync(
         int monthStartDay,

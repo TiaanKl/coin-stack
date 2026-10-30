@@ -34,11 +34,12 @@ public sealed class SavingsProjectionTests
         {
             await db.Database.EnsureCreatedAsync();
             db.AppSettings.Add(settings);
-            db.SavingsState.Add(new SavingsState
+            db.Accounts.Add(new Account
             {
-                Total = openingBalance,
-                Available = openingBalance,
-                Reserved = 0m
+                Name = "Savings",
+                Type = AccountType.Savings,
+                Balance = openingBalance,
+                BalanceAsOfUtc = DateTime.UtcNow.AddDays(-1)
             });
             await db.SaveChangesAsync();
         }
@@ -236,7 +237,7 @@ public sealed class SavingsProjectionTests
 
         try
         {
-            // R6 000 of the R10 000 is taken out; Total stays at R10 000.
+            // R6 000 of the R10 000 moves to the main account.
             await service.WithdrawForEmergencyAsync(6000m, "Car repair");
 
             var projections = await service.GetProjectionsAsync(12, includeInterest: true);
@@ -249,9 +250,10 @@ public sealed class SavingsProjectionTests
             Assert.Equal(45m, summary.Interest);
             Assert.Equal(4545m, summary.RunningTotal);
 
-            var state = await service.GetStateAsync();
+            // The month's R500 came out of the main account; the interest was added to savings.
+            var state = await service.GetSnapshotAsync();
+            Assert.Equal(4545m, state.SavingsBalance);
             Assert.Equal(4545m, state.Available);
-            Assert.Equal(10545m, state.Total);
         }
         finally
         {

@@ -62,7 +62,8 @@ public sealed class AchievementService : IAchievementService
         var underBudgetStreak = streaks.FirstOrDefault(s => s.Type == StreakType.DailyUnderBudget);
         var reflectionCount = await db.Reflections.CountAsync(r => r.IsCompleted, ct);
         var journalCount = await db.CbtJournalEntries.CountAsync(ct);
-        var transactionCount = await db.Transactions.CountAsync(ct);
+        // Rows the app adds by itself (monthly savings, shortfall cover) aren't the person's own logging.
+        var transactionCount = await db.Transactions.CountAsync(t => t.Source != TransactionConventions.AutoSource, ct);
         var goalCount = await db.Goals.CountAsync(g => g.Status == GoalStatus.Completed, ct);
         var challengeCount = await db.DailyChallenges.CountAsync(c => c.Status == ChallengeStatus.Completed, ct);
 

@@ -110,7 +110,7 @@ public sealed record MobileDebtSummary(
     DateTime? EstimatedPayoffDateUtc);
 
 public sealed record MobileSavingsSnapshot(
-    SavingsState State,
+    SavingsSnapshot State,
     IReadOnlyList<SavingsMonthlySummary> MonthlySummaries,
     IReadOnlyList<SavingsFallbackEvent> FallbackEvents,
     decimal FallbackUsedThisMonth,

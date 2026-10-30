@@ -22,8 +22,6 @@ public sealed class AppSettings : EntityBase
     public decimal? SavingsInterestRate { get; set; }
     public bool SavingsInterestIsYearly { get; set; } = true;
 
-    public bool ShowReserveAwareBudget { get; set; } = false;
-
     public bool EnableEmergencyFallback { get; set; } = true;
 
     /// <summary>

@@ -158,9 +158,9 @@ public sealed class SavingsPage : ContentPage
             var settings = await _financeService.GetSettingsAsync();
             var snapshot = await _financeService.GetSavingsSnapshotAsync();
 
-            _totalLabel.Text = $"Total: {MoneyDisplay.Format(settings.Currency, snapshot.State.Total)}";
-            _availableLabel.Text = $"Available: {MoneyDisplay.Format(settings.Currency, snapshot.State.Available)}";
-            _reservedLabel.Text = $"Reserved: {MoneyDisplay.Format(settings.Currency, snapshot.State.Reserved)}";
+            _totalLabel.Text = $"In savings: {MoneyDisplay.Format(settings.Currency, snapshot.State.SavingsBalance)}";
+            _availableLabel.Text = $"Free: {MoneyDisplay.Format(settings.Currency, snapshot.State.Available)}";
+            _reservedLabel.Text = $"For goals: {MoneyDisplay.Format(settings.Currency, snapshot.State.Reserved)}";
             _fallbackLabel.Text = $"Fallback used this month: {MoneyDisplay.Format(settings.Currency, snapshot.FallbackUsedThisMonth)}";
             _lastCalcLabel.Text = $"Last calculated month: {snapshot.State.LastCalculatedMonth ?? "Never"}";
             _fallbackToggle.IsToggled = snapshot.State.FallbackEnabled;

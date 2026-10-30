@@ -70,7 +70,7 @@ public sealed class TransactionService : ITransactionService
     public async Task<Transaction> CreateAsync(Transaction transaction, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-        await AccountService.PrepareForSaveAsync(db, transaction, before: null, cancellationToken);
+        await AccountService.PrepareForSaveAsync(db, transaction, before: null, _clock.GetUtcNow().UtcDateTime, cancellationToken);
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -102,7 +102,7 @@ public sealed class TransactionService : ITransactionService
         if (existing is null) return;
 
         // A change that can't be saved (a transfer without a destination) is refused before anything is undone.
-        await AccountService.PrepareForSaveAsync(db, transaction, existing, cancellationToken);
+        await AccountService.PrepareForSaveAsync(db, transaction, existing, _clock.GetUtcNow().UtcDateTime, cancellationToken);
 
         // Check impact before committing to this change, if there is an impact, we need to revert it before applying the new one
         await _gameLoop.RevertTransactionImpactAsync(existing, cancellationToken);

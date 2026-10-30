@@ -45,28 +45,25 @@
         <Border Classes="Card">
             <StackPanel Spacing="16">
                 <TextBlock Text="Reserves &amp; behavior" Classes="h2" />
-                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
                       ColumnSpacing="16" RowSpacing="10">
-                    <TextBlock Text="Reserve-aware budget" Classes="body" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowReserveAwareBudget}" />
+                    <TextBlock Text="Emergency fund fallback" Classes="body" VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Column="1" IsChecked="{Binding EnableEmergencyFallback}" />
 
-                    <TextBlock Grid.Row="1" Text="Emergency fund fallback" Classes="body" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="1" Grid.Column="1" IsChecked="{Binding EnableEmergencyFallback}" />
+                    <TextBlock Grid.Row="1" Text="Enable scoring" Classes="body" VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="1" Grid.Column="1" IsChecked="{Binding EnableScoring}" />
 
-                    <TextBlock Grid.Row="2" Text="Enable scoring" Classes="body" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="2" Grid.Column="1" IsChecked="{Binding EnableScoring}" />
+                    <TextBlock Grid.Row="2" Text="Enable streaks" Classes="body" VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="2" Grid.Column="1" IsChecked="{Binding EnableStreaks}" />
 
-                    <TextBlock Grid.Row="3" Text="Enable streaks" Classes="body" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="3" Grid.Column="1" IsChecked="{Binding EnableStreaks}" />
+                    <TextBlock Grid.Row="3" Text="Enable toasts" Classes="body" VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="3" Grid.Column="1" IsChecked="{Binding EnableToast}" />
 
-                    <TextBlock Grid.Row="4" Text="Enable toasts" Classes="body" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="4" Grid.Column="1" IsChecked="{Binding EnableToast}" />
+                    <TextBlock Grid.Row="4" Text="Enable sounds" Classes="body" VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="4" Grid.Column="1" IsChecked="{Binding EnableSounds}" />
 
-                    <TextBlock Grid.Row="5" Text="Enable sounds" Classes="body" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="5" Grid.Column="1" IsChecked="{Binding EnableSounds}" />
-
-                    <TextBlock Grid.Row="6" Text="Enable reflections" Classes="body" VerticalAlignment="Center" />
-                    <ToggleSwitch Grid.Row="6" Grid.Column="1" IsChecked="{Binding EnableReflections}" />
+                    <TextBlock Grid.Row="5" Text="Enable reflections" Classes="body" VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Row="5" Grid.Column="1" IsChecked="{Binding EnableReflections}" />
                 </Grid>
 
                 <Grid ColumnDefinitions="180,*" ColumnSpacing="16" Margin="0,8,0,0">

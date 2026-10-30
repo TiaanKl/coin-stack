@@ -11,7 +11,8 @@ namespace CoinStack.Tests;
 
 /// <summary>
 /// Upgrading a database from before accounts existed: the single bank balance becomes the main account,
-/// every transaction lands on it, and the money shown before and after is the same.
+/// every transaction lands on it, and the money shown before and after is the same. Savings and the
+/// emergency fund become accounts holding what their figures showed.
 /// </summary>
 public sealed class AccountsMigrationTests : IAsyncLifetime
 {
@@ -38,7 +39,7 @@ public sealed class AccountsMigrationTests : IAsyncLifetime
         await UpgradeAsync();
 
         await using var db = new CoinStackDbContext(_options);
-        var main = await db.Accounts.SingleAsync();
+        var main = await db.Accounts.SingleAsync(a => a.Type == AccountType.Cheque);
         Assert.Equal("Main account", main.Name);
         Assert.Equal(AccountType.Cheque, main.Type);
         Assert.True(main.IsDefault);
@@ -62,9 +63,34 @@ public sealed class AccountsMigrationTests : IAsyncLifetime
         await UpgradeAsync();
 
         await using var db = new CoinStackDbContext(_options);
-        var main = await db.Accounts.SingleAsync();
+        var main = await db.Accounts.SingleAsync(a => a.Type == AccountType.Cheque);
         Assert.Null(main.BalanceAsOfUtc);
         Assert.Equal(5000m, await AccountService.GetSpendableBalanceAsync(db, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Savings_And_The_Emergency_Fund_Become_Accounts_With_Their_Money()
+    {
+        await SeedOldDatabaseAsync(bankBalanceAsOf: "'2026-10-01 12:00:00'");
+
+        await UpgradeAsync();
+
+        await using var db = new CoinStackDbContext(_options);
+        var savings = await db.Accounts.SingleAsync(a => a.Type == AccountType.Savings);
+        var emergency = await db.Accounts.SingleAsync(a => a.Type == AccountType.EmergencyFund);
+        Assert.NotNull(savings.BalanceAsOfUtc);
+        Assert.NotNull(emergency.BalanceAsOfUtc);
+
+        // Savings holds the free money and what goals set aside; goals still have theirs set aside.
+        var snapshot = await SavingsService.GetSnapshotAsync(db, CancellationToken.None);
+        Assert.Equal(1000.25m, snapshot.SavingsBalance);
+        Assert.Equal(250m, snapshot.Reserved);
+        Assert.Equal(750.25m, snapshot.Available);
+        Assert.Equal(400m, snapshot.EmergencyBalance);
+        Assert.True(snapshot.FallbackEnabled);
+
+        // They are not money to spend.
+        Assert.Equal(17000m, await AccountService.GetSpendableBalanceAsync(db, CancellationToken.None));
     }
 
     [Fact]
@@ -92,12 +118,14 @@ public sealed class AccountsMigrationTests : IAsyncLifetime
         }
 
         Assert.Equal("5000.0", await ScalarAsync("SELECT \"CurrentBankBalance\" FROM \"AppSettings\""));
+        Assert.Equal(750.25, Convert.ToDouble(await ScalarAsync("SELECT \"Available\" FROM \"SavingsState\""), System.Globalization.CultureInfo.InvariantCulture));
 
         await UpgradeAsync();
 
         await using var again = new CoinStackDbContext(_options);
-        Assert.Single(await again.Accounts.ToListAsync());
+        Assert.Single(await again.Accounts.Where(a => a.Type == AccountType.Cheque).ToListAsync());
         Assert.Equal(17000m, await AccountService.GetSpendableBalanceAsync(again, CancellationToken.None));
+        Assert.Equal(1000.25m, (await SavingsService.GetSnapshotAsync(again, CancellationToken.None)).SavingsBalance);
     }
 
     private async Task UpgradeAsync()
@@ -129,6 +157,10 @@ public sealed class AccountsMigrationTests : IAsyncLifetime
                  (2, '2026-10-03 10:00:00', '20000.0', 'Income', 'Salary', 'Discretionary', 0, 0, 'Manual', NULL, {stamps}),
                  (3, '2026-10-04 10:00:00', '8000.0', 'Expense', 'Rent', 'Discretionary', 0, 0, 'Manual', NULL, {stamps}),
                  (4, '2026-10-05 10:00:00', '3000.0', 'Transfer', 'To savings', 'Discretionary', 0, 0, 'Manual', NULL, {stamps});
+
+             INSERT INTO "SavingsState" ("Total", "Available", "Reserved", "EmergencyTotal", "EmergencyAvailable", "FallbackEnabled",
+                 "LastCalculatedMonth", "CreatedAtUtc", "UpdatedAtUtc")
+             VALUES ('1200.0', '750.25', '250.0', '500.0', '400.0', 1, '2026-09', {stamps});
 
              INSERT INTO "ScoreEvents" ("Points", "Reason", "Description", "TransactionId", "CreatedAtUtc", "UpdatedAtUtc")
              VALUES (5, 'UnderBudget', 'Stayed under budget', 2, {stamps});

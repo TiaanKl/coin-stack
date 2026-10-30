@@ -205,9 +205,9 @@ public sealed class DashboardPage : ContentPage
 
             // Reserves
             var savingsState = savings.State;
-            _savingsLabel.Text = MoneyDisplay.Format(currency, savingsState.Available);
-            _emergencyLabel.Text = MoneyDisplay.Format(currency, savingsState.EmergencyAvailable);
-            _totalReservedLabel.Text = MoneyDisplay.Format(currency, savingsState.Available + savingsState.EmergencyAvailable);
+            _savingsLabel.Text = MoneyDisplay.Format(currency, savingsState.SavingsBalance);
+            _emergencyLabel.Text = MoneyDisplay.Format(currency, savingsState.EmergencyBalance);
+            _totalReservedLabel.Text = MoneyDisplay.Format(currency, savingsState.SavingsBalance + savingsState.EmergencyBalance);
 
             // Transactions
             _recentTxList.Children.Clear();

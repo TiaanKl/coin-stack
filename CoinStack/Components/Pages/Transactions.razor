@@ -631,7 +631,7 @@
         _categories = await CategoryService.GetAllAsync();
         _debts = await DebtService.GetAllAsync();
         _accounts = (await AccountService.GetBalancesAsync(includeArchived: true)).Select(a => a.Account).ToList();
-        var savingsState = await SavingsService.GetStateAsync();
+        var savingsState = await SavingsService.GetSnapshotAsync();
         _savingsAvailable = savingsState.Available;
         _bucketSpent = await BucketService.GetSpentAmountsForPeriodAsync(_settings.MonthStartDay, now);
         _transactions.Clear();

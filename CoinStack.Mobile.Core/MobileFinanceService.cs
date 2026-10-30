@@ -248,7 +248,7 @@ public sealed class MobileFinanceService : IMobileFinanceService, IDisposable
     public async Task<MobileSavingsSnapshot> GetSavingsSnapshotAsync(CancellationToken cancellationToken = default)
     {
         var savings = Get<ISavingsService>();
-        var state = await savings.GetStateAsync(cancellationToken);
+        var state = await savings.GetSnapshotAsync(cancellationToken);
         var summaries = (await savings.GetMonthlySummariesAsync(cancellationToken)).OrderByDescending(s => s.Month).Take(24).ToList();
         var fallbackEvents = (await savings.GetFallbackEventsAsync(cancellationToken)).OrderByDescending(e => e.OccurredAtUtc).Take(30).ToList();
         var fallbackUsedThisMonth = await savings.GetFallbackUsedThisMonthAsync(cancellationToken);
@@ -287,7 +287,7 @@ public sealed class MobileFinanceService : IMobileFinanceService, IDisposable
         var (periodIncome, periodExpense) = await transactions.GetIncomeExpenseForPeriodAsync(period.StartUtc, period.EndUtc, cancellationToken);
 
         var savings = Get<ISavingsService>();
-        var savingsState = await savings.GetStateAsync(cancellationToken);
+        var savingsState = await savings.GetSnapshotAsync(cancellationToken);
         var fallbackUsedThisMonth = await savings.GetFallbackUsedThisMonthAsync(cancellationToken);
 
         var openDebts = (await Get<IDebtService>().GetAllAsync(cancellationToken)).Where(d => d.CurrentBalance > 0).ToList();

@@ -4,31 +4,25 @@ namespace CoinStack.Services;
 
 public interface ISavingsService
 {
-    /// <summary>Gets or creates the singleton savings state.</summary>
-    Task<SavingsState> GetStateAsync(CancellationToken cancellationToken = default);
+    /// <summary>The savings and emergency-fund balances, and what goals have set aside.</summary>
+    Task<SavingsSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Runs the monthly savings calculation for the current month.
-    /// No-ops if already calculated for that month.
+    /// Runs the monthly savings for the current month: the planned amount moves from the main account to
+    /// savings, and the month's interest is added to savings. No-ops if already done for that month.
     /// </summary>
     Task<SavingsMonthlySummary?> CalculateMonthAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Explicitly withdraws up to <paramref name="amount"/> from available savings for a force-majeure
-    /// expense. Does <b>not</b> require <see cref="SavingsState.FallbackEnabled"/>.
-    /// Returns the amount actually deducted (may be less than requested if savings are insufficient).
-    /// Pass <paramref name="transactionId"/> so the withdrawal is refunded if that transaction is deleted.
+    /// Explicitly moves up to <paramref name="amount"/> of free savings to the main account for a
+    /// force-majeure expense. Does <b>not</b> require <see cref="SavingsState.FallbackEnabled"/>.
+    /// Returns the amount actually moved (may be less than requested if savings are insufficient).
+    /// Pass <paramref name="transactionId"/> so the withdrawal is undone if that transaction is deleted.
     /// </summary>
     Task<decimal> WithdrawForEmergencyAsync(decimal amount, string reason, int? transactionId = null, CancellationToken cancellationToken = default);
 
     /// <summary>Enables or disables savings fallback globally.</summary>
     Task SetFallbackEnabledAsync(bool enabled, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Deducts <paramref name="amount"/> from available savings as a fallback and logs the event.
-    /// Returns false if savings are insufficient or fallback is disabled.
-    /// </summary>
-    Task<bool> ApplyFallbackAsync(decimal amount, string reason, string sourceName, CancellationToken cancellationToken = default);
 
     /// <summary>Ordered (newest first) monthly history.</summary>
     Task<List<SavingsMonthlySummary>> GetMonthlySummariesAsync(CancellationToken cancellationToken = default);
@@ -44,15 +38,15 @@ public interface ISavingsService
     /// </summary>
     Task<List<SavingsProjectionPoint>> GetProjectionsAsync(int months = 12, bool includeInterest = true, CancellationToken cancellationToken = default);
 
-    /// <summary>Adds funds from available budget into savings.</summary>
+    /// <summary>Moves money from the main account into savings.</summary>
     Task<ReserveTransferResult> AddToSavingsAsync(decimal amount, string reason, CancellationToken cancellationToken = default);
 
-    /// <summary>Adds funds from available budget into emergency funds.</summary>
+    /// <summary>Moves money from the main account into the emergency fund.</summary>
     Task<ReserveTransferResult> AddToEmergencyFundAsync(decimal amount, string reason, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Applies reserve fallback in order: savings first, then emergency fund (if enabled).
-    /// Returns how much was covered from each source.
+    /// Covers a shortfall by moving money to the main account: free savings first, then the emergency fund
+    /// (if allowed). Returns how much was covered from each.
     /// </summary>
     Task<ReserveCoverageResult> ApplyReserveFallbackAsync(decimal amount, string reason, string sourceName, bool allowEmergencyFund, int? transactionId = null, CancellationToken cancellationToken = default);
 
@@ -77,6 +71,22 @@ public sealed record SavingsProjectionPoint(
     decimal Projected,
     decimal Contributions = 0m,
     decimal InterestEarned = 0m);
+/// <summary>
+/// Savings now. <paramref name="SavingsBalance"/> is the savings account, of which goals have set aside
+/// <paramref name="Reserved"/>; the rest is free to use. <paramref name="EmergencyBalance"/> is the
+/// emergency-fund account.
+/// </summary>
+public sealed record SavingsSnapshot(
+    decimal SavingsBalance,
+    decimal Reserved,
+    decimal EmergencyBalance,
+    bool FallbackEnabled,
+    string? LastCalculatedMonth)
+{
+    /// <summary>Savings not set aside for goals.</summary>
+    public decimal Available => Math.Max(0m, SavingsBalance - Reserved);
+}
+
 public sealed record ReserveTransferResult(decimal SavingsAdded, decimal EmergencyAdded);
 public sealed record ReserveCoverageResult(decimal SavingsUsed, decimal EmergencyUsed)
 {

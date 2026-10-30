@@ -372,7 +372,7 @@
         _goals.Clear();
         _goals.AddRange(goals);
 
-        var savings = await SavingsService.GetStateAsync();
+        var savings = await SavingsService.GetSnapshotAsync();
         _savingsAvailable = savings.Available;
         _savingsReserved = savings.Reserved;
     }

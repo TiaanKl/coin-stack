@@ -176,9 +176,6 @@ namespace FinanceManager.Data.Migrations
                     b.Property<bool>("SavingsIsPercent")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("ShowReserveAwareBudget")
-                        .HasColumnType("INTEGER");
-
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -662,6 +659,9 @@ namespace FinanceManager.Data.Migrations
                     b.Property<int?>("TransactionId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("TransferTransactionId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("TEXT");
 
@@ -719,19 +719,7 @@ namespace FinanceManager.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("Available")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("EmergencyAvailable")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("EmergencyTotal")
-                        .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("FallbackEnabled")
@@ -742,10 +730,6 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("Reserved")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("Total")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 

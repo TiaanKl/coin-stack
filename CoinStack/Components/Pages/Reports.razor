@@ -187,7 +187,7 @@
 
 		_periodNet = _periodIncome - _periodExpense;
 
-		var savings = await SavingsService.GetStateAsync();
+		var savings = await SavingsService.GetSnapshotAsync();
 		_savingsAvailable = savings.Available;
 		_fallbackUsedThisMonth = await SavingsService.GetFallbackUsedThisMonthAsync();
 

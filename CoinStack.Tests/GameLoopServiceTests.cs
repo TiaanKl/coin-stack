@@ -179,14 +179,11 @@ public sealed class GameLoopServiceTests
         {
             await setupDb.Database.EnsureCreatedAsync();
             setupDb.Buckets.Add(new Bucket { Id = 15, Name = "General", AllocatedAmount = 500m, IsSavings = false });
-            setupDb.SavingsState.Add(new SavingsState
-            {
-                FallbackEnabled = true,
-                Total = 100m,
-                Available = 50m,
-                EmergencyTotal = 100m,
-                EmergencyAvailable = 60m
-            });
+            var anchor = DateTime.UtcNow.AddDays(-1);
+            setupDb.Accounts.AddRange(
+                new Account { Name = "Savings", Type = AccountType.Savings, Balance = 50m, BalanceAsOfUtc = anchor },
+                new Account { Name = "Emergency fund", Type = AccountType.EmergencyFund, Balance = 60m, BalanceAsOfUtc = anchor });
+            setupDb.SavingsState.Add(new SavingsState { FallbackEnabled = true });
 
             setupDb.AppSettings.Add(new AppSettings
             {
@@ -250,9 +247,9 @@ public sealed class GameLoopServiceTests
         var result = await gameLoop.ProcessTransactionAsync(tx, 0);
 
         await using var verifyDb = new CoinStackDbContext(options);
-        var state = await verifyDb.SavingsState.FirstAsync();
+        var state = await SavingsService.GetSnapshotAsync(verifyDb, CancellationToken.None);
         Assert.Equal(40m, state.Available);
-        Assert.Equal(60m, state.EmergencyAvailable);
+        Assert.Equal(60m, state.EmergencyBalance);
         Assert.Equal(-15, result.PointsChanged);
     }
 
@@ -270,14 +267,11 @@ public sealed class GameLoopServiceTests
         {
             await setupDb.Database.EnsureCreatedAsync();
             setupDb.Buckets.Add(new Bucket { Id = 16, Name = "General", AllocatedAmount = 500m, IsSavings = false });
-            setupDb.SavingsState.Add(new SavingsState
-            {
-                FallbackEnabled = true,
-                Total = 100m,
-                Available = 5m,
-                EmergencyTotal = 100m,
-                EmergencyAvailable = 100m
-            });
+            var anchor = DateTime.UtcNow.AddDays(-1);
+            setupDb.Accounts.AddRange(
+                new Account { Name = "Savings", Type = AccountType.Savings, Balance = 5m, BalanceAsOfUtc = anchor },
+                new Account { Name = "Emergency fund", Type = AccountType.EmergencyFund, Balance = 100m, BalanceAsOfUtc = anchor });
+            setupDb.SavingsState.Add(new SavingsState { FallbackEnabled = true });
 
             setupDb.Transactions.Add(new Transaction
             {
@@ -331,9 +325,9 @@ public sealed class GameLoopServiceTests
         var result = await gameLoop.ProcessTransactionAsync(tx, 0);
 
         await using var verifyDb = new CoinStackDbContext(options);
-        var state = await verifyDb.SavingsState.FirstAsync();
+        var state = await SavingsService.GetSnapshotAsync(verifyDb, CancellationToken.None);
         Assert.Equal(0m, state.Available);
-        Assert.Equal(90m, state.EmergencyAvailable);
+        Assert.Equal(90m, state.EmergencyBalance);
         Assert.Equal(-45, result.PointsChanged);
     }
 }

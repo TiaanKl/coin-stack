@@ -275,7 +275,44 @@ public sealed class AccountService : IAccountService
     }
 
     /// <summary>
-    /// Fills in the account a row belongs to and checks a transfer before it is saved. A transfer needs two
+    /// The account of this kind that savings, the emergency fund and goals use: the first open one, or a new
+    /// one with nothing in it yet. The main account for <see cref="AccountType.Cheque"/>.
+    /// </summary>
+    public static async Task<Account> GetOrCreateOfTypeAsync(
+        CoinStackDbContext db,
+        AccountType type,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        if (type == AccountType.Cheque)
+        {
+            return await GetOrCreateDefaultAsync(db, cancellationToken);
+        }
+
+        var existing = await db.Accounts
+            .Where(a => a.Type == type && !a.IsArchived)
+            .OrderBy(a => a.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var created = new Account
+        {
+            Name = type == AccountType.EmergencyFund ? "Emergency fund" : AccountDisplay.Label(type),
+            Type = type,
+            BalanceAsOfUtc = nowUtc,
+            SortOrder = (await db.Accounts.MaxAsync(a => (int?)a.SortOrder, cancellationToken) ?? 0) + 1
+        };
+        db.Accounts.Add(created);
+        await db.SaveChangesAsync(cancellationToken);
+        return created;
+    }
+
+    /// <summary>
+    /// Fills in the account a row belongs to and checks a transfer before it is saved. A row for a savings
+    /// bucket goes to the savings account, anything else to the main account. A transfer needs two
     /// different accounts and carries no bucket, debt or spending details. A transfer saved before accounts
     /// existed has no destination; it can still be edited and goes on moving nothing.
     /// </summary>
@@ -283,9 +320,18 @@ public sealed class AccountService : IAccountService
         CoinStackDbContext db,
         Transaction transaction,
         Transaction? before,
+        DateTime nowUtc,
         CancellationToken cancellationToken)
     {
-        transaction.AccountId ??= (await GetOrCreateDefaultAsync(db, cancellationToken)).Id;
+        if (transaction.AccountId is null)
+        {
+            var forSavings = transaction.Type != TransactionType.Transfer
+                             && transaction.BucketId is { } bucketId
+                             && await db.Buckets.AnyAsync(b => b.Id == bucketId && b.IsSavings, cancellationToken);
+
+            transaction.AccountId = (await GetOrCreateOfTypeAsync(
+                db, forSavings ? AccountType.Savings : AccountType.Cheque, nowUtc, cancellationToken)).Id;
+        }
 
         if (transaction.Type != TransactionType.Transfer)
         {

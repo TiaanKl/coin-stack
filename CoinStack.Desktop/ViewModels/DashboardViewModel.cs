@@ -71,9 +71,9 @@ public partial class DashboardViewModel : ViewModelBase, IAsyncInitializable
             BudgetProgressMax = allocated > 0 ? (double)allocated : 1;
             IsOverBudget = spent > allocated && allocated > 0;
 
-            var reserves = await _savings.GetStateAsync();
-            ReservesTotalText = _money.Format(currency, reserves.Total);
-            EmergencyFundText = _money.Format(currency, reserves.EmergencyTotal);
+            var reserves = await _savings.GetSnapshotAsync();
+            ReservesTotalText = _money.Format(currency, reserves.SavingsBalance);
+            EmergencyFundText = _money.Format(currency, reserves.EmergencyBalance);
             SavingsAvailableText = _money.Format(currency, reserves.Available);
 
             TotalScore = await _scoring.GetTotalScoreAsync();

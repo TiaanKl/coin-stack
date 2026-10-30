@@ -17,16 +17,19 @@ public sealed class GameLoopRevertTests
         await using var fixture = await Fixture.CreateAsync();
         var tx = await fixture.AddExpenseAsync(300m, ExpenseKind.Discretionary);
 
-        // Income 100, spend 300: a R200 shortfall is covered from savings.
+        // Income 100, spend 300: a R200 shortfall is covered by moving R200 from savings to the main account.
         await fixture.GameLoop.ProcessTransactionAsync(tx, 0);
         Assert.Equal(800m, await fixture.SavingsAvailableAsync());
+        Assert.Equal(-100m, await fixture.MainBalanceAsync());
 
         await fixture.GameLoop.RevertTransactionImpactAsync(tx, CancellationToken.None);
 
         Assert.Equal(1000m, await fixture.SavingsAvailableAsync());
+        Assert.Equal(-300m, await fixture.MainBalanceAsync());
         Assert.Equal(-5, fixture.Levels.LastXpAmount);
         await using var db = fixture.NewDb();
         Assert.Empty(await db.SavingsFallbackEvents.ToListAsync());
+        Assert.DoesNotContain(await db.Transactions.ToListAsync(), t => t.Type == TransactionType.Transfer);
     }
 
     [Fact]
@@ -121,7 +124,11 @@ public sealed class GameLoopRevertTests
             {
                 await db.Database.EnsureCreatedAsync();
                 db.Buckets.Add(new Bucket { Id = BucketId, Name = "Everyday", AllocatedAmount = 5000m });
-                db.SavingsState.Add(new SavingsState { Total = 1000m, Available = 1000m, FallbackEnabled = true });
+                var anchor = DateTime.UtcNow.AddDays(-1);
+                db.Accounts.AddRange(
+                    new Account { Name = "Main account", Type = AccountType.Cheque, IsDefault = true, Balance = 0m, BalanceAsOfUtc = anchor },
+                    new Account { Name = "Savings", Type = AccountType.Savings, Balance = 1000m, BalanceAsOfUtc = anchor });
+                db.SavingsState.Add(new SavingsState { FallbackEnabled = true });
                 await db.SaveChangesAsync();
             }
 
@@ -147,7 +154,9 @@ public sealed class GameLoopRevertTests
             return tx;
         }
 
-        public async Task<decimal> SavingsAvailableAsync() => (await Savings.GetStateAsync()).Available;
+        public async Task<decimal> SavingsAvailableAsync() => (await Savings.GetSnapshotAsync()).Available;
+
+        public async Task<decimal> MainBalanceAsync() => await new AccountService(Factory).GetSpendableBalanceAsync();
 
         public async ValueTask DisposeAsync() => await _connection.DisposeAsync();
     }

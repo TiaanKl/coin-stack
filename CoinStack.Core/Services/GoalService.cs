@@ -93,16 +93,22 @@ public sealed class GoalService : IGoalService
         }
 
         var toMove = Math.Min(amount, stillNeeded);
-        var savings = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
-        var available = savings?.Available ?? 0m;
-        if (savings is null || available < toMove)
+        var available = (await SavingsService.GetSnapshotAsync(db, cancellationToken)).Available;
+        if (available < toMove)
         {
             return GoalMoneyResult.Failed(
                 $"Only {Math.Max(0m, available):N2} is free in savings. Add money to savings first, or contribute less.",
                 amount);
         }
 
-        savings.Available -= toMove;
+        // The money stays in the savings account; it is set aside for the goal, so it is no longer free.
+        var savings = await db.SavingsState.FirstOrDefaultAsync(cancellationToken);
+        if (savings is null)
+        {
+            savings = new SavingsState();
+            db.SavingsState.Add(savings);
+        }
+
         savings.Reserved += toMove;
         goal.CurrentAmount += toMove;
 
@@ -203,8 +209,8 @@ public sealed class GoalService : IGoalService
             db.SavingsState.Add(savings);
         }
 
+        // Releasing the set-aside money makes it free savings again; it never left the savings account.
         savings.Reserved = Math.Max(0m, savings.Reserved - moved);
-        savings.Available += moved;
         goal.CurrentAmount -= moved;
         return moved;
     }

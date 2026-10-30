@@ -23,7 +23,8 @@ public sealed class DataResetServiceTests
             db.Categories.Add(category);
             db.Transactions.Add(new Transaction { Description = "Coffee", Amount = 35m, Category = category });
             db.AppSettings.Add(new AppSettings { Currency = "ZAR", MonthlyIncome = 25_000m });
-            db.SavingsState.Add(new SavingsState { Total = 500m, Available = 500m });
+            db.SavingsState.Add(new SavingsState { Reserved = 500m });
+            db.Accounts.Add(new Account { Name = "Savings", Type = AccountType.Savings, Balance = 500m, BalanceAsOfUtc = DateTime.UtcNow });
             db.DismissedRecurringMerchants.Add(new DismissedRecurringMerchant { NormalizedKey = "NETFLIX", SubscriptionDismissed = true });
             await db.SaveChangesAsync();
         }
@@ -45,6 +46,7 @@ public sealed class DataResetServiceTests
         Assert.Empty(await verify.Transactions.ToListAsync());
         Assert.Empty(await verify.AppSettings.ToListAsync());
         Assert.Empty(await verify.SavingsState.ToListAsync());
+        Assert.Empty(await verify.Accounts.ToListAsync());
         Assert.Empty(await verify.DismissedRecurringMerchants.ToListAsync());
         Assert.DoesNotContain(await verify.Categories.ToListAsync(), c => c.Name == "Custom");
         Assert.Contains(await verify.Categories.ToListAsync(), c => c.Name == "Groceries");

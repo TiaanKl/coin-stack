@@ -283,7 +283,7 @@ public sealed class WaitlistService : IWaitlistService
 
         var totalMonthlyDebt = debts.Sum(d => d.MonthlyPaymentAmount);
 
-        var savingsState = await db.SavingsState.AsNoTracking().FirstOrDefaultAsync(cancellationToken);
+        var savings = await SavingsService.GetSnapshotAsync(db, cancellationToken);
 
         var emotion = item.EmotionAtTimeOfAdding;
         if (emotion is null)
@@ -306,7 +306,7 @@ public sealed class WaitlistService : IWaitlistService
             totalMonthlyDebt,
             debts.Count,
             // The emergency fund is not money for wants, so only ordinary savings count.
-            savingsState?.Available ?? 0m,
+            savings.Available,
             emotion,
             item.Priority,
             (now - item.CreatedAtUtc).TotalDays));
