@@ -58,58 +58,68 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 - **Privacy:** subscription logos no longer come from clearbit.com, which received every subscription's name; known merchants use the app's own icons.
 - **Not done:** automatic scheduled backups to a chosen folder. The web app still loads its fonts and icons from Google Fonts and cdnjs; bundling them would make it fully offline.
 
+**Still open (checked against the code, 2026-10-30):**
+
+- **Gamification integrity** (Part 1): five of its six problems. Only the repeated check-in was fixed, in Phase 2.
+- **Mobile:** goal withdraw/abandon, waitlist "Didn't buy" and the import screens. Android hasn't been run on a device, and iOS needs a Mac to build.
+- **Small fixes:** the reconnect modal, and subscription categories stored by name rather than as a link.
+- **Tests:** streak counting and the FNB PDF statement parser.
+- **Backup:** automatic scheduled backups, and bundling the web app's fonts and icons.
+- **Smarter import** (Part 2, item 4): the parts not yet done are listed under that item.
+- **Part 2:** every other item except 11. Next in the suggested order is item 1, accounts and transfers.
+
 ## Part 1: Improve what already exists
 
-### Calculations that are still wrong (highest priority)
+### Calculations that were wrong (all fixed in Phase 1)
 
-- **Debt calculator (M).**
-  - "Annual" compounding applies the full yearly rate every month.
-  - "Simple" interest uses the amortising formula. The page's own example says R300 interest but the calculation shows R161.62.
-  - "Compound" divides a lump sum over the term.
-  - Total owed is overstated.
-  - An entered rate of "1" is read as 100%.
-  - Very large inputs can crash the page.
-  - Fixed, Variable and APR all run the same calculation.
-- **Savings totals (S).** Withdrawals only reduce Available, but interest and projections use Total. Both are overstated after any withdrawal.
-- **Bank-import projection (M).**
-  - R8k rent paid on the 3rd projects as R82,667 a month.
-  - Partial statement months pull the expense estimate down.
-  - Occasional income is added to every month.
-  - Refunds are counted as freelance income.
-- **Recurring-payment detection (M).**
-  - Cost is taken per charge, not per month.
-  - 14-day and 180-day gaps are classed as "monthly".
-  - It overwrites subscription costs you've edited and recreates ones you deleted.
-- **Waitlist readiness score (S).** It ignores the item's price, so R50 and R50,000 items score the same.
-- **Money display (S).**
-  - Negative amounts show as `R-1 234.56`.
-  - Separators are mixed.
-  - The Debt page shows "$".
-  - New settings default to USD.
+- ~~**Debt calculator (M).**~~
+  - ~~"Annual" compounding applies the full yearly rate every month.~~
+  - ~~"Simple" interest uses the amortising formula. The page's own example says R300 interest but the calculation shows R161.62.~~
+  - ~~"Compound" divides a lump sum over the term.~~
+  - ~~Total owed is overstated.~~
+  - ~~An entered rate of "1" is read as 100%.~~
+  - ~~Very large inputs can crash the page.~~
+  - ~~Fixed, Variable and APR all run the same calculation.~~
+- ~~**Savings totals (S).** Withdrawals only reduce Available, but interest and projections use Total. Both are overstated after any withdrawal.~~
+- ~~**Bank-import projection (M).**~~
+  - ~~R8k rent paid on the 3rd projects as R82,667 a month.~~
+  - ~~Partial statement months pull the expense estimate down.~~
+  - ~~Occasional income is added to every month.~~
+  - ~~Refunds are counted as freelance income.~~
+- ~~**Recurring-payment detection (M).**~~
+  - ~~Cost is taken per charge, not per month.~~
+  - ~~14-day and 180-day gaps are classed as "monthly".~~
+  - ~~It overwrites subscription costs you've edited and recreates ones you deleted.~~
+- ~~**Waitlist readiness score (S).** It ignores the item's price, so R50 and R50,000 items score the same.~~
+- ~~**Money display (S).**~~
+  - ~~Negative amounts show as `R-1 234.56`.~~
+  - ~~Separators are mixed.~~
+  - ~~The Debt page shows "$".~~
+  - ~~New settings default to USD.~~
 
-### Features that only half work
+### Features that only half worked (all fixed in Phase 1)
 
-- **Achievements never unlock (S–M).** Nothing ever checks for them, and their XP is never awarded.
-- **Weekly recap and challenges (S).**
-  - Only one weekly recap can ever be generated, and its top category and streak figures are wrong.
-  - Weekly challenges disappear after Monday.
-- **Goals (M).**
-  - A contribution just bumps a number; no money moves.
-  - Overfunding is silently dropped, and a double-click adds the amount twice.
-  - There's no way to edit, delete, withdraw or abandon a goal.
-- **Savings buckets (S).** Nothing in the UI can mark a bucket as savings or link it to a goal, so goal funding can't happen.
-- **Debt page (S–M).**
-  - There's no delete or "record payment" button.
-  - The calculator isn't connected to your saved debts.
-  - Simulator dates ignore your debit-order day.
-- **Waitlist (S).**
-  - Buying an item after its cool-off still counts as an impulse buy.
-  - "Didn't buy" deletes the item, so there's no "saved by waiting" total.
-  - Unlocked items need a page reload before you can act on them.
-- **Import revert and multi-file imports (M).**
-  - Revert has no confirmation and leaves the subscriptions and buckets it created.
-  - Merging several files drops the recurring proposals.
-  - Writes aren't wrapped in one database transaction.
+- ~~**Achievements never unlock (S–M).** Nothing ever checks for them, and their XP is never awarded.~~
+- ~~**Weekly recap and challenges (S).**~~
+  - ~~Only one weekly recap can ever be generated, and its top category and streak figures are wrong.~~
+  - ~~Weekly challenges disappear after Monday.~~
+- ~~**Goals (M).**~~
+  - ~~A contribution just bumps a number; no money moves.~~
+  - ~~Overfunding is silently dropped, and a double-click adds the amount twice.~~
+  - ~~There's no way to edit, delete, withdraw or abandon a goal.~~
+- ~~**Savings buckets (S).** Nothing in the UI can mark a bucket as savings or link it to a goal, so goal funding can't happen.~~
+- ~~**Debt page (S–M).**~~
+  - ~~There's no delete or "record payment" button.~~
+  - ~~The calculator isn't connected to your saved debts.~~
+  - ~~Simulator dates ignore your debit-order day.~~
+- ~~**Waitlist (S).**~~
+  - ~~Buying an item after its cool-off still counts as an impulse buy.~~
+  - ~~"Didn't buy" deletes the item, so there's no "saved by waiting" total.~~
+  - ~~Unlocked items need a page reload before you can act on them.~~
+- ~~**Import revert and multi-file imports (M).**~~
+  - ~~Revert has no confirmation and leaves the subscriptions and buckets it created.~~
+  - ~~Merging several files drops the recurring proposals.~~
+  - ~~Writes aren't wrapped in one database transaction.~~
 
 ### Everyday usability gaps
 
@@ -118,39 +128,42 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 - ~~**Payday (S).**~~ Fixed in Phase 2: payday can be any day from the 1st to the 31st.
 - ~~**Subscriptions (S).**~~ Fixed: cost and debit day are checked, logos no longer go to clearbit.com, and renaming a category carries its subscriptions along. The category is still stored by name rather than as a link.
 - ~~**Merchant matching false positives (M).**~~ Fixed: "City Of Cape Town" was classed as OnlyFans, "MR DIY" as Mr D, and "Auto Spares" as Spar.
-- **Reports and Income disagree (S).** Income uses calendar months while Reports uses your payday period. Fallback History shows times in UTC.
+- ~~**Reports and Income disagree (S).**~~ Fixed in Phase 2: Income used calendar months while Reports used your payday period, and Fallback History showed times in UTC.
 
 ### Gamification integrity (M)
 
-- The under-budget streak counts days that aren't consecutive.
-- With streaks off, every dashboard load re-awards the check-in.
+Only the check-in fix is done; the other five are still open.
+
+- The under-budget streak counts days that aren't consecutive, and a day over budget doesn't reset it.
+- ~~With streaks off, every dashboard load re-awards the check-in.~~ Fixed in Phase 2.
 - Points are given per expense, so splitting one purchase into 20 small ones earns 20 times the points.
-- Points from CBT entries and reflections can be farmed.
+- Points from CBT entries (5 each) and reflections (3 each) can be farmed, with no daily limit.
 - Challenges are just ticked off, with nothing checking them.
-- Level-up is never celebrated.
+- Level-up is never celebrated. Levels go up silently, and nothing calls `CheckLevelUpAsync`.
 
 ### Foundations that make everything else easier
 
-- **Time zones (M).** Everything runs in UTC, so entries between 00:00 and 02:00 SAST land on the previous day. Every app runs on the person's own device, so use the device's time zone through `TimeProvider`; no setting is needed.
-- **A daily catch-up (M).** Today, auto-deductions, check-ins and reconciliation run on page load, and prerendering runs them twice. A phone app can't count on running at midnight, so replace them with one catch-up that runs when the app opens (and once a day while it stays open) and handles every day missed since the last run, once.
-- **One forecast engine (M).** Home and Bank Import each calculate their own forecast, and they will disagree.
-- **One budget-period helper (S).** The same calculation is currently copied into nine places.
-- **Accounts: decided.** Local-first with one person per install (see Progress), so the sign-in endpoints are removed.
-- **Mobile on CoinStack.Core (M–L).** The mobile app keeps its own copies of the services (`MobileFinanceService`), so every fix has to be made twice. Mobile already references CoinStack.Data and Core only builds on Data, so mobile can use Core directly. Add Android back to its targets at the same time.
-- **Small fixes (S).** ~~The layout loads every transaction on each refresh~~ (fixed: it sums in the database). The reconnect modal can't recover after a server restart.
-- **Tests (M).** Add coverage for the debt calculator, PDF parser, streaks, challenges, recap and achievements.
+- ~~**Time zones (M).**~~ Done in Phase 2: everything ran in UTC, so entries between 00:00 and 02:00 SAST landed on the previous day. Days now follow the device's time zone through `TimeProvider`.
+- ~~**A daily catch-up (M).**~~ Done in Phase 2: auto-deductions, check-ins and reconciliation ran on page load, twice with prerendering. One catch-up now runs when the app opens (and once a day while it stays open) and handles every day missed since the last run.
+- ~~**One forecast engine (M).**~~ Done in Phase 2: Home and Bank Import each calculated their own forecast.
+- ~~**One budget-period helper (S).**~~ Done in Phase 2: the same calculation was copied into nine places.
+- ~~**Accounts.**~~ Decided: local-first with one person per install (see Progress), so the sign-in endpoints are removed.
+- ~~**Mobile on CoinStack.Core (M–L).**~~ Done in Phase 2: the mobile app kept its own copies of the services, so every fix had to be made twice. Android is back in its targets. The mobile screens still lack goal withdraw/abandon, waitlist "Didn't buy" and import.
+- **Small fixes (S).** ~~The layout loads every transaction on each refresh~~ (fixed: it sums in the database). The reconnect modal can't recover after a server restart: when reconnecting fails, it never reloads the page.
+- **Tests (M).** ~~Add coverage for the debt calculator, challenges, recap and achievements~~ (done in Phases 1 and 2). Still missing: streak counting, and the FNB PDF statement parser has no tests of its own.
 
 ## Part 2: New functionality, ordered by value
 
 1. **Accounts and transfers (L).** Cheque, savings and credit card accounts with real transfers. Savings and the emergency fund become real money, and net worth becomes possible. Adding this would resolve more of the issues above than anything else.
 2. **Multi-debt payoff planner (M–L).** Avalanche or snowball ordering, rolling freed-up payments into the next debt, extra and lump-sum payments, and one debt-free date. Imported FNB card and WesBank payments would reduce the right debt automatically.
 3. **Budget history and envelope rollover (M).** Per-period allocations, carrying unspent money forward, and alerts at 80% and 100% of a bucket.
-4. **Smarter import (M–L).**
-   - Your own merchant rules.
-   - A review screen that lists skipped rows with reasons.
-   - A check that opening balance + transactions = closing balance.
+4. **Smarter import (M–L). Partly done:** rows already imported are skipped, and the category you choose for a merchant is learned (see Progress).
+   - Your own merchant rules. They are learned, but there's no page yet to see or edit them.
+   - A review screen that lists skipped rows with reasons. The reasons already show next to each row in the preview.
+   - A check that opening balance + transactions = closing balance. Today only the FNB PDF parser checks the running balance row by row, and it only warns.
    - Matching imported rows against ones you logged manually.
-   - Guards against importing the same file twice or mixing two accounts.
+   - ~~Guards against importing the same file twice~~ (done) or mixing two accounts. Combining several files keeps the first file's account number without checking the others.
+   - Reading other banks' statements. Only FNB is read today: PDF statements, and CSV or OFX transaction history.
 5. **Subscription renewals (M).** Next billing date, a monthly total, and alerts for price changes or missed debit orders.
 6. **Goal planning (S–M).** Required monthly contribution, an on-track or overdue status, and contribution history.
 7. **Reports upgrade (M).** A past-period picker, category trends, year-over-year comparison and CSV export.
@@ -168,6 +181,6 @@ Not done in Phase 2: the mobile screens still lack the web's goal withdraw/aband
 
 ## Suggested order
 
-1. **Phase 1:** the remaining calculation bugs and the half-working features. These are small and make the existing numbers trustworthy.
-2. **Phase 2:** the foundations, in this order: one period helper, remove sign-in, mobile on CoinStack.Core (so the rest is only done once), time zones, the daily catch-up, then one forecast.
-3. **Phase 3:** encrypted backup and restore (item 11, done), then new features 1–5, in that order.
+1. **Phase 1 (done):** the remaining calculation bugs and the half-working features. These are small and make the existing numbers trustworthy.
+2. **Phase 2 (done):** the foundations, in this order: one period helper, remove sign-in, mobile on CoinStack.Core (so the rest is only done once), time zones, the daily catch-up, then one forecast.
+3. **Phase 3:** encrypted backup and restore (item 11, done), then new features 1–5, in that order. Item 4 is partly done, so item 1 is next.
