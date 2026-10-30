@@ -23,13 +23,13 @@ public interface ITransactionService
     Task UpdateAsync(Transaction transaction, int userTimezoneOffsetHours = 0, CancellationToken cancellationToken = default);
     Task DeleteAsync(int id, CancellationToken cancellationToken = default);
 
+    /// <summary>Spending from cheque accounts in the pay period containing <paramref name="utcNow"/>. Card purchases are left out.</summary>
     Task<decimal> GetExpenseTotalForBudgetPeriodAsync(int monthStartDay, DateTime utcNow, CancellationToken cancellationToken = default);
     Task<(decimal TotalIncome, decimal TotalExpense)> GetLifetimeTotalsAsync(CancellationToken cancellationToken = default);
-    Task<decimal> GetNetBalanceBeforeAsync(DateTime beforeUtc, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// The bank balance now: the last balance from a statement or "Update balance", plus everything recorded
-    /// since. Every page that shows money in the bank uses this, so they agree.
+    /// The money in the bank now: the cheque accounts' balances, each its last statement or "Update balance"
+    /// plus everything recorded since. Same as <see cref="IAccountService.GetSpendableBalanceAsync"/>.
     /// </summary>
     Task<decimal> GetEffectiveBankBalanceAsync(CancellationToken cancellationToken = default);
     Task<(decimal Income, decimal Expense)> GetIncomeExpenseForPeriodAsync(

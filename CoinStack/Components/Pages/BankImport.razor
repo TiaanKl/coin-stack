@@ -869,9 +869,8 @@
         await ReloadDataAsync();
     }
 
-    private async Task OnBalanceSavedAsync(AppSettings updatedSettings)
+    private async Task OnBalanceSavedAsync()
     {
-        _currency = updatedSettings.Currency;
         await ReloadDataAsync();
         await InvokeAsync(StateHasChanged);
     }

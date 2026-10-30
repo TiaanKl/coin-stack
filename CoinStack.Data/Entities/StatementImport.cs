@@ -12,6 +12,10 @@ public sealed class StatementImport : EntityBase
 
     public string? AccountNumber { get; set; }
 
+    /// <summary>The account the statement's transactions were imported into.</summary>
+    public int? AccountId { get; set; }
+    public Account? Account { get; set; }
+
     public DateTime? PeriodStartUtc { get; set; }
     public DateTime? PeriodEndUtc { get; set; }
 

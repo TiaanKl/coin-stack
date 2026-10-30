@@ -9,18 +9,6 @@ public sealed class AppSettings : EntityBase
     public int MonthStartDay { get; set; } = 1;
     public decimal MonthlyIncome { get; set; }
 
-    /// <summary>
-    /// User-reported bank/cash balance snapshot. May be negative (overdrawn).
-    /// Combined with transactions after <see cref="BankBalanceAsOfUtc"/> for the live effective balance.
-    /// </summary>
-    public decimal CurrentBankBalance { get; set; }
-
-    /// <summary>
-    /// When <see cref="CurrentBankBalance"/> was last set by the user. Transactions after this
-    /// timestamp adjust the effective balance without double-counting history.
-    /// </summary>
-    public DateTime? BankBalanceAsOfUtc { get; set; }
-
     public bool EnableScoring { get; set; } = true;
     public bool EnableStreaks { get; set; } = true;
     public bool EnableToast { get; set; } = true;

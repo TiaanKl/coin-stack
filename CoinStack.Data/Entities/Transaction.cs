@@ -8,6 +8,15 @@ public sealed class Transaction : EntityBase
 
     public TransactionType Type { get; set; } = TransactionType.Expense;
 
+    /// <summary>The account the money left or reached. For a transfer, the account it left.</summary>
+    public int? AccountId { get; set; }
+    public Account? Account { get; set; }
+
+    /// <summary>For a transfer, the account the money reached. Null on older transfers, which move nothing.</summary>
+    public int? TransferAccountId { get; set; }
+    public Account? TransferAccount { get; set; }
+
+
     public string Description { get; set; } = "";
 
     public string? Notes { get; set; }

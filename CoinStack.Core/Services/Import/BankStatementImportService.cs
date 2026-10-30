@@ -493,12 +493,14 @@ public sealed class BankStatementImportService : IBankStatementImportService
             .ToListAsync(cancellationToken);
 
         var categoryByName = categories.ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase);
+        var account = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
 
         var import = new StatementImport
         {
             FileName = preview.FileName ?? "Import",
             BankFormat = preview.BankFormat,
             AccountNumber = preview.AccountNumber,
+            AccountId = account.Id,
             PeriodStartUtc = preview.PeriodStartUtc,
             PeriodEndUtc = preview.PeriodEndUtc,
             OpeningBalance = preview.OpeningBalance,
@@ -519,6 +521,7 @@ public sealed class BankStatementImportService : IBankStatementImportService
                 OccurredAtUtc = candidate.DateUtc,
                 Amount = candidate.Amount,
                 Type = candidate.Type,
+                AccountId = account.Id,
                 Description = candidate.Description,
                 Notes = candidate.RawDescription != candidate.Description ? candidate.RawDescription : null,
                 CategoryId = candidate.CategoryName is not null && categoryByName.TryGetValue(candidate.CategoryName, out var categoryId)
@@ -580,7 +583,7 @@ public sealed class BankStatementImportService : IBankStatementImportService
 
         var syntheticsRemoved = await RemoveSyntheticMonthlyIncomeAsync(db, cancellationToken);
         var balanceUpdated = await SyncSettingsFromStatementAsync(
-            db, preview.ClosingBalance, balanceAsOf, isNewestStatement ? detectedSalary : null,
+            db, account, preview.ClosingBalance, balanceAsOf, isNewestStatement ? detectedSalary : null,
             isNewestStatement ? payday : 0, cancellationToken);
 
         var recurringStats = await ApplyRecurringProposalsAsync(db, preview.RecurringProposals, import.Id, cancellationToken);
@@ -651,18 +654,21 @@ public sealed class BankStatementImportService : IBankStatementImportService
 
         // Legacy placeholder income is cleaned up once at startup (DatabaseInitializer), not per page view.
         var settings = await db.AppSettings.FirstOrDefaultAsync(cancellationToken);
+        var account = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
+
         // Files without a running balance store null; never turn that into an R0 bank balance.
         var latestImport = await db.StatementImports
             .AsNoTracking()
-            .Where(i => i.Status == StatementImportStatus.Imported && i.ClosingBalance != null)
+            .Where(i => i.Status == StatementImportStatus.Imported
+                        && i.ClosingBalance != null
+                        && (i.AccountId == null || i.AccountId == account.Id))
             .OrderByDescending(i => i.PeriodEndUtc ?? i.CreatedAtUtc)
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (settings is not null && settings.BankBalanceAsOfUtc is null && latestImport?.ClosingBalance is { } closing)
+        if (account.BalanceAsOfUtc is null && latestImport?.ClosingBalance is { } closing)
         {
-            var asOf = latestImport.PeriodEndUtc?.Date.AddDays(1).AddTicks(-1) ?? latestImport.CreatedAtUtc;
-            settings.CurrentBankBalance = closing;
-            settings.BankBalanceAsOfUtc = asOf;
+            account.Balance = closing;
+            account.BalanceAsOfUtc = latestImport.PeriodEndUtc?.Date.AddDays(1).AddTicks(-1) ?? latestImport.CreatedAtUtc;
         }
 
         if (settings is not null && settings.MonthlyIncome <= 0m)
@@ -702,12 +708,13 @@ public sealed class BankStatementImportService : IBankStatementImportService
         => DatabaseInitializer.RemoveLegacySyntheticMonthlyIncomeAsync(db, cancellationToken);
 
     /// <summary>
-    /// Applies the statement's closing balance only when it is newer than the balance already on file
-    /// (an earlier import or a manual "Update balance"). Returns whether the balance was applied.
+    /// Applies the statement's closing balance to its account only when it is newer than the balance already
+    /// on file (an earlier import or a manual "Update balance"). Returns whether the balance was applied.
     /// Pass a null salary and payday 0 to leave income settings untouched.
     /// </summary>
     private static async Task<bool> SyncSettingsFromStatementAsync(
         CoinStackDbContext db,
+        Account account,
         decimal? closingBalance,
         DateTime? balanceAsOfUtc,
         decimal? detectedSalary,
@@ -725,10 +732,10 @@ public sealed class BankStatementImportService : IBankStatementImportService
         if (closingBalance is not null)
         {
             var asOf = balanceAsOfUtc ?? DateTime.UtcNow;
-            if (settings.BankBalanceAsOfUtc is null || asOf > settings.BankBalanceAsOfUtc.Value)
+            if (account.BalanceAsOfUtc is null || asOf > account.BalanceAsOfUtc.Value)
             {
-                settings.CurrentBankBalance = closingBalance.Value;
-                settings.BankBalanceAsOfUtc = asOf;
+                account.Balance = closingBalance.Value;
+                account.BalanceAsOfUtc = asOf;
                 balanceUpdated = true;
             }
         }

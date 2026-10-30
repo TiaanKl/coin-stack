@@ -290,7 +290,7 @@
     private SavingsState _state = new();
     private AppSettings _settings = new();
     private decimal _bankBalance;
-    private bool IsOverdrawn => _settings.BankBalanceAsOfUtc is not null && _bankBalance < 0;
+    private bool IsOverdrawn => _bankBalance < 0;
     private List<SavingsMonthlySummary> _history = [];
     private List<SavingsFallbackEvent> _fallbackEvents = [];
     private List<SavingsProjectionPoint> _projections = [];

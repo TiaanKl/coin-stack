@@ -17,6 +17,61 @@ namespace FinanceManager.Data.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
 
+            modelBuilder.Entity("CoinStack.Data.Entities.Account", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("AccountNumber")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("BalanceAsOfUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DebtAccountId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsArchived")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountNumber");
+
+                    b.HasIndex("DebtAccountId")
+                        .IsUnique();
+
+                    b.ToTable("Accounts", (string)null);
+                });
+
             modelBuilder.Entity("CoinStack.Data.Entities.Achievement", b =>
                 {
                     b.Property<int>("Id")
@@ -68,18 +123,12 @@ namespace FinanceManager.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTime?>("BankBalanceAsOfUtc")
-                        .HasColumnType("TEXT");
-
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(8)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("CurrentBankBalance")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("EnableEmergencyFallback")
@@ -756,6 +805,9 @@ namespace FinanceManager.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("AccountNumber")
                         .HasMaxLength(32)
                         .HasColumnType("TEXT");
@@ -808,6 +860,8 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
 
                     b.ToTable("StatementImports", (string)null);
                 });
@@ -909,6 +963,9 @@ namespace FinanceManager.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("AccountId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
@@ -968,6 +1025,9 @@ namespace FinanceManager.Data.Migrations
                     b.Property<int?>("SubscriptionId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("TransferAccountId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(32)
@@ -977,6 +1037,8 @@ namespace FinanceManager.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
 
                     b.HasIndex("AutoDeductTemplateId");
 
@@ -993,6 +1055,8 @@ namespace FinanceManager.Data.Migrations
                     b.HasIndex("StatementImportId");
 
                     b.HasIndex("SubscriptionId");
+
+                    b.HasIndex("TransferAccountId");
 
                     b.ToTable("Transactions", (string)null);
                 });
@@ -1160,6 +1224,16 @@ namespace FinanceManager.Data.Migrations
                     b.ToTable("WeeklyRecaps");
                 });
 
+            modelBuilder.Entity("CoinStack.Data.Entities.Account", b =>
+                {
+                    b.HasOne("CoinStack.Data.Entities.DebtAccount", "DebtAccount")
+                        .WithMany()
+                        .HasForeignKey("DebtAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("DebtAccount");
+                });
+
             modelBuilder.Entity("CoinStack.Data.Entities.Bucket", b =>
                 {
                     b.HasOne("CoinStack.Data.Entities.Category", "Category")
@@ -1240,8 +1314,23 @@ namespace FinanceManager.Data.Migrations
                     b.Navigation("Transaction");
                 });
 
+            modelBuilder.Entity("CoinStack.Data.Entities.StatementImport", b =>
+                {
+                    b.HasOne("CoinStack.Data.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Account");
+                });
+
             modelBuilder.Entity("CoinStack.Data.Entities.Transaction", b =>
                 {
+                    b.HasOne("CoinStack.Data.Entities.Account", "Account")
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("CoinStack.Data.Entities.Bucket", "Bucket")
                         .WithMany("Transactions")
                         .HasForeignKey("BucketId")
@@ -1267,6 +1356,13 @@ namespace FinanceManager.Data.Migrations
                         .HasForeignKey("SubscriptionId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("CoinStack.Data.Entities.Account", "TransferAccount")
+                        .WithMany()
+                        .HasForeignKey("TransferAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+
                     b.Navigation("Bucket");
 
                     b.Navigation("Category");
@@ -1276,6 +1372,8 @@ namespace FinanceManager.Data.Migrations
                     b.Navigation("StatementImport");
 
                     b.Navigation("Subscription");
+
+                    b.Navigation("TransferAccount");
                 });
 
             modelBuilder.Entity("CoinStack.Data.Entities.Bucket", b =>

@@ -30,6 +30,7 @@ public static class DatabaseInitializer
     {
         await using var scope = services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<CoinStackDbContext>();
+        await SaveCopyBeforeUpgradeAsync(db, cancellationToken);
         await db.Database.MigrateAsync(cancellationToken);
         await SeedMissingDefaultCategoriesAsync(db, cancellationToken);
 
@@ -43,6 +44,21 @@ public static class DatabaseInitializer
 
         var levelService = scope.ServiceProvider.GetRequiredService<ILevelService>();
         await levelService.GetCurrentLevelAsync(cancellationToken); // ensures UserLevel row exists
+    }
+
+    /// <summary>
+    /// An upgrade can rebuild tables, and SQLite runs part of a rebuild outside the migration's transaction,
+    /// so an existing database is copied first. A new, empty database has nothing to lose.
+    /// </summary>
+    private static async Task SaveCopyBeforeUpgradeAsync(CoinStackDbContext db, CancellationToken cancellationToken)
+    {
+        if (!(await db.Database.GetPendingMigrationsAsync(cancellationToken)).Any()
+            || !(await db.Database.GetAppliedMigrationsAsync(cancellationToken)).Any())
+        {
+            return;
+        }
+
+        await DatabaseSnapshots.SaveCopyAsync(db, "upgrade", cancellationToken);
     }
 
     /// <summary>

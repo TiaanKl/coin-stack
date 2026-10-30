@@ -54,7 +54,8 @@ public sealed class SavingsService : ISavingsService
             return null;
         }
 
-        if (settings.BankBalanceAsOfUtc is not null && settings.CurrentBankBalance < 0m)
+        // Nothing is set aside from an overdrawn account; the Savings page says so.
+        if (await AccountService.GetSpendableBalanceAsync(db, cancellationToken) < 0m)
         {
             return null;
         }

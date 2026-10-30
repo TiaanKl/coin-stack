@@ -48,8 +48,9 @@ public sealed class DataResetService : IDataResetService
             await db.Buckets.ExecuteDeleteAsync(cancellationToken);
             await db.Subscriptions.ExecuteDeleteAsync(cancellationToken);
             await db.Goals.ExecuteDeleteAsync(cancellationToken);
-            await db.DebtAccounts.ExecuteDeleteAsync(cancellationToken);
             await db.StatementImports.ExecuteDeleteAsync(cancellationToken);
+            await db.Accounts.ExecuteDeleteAsync(cancellationToken);
+            await db.DebtAccounts.ExecuteDeleteAsync(cancellationToken);
             await db.MerchantRules.ExecuteDeleteAsync(cancellationToken);
             await db.Categories.ExecuteDeleteAsync(cancellationToken);
             await db.Streaks.ExecuteDeleteAsync(cancellationToken);

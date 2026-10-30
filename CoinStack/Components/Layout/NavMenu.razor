@@ -46,6 +46,14 @@
 
                 <ul class="mb-6 flex flex-col gap-1">
                     <li>
+                        <NavLink href="/accounts" class="menu-item group menu-item-inactive"
+                                 ActiveClass="menu-item-active">
+                            <i class="menu-item-icon-inactive fa-solid fa-building-columns fa-fw text-xl"></i>
+                            <span class="@(SidebarToggle ? "xl:hidden" : "") menu-item-text">Accounts</span>
+                        </NavLink>
+                    </li>
+
+                    <li>
                         <NavLink href="/transactions" class="menu-item group menu-item-inactive"
                                  ActiveClass="menu-item-active">
                             <i class="menu-item-icon-inactive fa-solid fa-arrow-right-arrow-left fa-fw text-xl"></i>

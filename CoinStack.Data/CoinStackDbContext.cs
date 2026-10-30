@@ -32,6 +32,7 @@ public sealed class CoinStackDbContext : DbContext
     public DbSet<StatementImport> StatementImports => Set<StatementImport>();
     public DbSet<DismissedRecurringMerchant> DismissedRecurringMerchants => Set<DismissedRecurringMerchant>();
     public DbSet<MerchantRule> MerchantRules => Set<MerchantRule>();
+    public DbSet<Account> Accounts => Set<Account>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

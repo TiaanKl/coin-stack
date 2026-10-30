@@ -70,6 +70,7 @@ public sealed class TransactionService : ITransactionService
     public async Task<Transaction> CreateAsync(Transaction transaction, CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await AccountService.PrepareForSaveAsync(db, transaction, before: null, cancellationToken);
         db.Transactions.Add(transaction);
         await db.SaveChangesAsync(cancellationToken);
 
@@ -100,6 +101,9 @@ public sealed class TransactionService : ITransactionService
         var existing = await db.Transactions.FirstOrDefaultAsync(x => x.Id == transaction.Id, cancellationToken);
         if (existing is null) return;
 
+        // A change that can't be saved (a transfer without a destination) is refused before anything is undone.
+        await AccountService.PrepareForSaveAsync(db, transaction, existing, cancellationToken);
+
         // Check impact before committing to this change, if there is an impact, we need to revert it before applying the new one
         await _gameLoop.RevertTransactionImpactAsync(existing, cancellationToken);
 
@@ -119,6 +123,8 @@ public sealed class TransactionService : ITransactionService
         existing.OccurredAtUtc = transaction.OccurredAtUtc;
         existing.Amount = transaction.Amount;
         existing.Type = transaction.Type;
+        existing.AccountId = transaction.AccountId;
+        existing.TransferAccountId = transaction.TransferAccountId;
         existing.Description = transaction.Description;
         existing.Notes = transaction.Notes;
         existing.CategoryId = transaction.CategoryId;
@@ -174,11 +180,15 @@ public sealed class TransactionService : ITransactionService
         var (_, startUtc, endUtc) = BudgetPeriod.Containing(monthStartDay, utcNow, _clock.LocalTimeZone);
 
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        // Cash spending only: a card purchase leaves the bank when the card is paid, so counting it here
+        // as well would make the cash limit grow with every swipe.
         var sum = await db.Transactions
             .AsNoTracking()
             .Where(t => t.Type == TransactionType.Expense
                         && t.OccurredAtUtc >= startUtc
-                        && t.OccurredAtUtc < endUtc)
+                        && t.OccurredAtUtc < endUtc
+                        && (t.AccountId == null || t.Account!.Type == AccountType.Cheque))
             .SumAsync(t => (decimal?)t.Amount, cancellationToken);
 
         return sum ?? 0m;
@@ -201,44 +211,10 @@ public sealed class TransactionService : ITransactionService
         return (income, expense);
     }
 
-    public async Task<decimal> GetNetBalanceBeforeAsync(DateTime beforeUtc, CancellationToken cancellationToken = default)
-    {
-        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-
-        var income = await db.Transactions
-            .AsNoTracking()
-            .Where(t => t.OccurredAtUtc < beforeUtc && t.Type == TransactionType.Income)
-            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
-
-        var expense = await db.Transactions
-            .AsNoTracking()
-            .Where(t => t.OccurredAtUtc < beforeUtc && t.Type == TransactionType.Expense)
-            .SumAsync(t => (decimal?)t.Amount, cancellationToken) ?? 0m;
-
-        return income - expense;
-    }
-
     public async Task<decimal> GetEffectiveBankBalanceAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
-
-        var settings = await db.AppSettings.AsNoTracking().FirstOrDefaultAsync(cancellationToken) ?? new AppSettings();
-        if (settings.BankBalanceAsOfUtc is not { } asOf)
-        {
-            return settings.CurrentBankBalance;
-        }
-
-        // Transfers between the person's own accounts and the retired placeholder income don't move the bank balance.
-        var since = (await db.Transactions
-                .AsNoTracking()
-                .Where(t => t.OccurredAtUtc > asOf && t.Type != TransactionType.Transfer)
-                .ToListAsync(cancellationToken))
-            .Where(t => !TransactionConventions.IsSyntheticMonthlyIncome(t))
-            .ToList();
-
-        return settings.CurrentBankBalance
-               + since.Where(t => t.Type == TransactionType.Income).Sum(t => t.Amount)
-               - since.Where(t => t.Type == TransactionType.Expense).Sum(t => t.Amount);
+        return await AccountService.GetSpendableBalanceAsync(db, cancellationToken);
     }
 
     public async Task<(decimal Income, decimal Expense)> GetIncomeExpenseForPeriodAsync(
@@ -365,6 +341,7 @@ public sealed class TransactionService : ITransactionService
                 OccurredAtUtc = startUtc,
                 Amount = template.Amount,
                 Type = TransactionType.Expense,
+                AccountId = template.AccountId,
                 Description = template.Description,
                 Notes = template.Notes,
                 CategoryId = template.CategoryId,

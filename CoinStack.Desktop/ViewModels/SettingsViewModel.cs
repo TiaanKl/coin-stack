@@ -13,6 +13,10 @@ namespace CoinStack.Desktop.ViewModels;
 public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
 {
     private readonly ISettingsService _settings;
+    private readonly IAccountService _accounts;
+
+    // The main account's balance as loaded, so saving only resets its date when the figure was changed.
+    private decimal _loadedBankBalance;
 
     [ObservableProperty] private string _currency = AppSettings.DefaultCurrency;
     [ObservableProperty] private int _monthStartDay = 1;
@@ -47,9 +51,10 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
     [ObservableProperty] private bool _confirmingRestore;
     [ObservableProperty] private string? _restoreMessage;
 
-    public SettingsViewModel(ISettingsService settings, IBackupService backups, IFileDialogs files)
+    public SettingsViewModel(ISettingsService settings, IAccountService accounts, IBackupService backups, IFileDialogs files)
     {
         _settings = settings;
+        _accounts = accounts;
         _backups = backups;
         _files = files;
     }
@@ -175,7 +180,9 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
             Currency = settings.Currency;
             MonthStartDay = BudgetPeriod.NormalizePayday(settings.MonthStartDay);
             MonthlyIncome = settings.MonthlyIncome;
-            CurrentBankBalance = settings.CurrentBankBalance;
+            var main = (await _accounts.GetBalancesAsync()).FirstOrDefault(a => a.Account.IsDefault);
+            CurrentBankBalance = main?.Balance ?? 0m;
+            _loadedBankBalance = CurrentBankBalance;
             ShowReserveAwareBudget = settings.ShowReserveAwareBudget;
             EnableEmergencyFallback = settings.EnableEmergencyFallback;
             EnableScoring = settings.EnableScoring;
@@ -205,8 +212,12 @@ public partial class SettingsViewModel : ViewModelBase, IAsyncInitializable
             settings.Currency = Currency;
             settings.MonthStartDay = MonthStartDay;
             settings.MonthlyIncome = MonthlyIncome;
-            settings.CurrentBankBalance = CurrentBankBalance;
-            settings.BankBalanceAsOfUtc = DateTime.UtcNow;
+            if (CurrentBankBalance != _loadedBankBalance)
+            {
+                var main = await _accounts.GetDefaultAsync();
+                await _accounts.SetBalanceAsync(main.Id, CurrentBankBalance, DateTime.UtcNow);
+                _loadedBankBalance = CurrentBankBalance;
+            }
             settings.ShowReserveAwareBudget = ShowReserveAwareBudget;
             settings.EnableEmergencyFallback = EnableEmergencyFallback;
             settings.EnableScoring = EnableScoring;

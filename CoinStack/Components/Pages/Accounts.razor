@@ -1,0 +1,371 @@
+@page "/accounts"
+@rendermode InteractiveServer
+@using CoinStack.Data.Entities
+@using CoinStack.Services
+@inject IAccountService AccountService
+@inject ISettingsService SettingsService
+@inject TimeProvider Clock
+
+<PageTitle>Accounts</PageTitle>
+
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div>
+        <h2 class="text-xl font-semibold text-gray-800 dark:text-white/90">Accounts</h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Where your money is. Spending and income land in an account, and transfers move money between them.
+        </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+        <button type="button" @onclick="() => OpenTransfer(null)" disabled="@(_open.Count < 2)"
+                class="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-white/[0.03] dark:text-gray-300 dark:hover:bg-white/[0.06]">
+            <i class="fa-solid fa-right-left text-xs"></i>
+            Transfer
+        </button>
+        <button type="button" @onclick="OpenCreate"
+                class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-5 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+            <i class="fa-solid fa-plus text-xs"></i>
+            Add account
+        </button>
+    </div>
+</div>
+
+<div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Money to spend</p>
+        <p class="mt-1 text-2xl font-bold @(_spendable < 0 ? "text-error-600 dark:text-error-400" : "text-gray-800 dark:text-white/90")">@FormatC(_spendable)</p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Your cheque accounts. Budgets and the forecast start from this.</p>
+    </div>
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <p class="text-sm text-gray-500 dark:text-gray-400">All accounts</p>
+        <p class="mt-1 text-2xl font-bold @(_total < 0 ? "text-error-600 dark:text-error-400" : "text-gray-800 dark:text-white/90")">@FormatC(_total)</p>
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Everything you hold, less what you owe on cards.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(_pageError))
+{
+    <div class="mb-4 rounded-xl border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">@_pageError</div>
+}
+
+<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+    @foreach (var entry in _open)
+    {
+        @AccountCard(entry)
+    }
+</div>
+
+@if (_archived.Count > 0)
+{
+    <div class="mt-8">
+        <button type="button" @onclick="() => _showArchived = !_showArchived" class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <i class="fa-solid @(_showArchived ? "fa-chevron-down" : "fa-chevron-right") text-xs"></i>
+            Archived accounts (@_archived.Count)
+        </button>
+        @if (_showArchived)
+        {
+            <div class="mt-4 grid grid-cols-1 gap-4 opacity-70 md:grid-cols-2 xl:grid-cols-3">
+                @foreach (var entry in _archived)
+                {
+                    @AccountCard(entry)
+                }
+            </div>
+        }
+    </div>
+}
+
+@if (_showForm)
+{
+    <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5 modal-backdrop-enter">
+        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @onclick="CloseForm"></div>
+        <div class="relative w-full max-w-[500px] rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8 modal-panel-enter shadow-xl">
+            <form @onsubmit="SaveFormAsync" @onsubmit:preventDefault="true">
+                <h4 class="mb-5 text-lg font-bold text-gray-800 dark:text-white/90">@(_editingId.HasValue ? "Edit account" : "Add account")</h4>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Name</label>
+                        <input type="text" @bind="_formName" maxlength="200" class="@InputClass" placeholder="e.g. FNB Cheque" />
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Type</label>
+                        <select @bind="_formType" class="@InputClass" disabled="@_formIsMain">
+                            @foreach (var type in Enum.GetValues<AccountType>())
+                            {
+                                <option value="@type">@AccountDisplay.Label(type)</option>
+                            }
+                        </select>
+                        @if (_formIsMain)
+                        {
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">The main account stays a cheque account.</p>
+                        }
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Account number (optional)</label>
+                        <input type="text" @bind="_formNumber" maxlength="32" class="@InputClass" placeholder="As printed on your statement" />
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Lets imported statements find this account.</p>
+                    </div>
+
+                    @if (!_editingId.HasValue)
+                    {
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Balance</label>
+                                <input type="number" step="0.01" @bind="_formBalance" class="@InputClass" placeholder="0.00" />
+                            </div>
+                            <div>
+                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">As of</label>
+                                <input type="date" @bind="_formAsOf" max="@Clock.Today().ToString("yyyy-MM-dd")" class="@InputClass" />
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            Enter what the bank shows. For a credit card, enter what you owe as a negative amount.
+                        </p>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(_formError))
+                    {
+                        <div class="rounded-xl border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">@_formError</div>
+                    }
+                </div>
+
+                <div class="mt-6 flex w-full items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                    <button type="button" @onclick="CloseForm"
+                            class="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                        Cancel
+                    </button>
+                    <button type="submit" disabled="@_isSaving"
+                            class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 disabled:opacity-50">
+                        <i class="fa-solid @(_isSaving ? "fa-spinner fa-spin" : "fa-check")"></i>
+                        <span>@(_editingId.HasValue ? "Save changes" : "Add account")</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+<UpdateBalanceModal @bind-IsOpen="_showBalanceModal" AccountId="_balanceAccountId" OnBalanceSaved="ReloadAsync" />
+<TransferModal @bind-IsOpen="_showTransferModal" FromAccountId="_transferFromId" OnTransferred="ReloadAsync" />
+
+@code {
+    private const string InputClass = "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800";
+
+    private string _currency = AppSettings.DefaultCurrency;
+    private List<AccountBalance> _open = [];
+    private List<AccountBalance> _archived = [];
+    private decimal _spendable;
+    private decimal _total;
+    private bool _showArchived;
+    private string? _pageError;
+
+    private bool _showForm;
+    private int? _editingId;
+    private bool _formIsMain;
+    private string _formName = "";
+    private AccountType _formType = AccountType.Cheque;
+    private string? _formNumber;
+    private decimal _formBalance;
+    private DateTime _formAsOf;
+    private string? _formError;
+    private bool _isSaving;
+
+    private bool _showBalanceModal;
+    private int? _balanceAccountId;
+    private bool _showTransferModal;
+    private int? _transferFromId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currency = (await SettingsService.GetAsync()).Currency;
+        await ReloadAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        var all = await AccountService.GetBalancesAsync(includeArchived: true);
+        _open = all.Where(a => !a.Account.IsArchived).ToList();
+        _archived = all.Where(a => a.Account.IsArchived).ToList();
+        _spendable = _open.Where(a => a.Account.Type == AccountType.Cheque).Sum(a => a.Balance);
+        _total = _open.Sum(a => a.Balance);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void OpenCreate()
+    {
+        _editingId = null;
+        _formIsMain = false;
+        _formName = "";
+        _formType = AccountType.Cheque;
+        _formNumber = null;
+        _formBalance = 0m;
+        _formAsOf = Clock.Today();
+        _formError = null;
+        _showForm = true;
+    }
+
+    private void OpenEdit(Account account)
+    {
+        _editingId = account.Id;
+        _formIsMain = account.IsDefault;
+        _formName = account.Name;
+        _formType = account.Type;
+        _formNumber = account.AccountNumber;
+        _formError = null;
+        _showForm = true;
+    }
+
+    private void CloseForm() => _showForm = false;
+
+    private async Task SaveFormAsync()
+    {
+        _formError = null;
+        _isSaving = true;
+        try
+        {
+            if (_editingId is { } id)
+            {
+                var existing = _open.Concat(_archived).First(a => a.Account.Id == id).Account;
+                await AccountService.UpdateAsync(new Account
+                {
+                    Id = id,
+                    Name = _formName,
+                    Type = _formType,
+                    AccountNumber = _formNumber,
+                    SortOrder = existing.SortOrder
+                });
+            }
+            else
+            {
+                if (_formAsOf > Clock.Today())
+                {
+                    _formError = "The balance date can't be in the future.";
+                    return;
+                }
+
+                // Today keeps the current time; an earlier day means the balance at the end of that day.
+                var asOfUtc = _formAsOf == Clock.Today()
+                    ? Clock.GetUtcNow().UtcDateTime
+                    : Clock.StartOfDayUtc(_formAsOf.AddDays(1)).AddTicks(-1);
+
+                await AccountService.CreateAsync(new Account
+                {
+                    Name = _formName,
+                    Type = _formType,
+                    AccountNumber = _formNumber,
+                    Balance = _formBalance,
+                    BalanceAsOfUtc = asOfUtc
+                });
+            }
+
+            _showForm = false;
+            await ReloadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _formError = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void OpenBalance(int accountId)
+    {
+        _balanceAccountId = accountId;
+        _showBalanceModal = true;
+    }
+
+    private void OpenTransfer(int? fromAccountId)
+    {
+        _transferFromId = fromAccountId;
+        _showTransferModal = true;
+    }
+
+    private Task SetArchivedAsync(int accountId, bool archived)
+        => RunAsync(() => AccountService.SetArchivedAsync(accountId, archived));
+
+    private Task MakeMainAsync(int accountId)
+        => RunAsync(() => AccountService.SetDefaultAsync(accountId));
+
+    private async Task RunAsync(Func<Task> action)
+    {
+        _pageError = null;
+        try
+        {
+            await action();
+            await ReloadAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _pageError = ex.Message;
+        }
+    }
+
+    private string FormatC(decimal amount) => CurrencyFormatting.FormatCurrency(amount, _currency, 2);
+
+    private RenderFragment AccountCard(AccountBalance entry) => __builder =>
+    {
+        var account = entry.Account;
+        var number = AccountDisplay.MaskedNumber(account.AccountNumber);
+        <div class="flex h-full flex-col rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+            <div class="mb-3 flex items-start justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                        <i class="fa-solid @AccountDisplay.Icon(account.Type)"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-base font-semibold text-gray-800 dark:text-white/90">@account.Name</h4>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            @AccountDisplay.Label(account.Type)@(number is null ? "" : $" · {number}")
+                        </p>
+                    </div>
+                </div>
+                @if (account.IsDefault)
+                {
+                    <span class="rounded-lg bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-400">Main</span>
+                }
+                else if (account.IsArchived)
+                {
+                    <span class="rounded-lg bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">Archived</span>
+                }
+            </div>
+
+            <p class="text-2xl font-bold @(entry.Balance < 0 ? "text-error-600 dark:text-error-400" : "text-gray-800 dark:text-white/90")">@FormatC(entry.Balance)</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                @if (account.BalanceAsOfUtc is { } asOf)
+                {
+                    <text>From @FormatC(account.Balance) on @asOf.ToLocalTime().ToString("dd MMM yyyy"), plus everything since</text>
+                }
+                else
+                {
+                    <text>No balance entered yet. Update it or import a statement.</text>
+                }
+            </p>
+
+            <div class="mt-4 flex flex-wrap gap-2 border-t border-gray-100 pt-4 text-xs dark:border-gray-800">
+                @if (!account.IsArchived)
+                {
+                    <button type="button" @onclick="() => OpenBalance(account.Id)" class="rounded-full border border-gray-200 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.06]">Update balance</button>
+                    @if (_open.Count > 1)
+                    {
+                        <button type="button" @onclick="() => OpenTransfer(account.Id)" class="rounded-full border border-gray-200 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.06]">Transfer from</button>
+                    }
+                    <button type="button" @onclick="() => OpenEdit(account)" class="rounded-full border border-gray-200 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.06]">Edit</button>
+                    @if (!account.IsDefault && account.Type == AccountType.Cheque)
+                    {
+                        <button type="button" @onclick="() => MakeMainAsync(account.Id)" class="rounded-full border border-gray-200 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.06]">Make main</button>
+                    }
+                    @if (!account.IsDefault)
+                    {
+                        <button type="button" @onclick="() => SetArchivedAsync(account.Id, true)" class="rounded-full border border-gray-200 px-3 py-1.5 font-medium text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.06]">Archive</button>
+                    }
+                }
+                else
+                {
+                    <button type="button" @onclick="() => SetArchivedAsync(account.Id, false)" class="rounded-full border border-gray-200 px-3 py-1.5 font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.06]">Restore</button>
+                }
+            </div>
+        </div>
+    };
+}

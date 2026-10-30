@@ -39,8 +39,6 @@ public sealed class SettingsService : ISettingsService
             existing.Currency = settings.Currency;
             existing.MonthStartDay = settings.MonthStartDay;
             existing.MonthlyIncome = settings.MonthlyIncome;
-            existing.CurrentBankBalance = settings.CurrentBankBalance;
-            existing.BankBalanceAsOfUtc = settings.BankBalanceAsOfUtc;
             existing.EnableScoring = settings.EnableScoring;
             existing.EnableStreaks = settings.EnableStreaks;
             existing.EnableToast = settings.EnableToast;

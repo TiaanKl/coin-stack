@@ -36,7 +36,7 @@
                     <TextBlock Grid.Row="2" Text="Monthly income" VerticalAlignment="Center" Classes="body" />
                     <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding MonthlyIncome}" />
 
-                    <TextBlock Grid.Row="3" Text="Current bank balance" VerticalAlignment="Center" Classes="body" />
+                    <TextBlock Grid.Row="3" Text="Main account balance" VerticalAlignment="Center" Classes="body" />
                     <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding CurrentBankBalance}" />
                 </Grid>
             </StackPanel>

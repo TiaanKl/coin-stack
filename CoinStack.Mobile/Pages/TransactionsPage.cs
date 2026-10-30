@@ -23,7 +23,8 @@ public sealed class TransactionsPage : ContentPage
         _amountEntry = new Entry { Placeholder = "Amount", Keyboard = Keyboard.Numeric };
         _descriptionEntry = new Entry { Placeholder = "Description" };
         _typePicker = new Picker { Title = "Type" };
-        _typePicker.ItemsSource = Enum.GetValues<TransactionType>().ToList();
+        // A transfer needs a from and a to account, which this form doesn't ask for yet.
+        _typePicker.ItemsSource = new List<TransactionType> { TransactionType.Expense, TransactionType.Income };
         _typePicker.SelectedItem = TransactionType.Expense;
 
         var addButton = new Button { Text = "Add Transaction" };

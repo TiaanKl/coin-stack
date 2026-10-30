@@ -188,7 +188,9 @@ public sealed class TransactionServiceTests
         await using (var db = new CoinStackDbContext(options))
         {
             await db.Database.EnsureCreatedAsync();
-            db.AppSettings.Add(new AppSettings { CurrentBankBalance = 5000m, BankBalanceAsOfUtc = asOf });
+            db.Accounts.Add(new Account { Name = "Main account", IsDefault = true, Balance = 5000m, BalanceAsOfUtc = asOf });
+
+            // Rows with no account are the main account's, as rows saved before accounts existed are.
             db.Transactions.AddRange(
                 new Transaction { Description = "Before the balance", Amount = 999m, Type = TransactionType.Expense, OccurredAtUtc = asOf.AddDays(-1) },
                 new Transaction { Description = "Salary", Amount = 20000m, Type = TransactionType.Income, OccurredAtUtc = asOf.AddDays(2) },
@@ -199,12 +201,13 @@ public sealed class TransactionServiceTests
 
         var service = new TransactionService(new TestDbContextFactory(options), new FakeGameLoopService());
 
-        // The balance from the statement, plus the salary, minus the rent. Earlier rows and transfers don't count.
+        // The balance from the statement, plus the salary, minus the rent. Earlier rows don't count, and nor
+        // does a transfer from before accounts existed, which has nowhere to go.
         Assert.Equal(17000m, await service.GetEffectiveBankBalanceAsync());
 
         await using (var db = new CoinStackDbContext(options))
         {
-            (await db.AppSettings.SingleAsync()).BankBalanceAsOfUtc = null;
+            (await db.Accounts.SingleAsync()).BalanceAsOfUtc = null;
             await db.SaveChangesAsync();
         }
 

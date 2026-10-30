@@ -7,6 +7,14 @@ public enum TransactionType
     Transfer = 2
 }
 
+public enum AccountType
+{
+    Cheque = 0,
+    Savings = 1,
+    EmergencyFund = 2,
+    CreditCard = 3
+}
+
 public enum CategoryScope
 {
     Both = 0,

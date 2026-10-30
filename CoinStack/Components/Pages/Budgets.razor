@@ -5,6 +5,7 @@
 @inject IDailyCatchUpService CatchUp
 @inject ICategoryService CategoryService
 @inject ITransactionService TransactionService
+@inject IAccountService AccountService
 @inject ISettingsService SettingsService
 @inject IGoalService GoalService
 
@@ -321,7 +322,8 @@
         _goals.Clear();
         _goals.AddRange((await GoalService.GetAllAsync()).Where(g => g.Status != GoalStatus.Abandoned));
         // The same figure as the dashboard: what was spent this period plus what is in the bank now.
-        _budgetLimit = settings.BankBalanceAsOfUtc is not null
+        var mainAccount = await AccountService.GetDefaultAsync();
+        _budgetLimit = mainAccount.BalanceAsOfUtc is not null
             ? _budgetSpent + Math.Max(0m, await TransactionService.GetEffectiveBankBalanceAsync())
             : Math.Max(_totalAllocated, _budgetSpent);
         _isLoading = false;

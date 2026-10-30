@@ -67,6 +67,16 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
             .HasForeignKey(x => x.StatementImportId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        builder.HasOne(x => x.Account)
+            .WithMany()
+            .HasForeignKey(x => x.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.TransferAccount)
+            .WithMany()
+            .HasForeignKey(x => x.TransferAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(x => x.OccurredAtUtc);
 
         builder.HasIndex(x => x.AutoDeductTemplateId);

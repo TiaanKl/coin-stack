@@ -31,5 +31,10 @@ internal sealed class StatementImportConfiguration : IEntityTypeConfiguration<St
             .HasConversion<string>()
             .HasMaxLength(16)
             .IsRequired();
+
+        builder.HasOne(x => x.Account)
+            .WithMany()
+            .HasForeignKey(x => x.AccountId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

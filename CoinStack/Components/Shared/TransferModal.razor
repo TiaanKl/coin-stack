@@ -1,0 +1,170 @@
+@using CoinStack.Data.Entities
+@inject IAccountService AccountService
+@inject ISettingsService SettingsService
+@inject IMoneyFormatter MoneyFormatter
+@inject IGameFeedbackService GameFeedbackService
+@inject TimeProvider Clock
+
+@if (IsOpen)
+{
+    <div class="fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5 modal-backdrop-enter">
+        <div class="fixed inset-0 h-full w-full bg-gray-400/50 backdrop-blur-[32px]" @onclick="Close"></div>
+        <div class="relative w-full max-w-[500px] rounded-3xl bg-white p-6 dark:bg-gray-900 lg:p-8 modal-panel-enter shadow-xl">
+            <form @onsubmit="SaveAsync" @onsubmit:preventDefault="true">
+                <div class="mb-5 flex items-center gap-3">
+                    <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+                        <i class="fa-solid fa-right-left text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-bold text-gray-800 dark:text-white/90">Transfer</h4>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Move money between your own accounts. It isn't spending or income.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">From</label>
+                            <select @bind="_fromId" class="@InputClass">
+                                @foreach (var entry in _accounts)
+                                {
+                                    <option value="@entry.Account.Id">@entry.Account.Name (@MoneyFormatter.Format(_currency, entry.Balance))</option>
+                                }
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">To</label>
+                            <select @bind="_toId" class="@InputClass">
+                                @foreach (var entry in _accounts)
+                                {
+                                    <option value="@entry.Account.Id">@entry.Account.Name (@MoneyFormatter.Format(_currency, entry.Balance))</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Amount</label>
+                        <input type="number" step="0.01" min="0" @bind="_amount" class="@InputClass" placeholder="0.00" />
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Date</label>
+                        <input type="date" @bind="_date" max="@Clock.Today().ToString("yyyy-MM-dd")" class="@InputClass" />
+                    </div>
+
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Note (optional)</label>
+                        <input type="text" @bind="_note" maxlength="200" class="@InputClass" placeholder="e.g. Card payment" />
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                    {
+                        <div class="rounded-xl border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/40 dark:bg-error-500/10 dark:text-error-400">
+                            @_errorMessage
+                        </div>
+                    }
+                </div>
+
+                <div class="mt-6 flex w-full items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                    <button type="button" @onclick="Close"
+                            class="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                        Cancel
+                    </button>
+                    <button type="submit" disabled="@_isSaving"
+                            class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600 focus:outline-none disabled:opacity-50">
+                        <i class="fa-solid @(_isSaving ? "fa-spinner fa-spin" : "fa-check")"></i>
+                        <span>Transfer</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@code {
+    private const string InputClass = "h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800";
+
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    /// <summary>The account to start from; the main account when not set.</summary>
+    [Parameter] public int? FromAccountId { get; set; }
+    [Parameter] public int? ToAccountId { get; set; }
+    [Parameter] public EventCallback OnTransferred { get; set; }
+
+    private List<AccountBalance> _accounts = [];
+    private string _currency = AppSettings.DefaultCurrency;
+    private int _fromId;
+    private int _toId;
+    private decimal _amount;
+    private DateTime _date;
+    private string _note = "";
+    private bool _isSaving;
+    private bool _wasOpen;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Load once per opening, so a re-render while typing doesn't reset the inputs.
+        if (IsOpen && !_wasOpen)
+        {
+            _errorMessage = null;
+            _currency = (await SettingsService.GetAsync()).Currency;
+            _accounts = await AccountService.GetBalancesAsync();
+            _amount = 0m;
+            _note = "";
+            _date = Clock.Today();
+
+            var main = _accounts.FirstOrDefault(a => a.Account.IsDefault)?.Account.Id ?? 0;
+            _fromId = FromAccountId ?? main;
+            _toId = ToAccountId ?? _accounts.Select(a => a.Account.Id).FirstOrDefault(id => id != _fromId);
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task Close()
+    {
+        IsOpen = false;
+        await IsOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = null;
+        if (_date > Clock.Today())
+        {
+            _errorMessage = "A transfer can't be in the future.";
+            return;
+        }
+
+        _isSaving = true;
+        try
+        {
+            // Today keeps the current time; an earlier day is placed at its middle so it lands on that day.
+            var occurredAtUtc = _date == Clock.Today()
+                ? Clock.GetUtcNow().UtcDateTime
+                : Clock.StartOfDayUtc(_date).AddHours(12);
+
+            await AccountService.TransferAsync(_fromId, _toId, _amount, occurredAtUtc, _note);
+
+            var to = _accounts.FirstOrDefault(a => a.Account.Id == _toId)?.Account.Name ?? "the other account";
+            GameFeedbackService.Trigger(new FeedbackPayload(
+                0,
+                $"Moved {MoneyFormatter.Format(_currency, _amount)} to {to}",
+                FeedbackKind.Positive));
+
+            await OnTransferred.InvokeAsync();
+            await Close();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+}

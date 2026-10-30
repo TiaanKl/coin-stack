@@ -11,6 +11,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IDailyCatchUpService, DailyCatchUpService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<ITransactionService, TransactionService>();
+        services.AddScoped<IAccountService, AccountService>();
         services.AddScoped<ICategoryService, CategoryService>();
         services.AddScoped<IBudgetService, BudgetService>();
         services.AddScoped<IGoalService, GoalService>();

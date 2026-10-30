@@ -3,6 +3,7 @@
 @using CoinStack.Data.Entities
 @using CoinStack.Services
 @inject ITransactionService TransactionService
+@inject IAccountService AccountService
 @inject IDailyCatchUpService CatchUp
 @inject IBucketService BucketService
 @inject ICategoryService CategoryService
@@ -111,6 +112,8 @@
                                 </th>
                                 <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">
                                     Description</th>
+                                    <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Account
+                                    </th>
                                     <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Bucket
                                     </th>
                                     <th class="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400">Debt
@@ -166,6 +169,16 @@
                                                         </div>
                                                     </td>
                                                     <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
+                                                        @if (tx.Type == TransactionType.Transfer)
+                                                        {
+                                                            <span class="whitespace-nowrap">@AccountName(tx.AccountId) <i class="fa-solid fa-arrow-right text-[10px] text-gray-400"></i> @(tx.TransferAccountId.HasValue ? AccountName(tx.TransferAccountId) : "?")</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            @AccountName(tx.AccountId)
+                                                        }
+                                                    </td>
+                                                    <td class="px-4 py-4 text-sm text-gray-700 dark:text-gray-300">
                                                         @if (tx.BucketId.HasValue)
                                                         {
                                                             var bucket = _buckets.FirstOrDefault(b => b.Id == tx.BucketId.Value);
@@ -208,8 +221,8 @@
                                                         </span>
                                                     </td>
                                                     <td
-                                                        class="px-4 py-4 text-right text-sm font-medium @(tx.Type == TransactionType.Income ? "text-success-600 dark:text-success-500" : "text-gray-800 dark:text-white/90")">
-                                                        @(tx.Type == TransactionType.Income ? "+" : "-")@tx.Amount.ToString("0.00")
+                                                        class="px-4 py-4 text-right text-sm font-medium @(tx.Type == TransactionType.Income ? "text-success-600 dark:text-success-500" : tx.Type == TransactionType.Transfer ? "text-gray-500 dark:text-gray-400" : "text-gray-800 dark:text-white/90")">
+                                                        @(tx.Type switch { TransactionType.Income => "+", TransactionType.Expense => "-", _ => "" })@tx.Amount.ToString("0.00")
                                                     </td>
                                                     <td class="px-4 py-4 text-right">
                                                         <div class="flex items-center justify-end gap-1">
@@ -354,6 +367,33 @@
                                         </div>
 
                                         <div class="col-span-1">
+                                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">@(_formType == TransactionType.Transfer ? "From account" : "Account")</label>
+                                            <select @bind="_formAccountId"
+                                                    class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                                                @foreach (var account in AccountChoices(_formAccountId))
+                                                {
+                                                    <option value="@account.Id">@account.Name</option>
+                                                }
+                                            </select>
+                                        </div>
+
+                                        @if (_formType == TransactionType.Transfer)
+                                        {
+                                            <div class="col-span-1">
+                                                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">To account</label>
+                                                <select @bind="_formTransferAccountId"
+                                                        class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
+                                                    <option value="">— Choose —</option>
+                                                    @foreach (var account in AccountChoices(_formTransferAccountId).Where(a => a.Id != _formAccountId))
+                                                    {
+                                                        <option value="@account.Id">@account.Name</option>
+                                                    }
+                                                </select>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                        <div class="col-span-1">
                                             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bucket</label>
                                             <select value="@_formBucketId" @onchange="OnBucketChanged"
                                                     class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400">
@@ -365,6 +405,8 @@
                                                     }
                                                 </select>
                                             </div>
+
+                                        }
 
                                             <div class="col-span-1">
                                                 <label
@@ -393,6 +435,8 @@
                                                     }
                                                 </div>
 
+                                                @if (_formType != TransactionType.Transfer)
+                                                {
                                                 <div class="col-span-1">
                                                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Debt
                                                         (optional)</label>
@@ -405,6 +449,8 @@
                                                             }
                                                         </select>
                                                     </div>
+
+                                                }
 
                                                     <div class="col-span-1">
                                                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Type</label>
@@ -484,6 +530,8 @@
                                                                                     }
                                                                                 }
 
+                                                                                @if (_formType != TransactionType.Transfer)
+                                                                                {
                                                                                 <div class="col-span-1">
                                                                                     <label
                                                                                         class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-400">
@@ -492,6 +540,7 @@
                                                                                         Impulse purchase?
                                                                                     </label>
                                                                                 </div>
+                                                                                }
 
                                                                                 <div class="col-span-1 sm:col-span-2">
                                                                                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Notes
@@ -550,6 +599,9 @@
     private int? _formCategoryId;
     private int? _formBucketId;
     private int? _formDebtAccountId;
+    private int? _formAccountId;
+    private int? _formTransferAccountId;
+    private List<Account> _accounts = [];
     private TransactionType _formType = TransactionType.Expense;
     private ExpenseKind _formExpenseKind = ExpenseKind.Discretionary;
     private bool _formAutoDeduct;
@@ -578,6 +630,7 @@
         _buckets = await BucketService.GetAllAsync();
         _categories = await CategoryService.GetAllAsync();
         _debts = await DebtService.GetAllAsync();
+        _accounts = (await AccountService.GetBalancesAsync(includeArchived: true)).Select(a => a.Account).ToList();
         var savingsState = await SavingsService.GetStateAsync();
         _savingsAvailable = savingsState.Available;
         _bucketSpent = await BucketService.GetSpentAmountsForPeriodAsync(_settings.MonthStartDay, now);
@@ -594,6 +647,8 @@
         _formCategoryId = null;
         _formBucketId = null;
         _formDebtAccountId = null;
+        _formAccountId = MainAccountId;
+        _formTransferAccountId = null;
         _formType = TransactionType.Expense;
         _formExpenseKind = ExpenseKind.Discretionary;
         _formAutoDeduct = false;
@@ -615,6 +670,8 @@
         _formCategoryId = tx.CategoryId;
         _formBucketId = tx.BucketId;
         _formDebtAccountId = tx.DebtAccountId;
+        _formAccountId = tx.AccountId ?? MainAccountId;
+        _formTransferAccountId = tx.TransferAccountId;
         _formType = tx.Type;
         _formExpenseKind = tx.ExpenseKind;
         _formAutoDeduct = tx.AutoDeduct;
@@ -672,6 +729,19 @@
         if (_formDate > Clock.Today())
         {
             return "The date can't be in the future.";
+        }
+
+        // A transfer saved before accounts existed has no destination and may stay that way.
+        var olderTransfer = _editingId.HasValue
+                            && _transactions.FirstOrDefault(t => t.Id == _editingId.Value) is { Type: TransactionType.Transfer, TransferAccountId: null };
+        if (_formType == TransactionType.Transfer && _formTransferAccountId is null && !olderTransfer)
+        {
+            return "Choose the account the money goes to.";
+        }
+
+        if (_formType == TransactionType.Transfer && _formTransferAccountId == _formAccountId)
+        {
+            return "Choose two different accounts.";
         }
 
         return _formDate.Year < 2000 ? "Check the date." : null;
@@ -782,6 +852,8 @@
                 existing.Description = _formDescription.Trim();
                 existing.Amount = _formAmount;
                 existing.Type = _formType;
+                existing.AccountId = _formAccountId;
+                existing.TransferAccountId = _formType == TransactionType.Transfer ? _formTransferAccountId : null;
                 existing.CategoryId = _formCategoryId;
                 existing.BucketId = _formBucketId;
                 existing.DebtAccountId = _formDebtAccountId;
@@ -812,6 +884,8 @@
                 Description = _formDescription.Trim(),
                 Amount = _formAmount,
                 Type = _formType,
+                AccountId = _formAccountId,
+                TransferAccountId = _formType == TransactionType.Transfer ? _formTransferAccountId : null,
                 CategoryId = _formCategoryId,
                 BucketId = _formBucketId,
                 DebtAccountId = _formDebtAccountId,
@@ -890,6 +964,8 @@
         _formCategoryId = null;
         _formBucketId = null;
         _formDebtAccountId = null;
+        _formAccountId = MainAccountId;
+        _formTransferAccountId = null;
         _formType = TransactionType.Expense;
         _formExpenseKind = ExpenseKind.Discretionary;
         _formAutoDeduct = false;
@@ -935,6 +1011,17 @@
         if (Enum.TryParse<TransactionType>(args.Value.ToString(), out var parsed))
         {
             _formType = parsed;
+            if (parsed == TransactionType.Transfer)
+            {
+                // A transfer moves money between accounts; it isn't spending from a bucket or a debt payment.
+                _formBucketId = null;
+                _formDebtAccountId = null;
+            }
+            else
+            {
+                _formTransferAccountId = null;
+            }
+
             EnsureCategorySelectionValid();
         }
     }
@@ -954,6 +1041,13 @@
             if (bucket?.CategoryId is not null)
             {
                 _formCategoryId = bucket.CategoryId;
+            }
+
+            // Money for a savings bucket lands in the savings account, when there is one.
+            if (bucket?.IsSavings == true
+                && _accounts.FirstOrDefault(a => a.Type == AccountType.Savings && !a.IsArchived) is { } savings)
+            {
+                _formAccountId = savings.Id;
             }
         }
     }
@@ -1031,6 +1125,15 @@
         ExpenseKind.ForceMajeure => "Force Majeure",
         _ => kind.ToString()
     };
+
+    private int? MainAccountId => _accounts.FirstOrDefault(a => a.IsDefault)?.Id;
+
+    private string AccountName(int? accountId)
+        => _accounts.FirstOrDefault(a => a.Id == (accountId ?? MainAccountId))?.Name ?? "—";
+
+    /// <summary>Open accounts, plus the one already chosen even if it has since been archived.</summary>
+    private IEnumerable<Account> AccountChoices(int? selectedId)
+        => _accounts.Where(a => !a.IsArchived || a.Id == selectedId);
 
     private static string GetTypeClasses(TransactionType type) => type switch
     {
