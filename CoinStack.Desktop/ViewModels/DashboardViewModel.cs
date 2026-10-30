@@ -17,6 +17,8 @@ public partial class DashboardViewModel : ViewModelBase, IAsyncInitializable
     private readonly ISettingsService _settings;
     private readonly IMoneyFormatter _money;
 
+    [ObservableProperty] private string _bankBalanceText = "";
+    [ObservableProperty] private bool _isOverdrawn;
     [ObservableProperty] private string _budgetRemainingText = "";
     [ObservableProperty] private string _budgetSpentText = "";
     [ObservableProperty] private string _budgetLimitText = "";
@@ -70,6 +72,10 @@ public partial class DashboardViewModel : ViewModelBase, IAsyncInitializable
             BudgetProgress = (double)spent;
             BudgetProgressMax = allocated > 0 ? (double)allocated : 1;
             IsOverBudget = spent > allocated && allocated > 0;
+
+            var bankBalance = await _transactions.GetEffectiveBankBalanceAsync();
+            BankBalanceText = _money.Format(currency, bankBalance);
+            IsOverdrawn = bankBalance < 0;
 
             var reserves = await _savings.GetSnapshotAsync();
             ReservesTotalText = _money.Format(currency, reserves.SavingsBalance);

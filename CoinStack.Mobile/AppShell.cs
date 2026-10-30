@@ -10,6 +10,7 @@ public sealed class AppShell : Shell
         Title = "CoinStack";
 
         // Register sub-page routes (navigated via GoToAsync from hub pages)
+        Routing.RegisterRoute("accounts", typeof(AccountsPage));
         Routing.RegisterRoute("transactions", typeof(TransactionsPage));
         Routing.RegisterRoute("income", typeof(IncomePage));
         Routing.RegisterRoute("buckets", typeof(BucketsPage));

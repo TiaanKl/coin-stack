@@ -42,6 +42,25 @@ public sealed class MobileFinanceServiceTests : IAsyncLifetime
     private IMobileFinanceService Mobile => _provider.GetRequiredService<IMobileFinanceService>();
 
     [Fact]
+    public async Task Accounts_Can_Be_Listed_Moved_Between_And_Updated()
+    {
+        var accounts = await Mobile.GetAccountsAsync();
+        var main = accounts.Single(a => a.Account.IsDefault).Account;
+        var savings = accounts.First(a => a.Account.Type == AccountType.Savings);
+
+        await Mobile.TransferAsync(main.Id, savings.Account.Id, 250m, "To savings");
+        await Mobile.AddTransactionAsync(100m, TransactionType.Expense, "Groceries", accountId: main.Id);
+
+        var after = await Mobile.GetAccountsAsync();
+        Assert.Equal(savings.Balance + 250m, after.Single(a => a.Account.Id == savings.Account.Id).Balance);
+        Assert.Equal(main.Id, (await Mobile.GetTransactionsAsync()).Single(t => t.Description == "Groceries").AccountId);
+
+        // "Update balance" sets what the bank shows now; what came before is already in it.
+        await Mobile.SetAccountBalanceAsync(main.Id, 1000m);
+        Assert.Equal(1000m, await Mobile.GetSpendableBalanceAsync());
+    }
+
+    [Fact]
     public async Task Transactions_Go_Through_The_Shared_Game_Loop()
     {
         await Mobile.AddTransactionAsync(500m, TransactionType.Income, "Freelance");

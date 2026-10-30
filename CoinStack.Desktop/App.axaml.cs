@@ -67,6 +67,7 @@ public partial class App : Application
 
         services.AddSingleton<MainViewModel>();
         services.AddTransient<DashboardViewModel>();
+        services.AddTransient<AccountsViewModel>();
         services.AddTransient<TransactionsViewModel>();
         services.AddTransient<BudgetsViewModel>();
         services.AddTransient<GoalsViewModel>();

@@ -29,6 +29,7 @@ public partial class MainViewModel : ViewModelBase
 
         Sections.Add(new NavSection("Money In & Out",
         [
+            new NavItem("Accounts", "fa-solid fa-building-columns", typeof(AccountsViewModel)),
             new NavItem("Transactions", "fa-solid fa-right-left", typeof(TransactionsViewModel)),
             new NavItem("Income", "fa-solid fa-arrow-trend-up", typeof(IncomeViewModel)),
             new NavItem("Categories", "fa-solid fa-tags", typeof(CategoriesViewModel)),

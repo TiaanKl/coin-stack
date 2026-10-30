@@ -9,7 +9,20 @@ public interface IMobileFinanceService
     Task<MobileDashboardSnapshot> GetDashboardSnapshotAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Transaction>> GetTransactionsAsync(CancellationToken cancellationToken = default);
-    Task AddTransactionAsync(decimal amount, TransactionType type, string description, int? bucketId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>Logs income or spending on <paramref name="accountId"/>, or the main account when not given.</summary>
+    Task AddTransactionAsync(decimal amount, TransactionType type, string description, int? bucketId = null, int? accountId = null, CancellationToken cancellationToken = default);
+
+    /// <summary>Every open account with its balance now, the main account first.</summary>
+    Task<IReadOnlyList<AccountBalance>> GetAccountsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>The money in the cheque accounts.</summary>
+    Task<decimal> GetSpendableBalanceAsync(CancellationToken cancellationToken = default);
+
+    Task TransferAsync(int fromAccountId, int toAccountId, decimal amount, string? note = null, CancellationToken cancellationToken = default);
+
+    /// <summary>"Update balance": the account holds <paramref name="balance"/> now.</summary>
+    Task SetAccountBalanceAsync(int accountId, decimal balance, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Bucket>> GetBucketsAsync(CancellationToken cancellationToken = default);
     Task AddBucketAsync(string name, decimal allocatedAmount, bool isSavings, CancellationToken cancellationToken = default);

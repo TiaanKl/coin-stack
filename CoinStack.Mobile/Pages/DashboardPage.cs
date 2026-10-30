@@ -19,7 +19,8 @@ public sealed class DashboardPage : ContentPage
     private Label _spentLabel = null!;
     private Label _availableLabel = null!;
     private ProgressBar _budgetProgress = null!;
-    // Reserves card
+    // Money card
+    private Label _bankLabel = null!;
     private Label _savingsLabel = null!;
     private Label _emergencyLabel = null!;
     private Label _totalReservedLabel = null!;
@@ -97,6 +98,7 @@ public sealed class DashboardPage : ContentPage
         };
 
         // ── Reserves On Hand card ──
+        _bankLabel = new Label { FontSize = 14, FontFamily = "InterBold", TextColor = AppColors.Dark };
         _savingsLabel = new Label { FontSize = 14, FontFamily = "InterBold", TextColor = AppColors.Success };
         _emergencyLabel = new Label { FontSize = 14, FontFamily = "InterBold", TextColor = AppColors.Warning };
         _totalReservedLabel = new Label { FontSize = 14, FontFamily = "InterBold", TextColor = AppColors.Dark };
@@ -113,7 +115,8 @@ public sealed class DashboardPage : ContentPage
                 Spacing = 8,
                 Children =
                 {
-                    new Label { Text = "Reserves On Hand", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                    new Label { Text = "Your Money", FontFamily = "InterBold", FontSize = 16, TextColor = AppColors.Dark },
+                    CreateReserveRow("In the bank", _bankLabel),
                     CreateReserveRow("Savings", _savingsLabel),
                     CreateReserveRow("Emergency Fund", _emergencyLabel),
                     new BoxView { HeightRequest = 1, Color = AppColors.Border },
@@ -203,7 +206,10 @@ public sealed class DashboardPage : ContentPage
             _availableLabel.Text = $"Available: {MoneyDisplay.Format(currency, available)}";
             _availableLabel.TextColor = available >= 0 ? AppColors.Success : AppColors.Danger;
 
-            // Reserves
+            // Money
+            var bank = await _financeService.GetSpendableBalanceAsync();
+            _bankLabel.Text = MoneyDisplay.Format(currency, bank);
+            _bankLabel.TextColor = bank < 0 ? AppColors.Danger : AppColors.Dark;
             var savingsState = savings.State;
             _savingsLabel.Text = MoneyDisplay.Format(currency, savingsState.SavingsBalance);
             _emergencyLabel.Text = MoneyDisplay.Format(currency, savingsState.EmergencyBalance);

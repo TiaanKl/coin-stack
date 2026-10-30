@@ -35,6 +35,7 @@ public sealed class MoneyHubPage : ContentPage
                         TextColor = AppColors.Dark,
                         Margin = new Thickness(0, 0, 0, 8)
                     },
+                    NavigationCardBuilder.Create("Accounts", "Balances and transfers between accounts", AppIcons.GlyphBuildingColumns, "accounts"),
                     NavigationCardBuilder.Create("Transactions", "Track your spending and income", AppIcons.GlyphReceipt, "transactions"),
                     NavigationCardBuilder.Create("Income", "Manage your income streams", AppIcons.GlyphArrowTrendUp, "income"),
                     NavigationCardBuilder.Create("Budgets", "Spending envelopes and allocations", AppIcons.GlyphBuildingColumns, "buckets"),

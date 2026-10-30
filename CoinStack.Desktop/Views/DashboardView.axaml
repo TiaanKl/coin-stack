@@ -15,7 +15,16 @@
 
         <TextBlock Text="{Binding StatusMessage}" Classes="body" IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16">
+        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="16">
+            <Border Classes="StatCard" Grid.Column="3">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Money in the bank" Classes="body" />
+                    <TextBlock Text="{Binding BankBalanceText}" Classes="Money"
+                               Foreground="{Binding IsOverdrawn, Converter={StaticResource BoolToStatusBrushConverter}, ConverterParameter=invert}" />
+                    <TextBlock Text="Your cheque accounts" Classes="body" FontSize="12" />
+                </StackPanel>
+            </Border>
+
             <Border Classes="StatCard" Grid.Column="0">
                 <StackPanel Spacing="8">
                     <TextBlock Text="Budget remaining" Classes="body" />

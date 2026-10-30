@@ -2,6 +2,7 @@ using CoinStack.Data.Entities;
 using CoinStack.Mobile.Core;
 using CoinStack.Mobile.Helpers;
 using CoinStack.Mobile.Services;
+using CoinStack.Services;
 using Microsoft.Maui.Controls.Shapes;
 
 namespace CoinStack.Mobile.Pages;
@@ -13,7 +14,11 @@ public sealed class TransactionsPage : ContentPage
     private readonly Entry _amountEntry;
     private readonly Entry _descriptionEntry;
     private readonly Picker _typePicker;
+    private readonly Picker _accountPicker;
+    private readonly Picker _toAccountPicker;
     private readonly VerticalStackLayout _list;
+
+    private IReadOnlyList<AccountBalance> _accounts = [];
 
     public TransactionsPage(IMobileFinanceService financeService)
     {
@@ -23,9 +28,18 @@ public sealed class TransactionsPage : ContentPage
         _amountEntry = new Entry { Placeholder = "Amount", Keyboard = Keyboard.Numeric };
         _descriptionEntry = new Entry { Placeholder = "Description" };
         _typePicker = new Picker { Title = "Type" };
-        // A transfer needs a from and a to account, which this form doesn't ask for yet.
-        _typePicker.ItemsSource = new List<TransactionType> { TransactionType.Expense, TransactionType.Income };
+        _typePicker.ItemsSource = new List<TransactionType> { TransactionType.Expense, TransactionType.Income, TransactionType.Transfer };
         _typePicker.SelectedItem = TransactionType.Expense;
+        _accountPicker = new Picker { Title = "Account" };
+
+        // A transfer moves money to another of the person's accounts.
+        _toAccountPicker = new Picker { Title = "To account", IsVisible = false };
+        _typePicker.SelectedIndexChanged += (_, _) =>
+        {
+            var isTransfer = _typePicker.SelectedItem is TransactionType.Transfer;
+            _toAccountPicker.IsVisible = isTransfer;
+            _accountPicker.Title = isTransfer ? "From account" : "Account";
+        };
 
         var addButton = new Button { Text = "Add Transaction" };
         addButton.Clicked += async (_, _) => await AddTransactionAsync();
@@ -42,6 +56,8 @@ public sealed class TransactionsPage : ContentPage
                 _amountEntry,
                 _descriptionEntry,
                 _typePicker,
+                _accountPicker,
+                _toAccountPicker,
                 addButton
             }
         });
@@ -84,10 +100,25 @@ public sealed class TransactionsPage : ContentPage
 
         var description = _descriptionEntry.Text ?? string.Empty;
         var selectedType = _typePicker.SelectedItem as TransactionType? ?? TransactionType.Expense;
+        int? accountId = _accountPicker.SelectedIndex >= 0 ? _accounts[_accountPicker.SelectedIndex].Account.Id : null;
 
         try
         {
-            await _financeService.AddTransactionAsync(amount, selectedType, description);
+            if (selectedType == TransactionType.Transfer)
+            {
+                if (accountId is null || _toAccountPicker.SelectedIndex < 0)
+                {
+                    await DisplayAlertAsync("Validation", "Choose the account the money comes from and the one it goes to.", "OK");
+                    return;
+                }
+
+                await _financeService.TransferAsync(accountId.Value, _accounts[_toAccountPicker.SelectedIndex].Account.Id, amount, description);
+            }
+            else
+            {
+                await _financeService.AddTransactionAsync(amount, selectedType, description, accountId: accountId);
+            }
+
             _amountEntry.Text = string.Empty;
             _descriptionEntry.Text = string.Empty;
             _typePicker.SelectedItem = TransactionType.Expense;
@@ -106,6 +137,15 @@ public sealed class TransactionsPage : ContentPage
             var settings = await _financeService.GetSettingsAsync();
             var transactions = await _financeService.GetTransactionsAsync();
 
+            _accounts = await _financeService.GetAccountsAsync();
+            var names = _accounts.Select(a => a.Account.Name).ToList();
+            var chosen = _accountPicker.SelectedIndex;
+            _accountPicker.ItemsSource = names;
+            _toAccountPicker.ItemsSource = names.ToList();
+            _accountPicker.SelectedIndex = chosen >= 0 && chosen < names.Count ? chosen : names.Count > 0 ? 0 : -1;
+            string AccountName(int? id) => _accounts.FirstOrDefault(a => a.Account.Id == id)?.Account.Name
+                                           ?? (id is null ? _accounts.FirstOrDefault()?.Account.Name ?? "" : "Archived account");
+
             _list.Children.Clear();
             if (transactions.Count == 0)
             {
@@ -117,7 +157,10 @@ public sealed class TransactionsPage : ContentPage
             {
                 var amount = MoneyDisplay.Format(settings.Currency, tx.Amount);
                 bool isIncome = tx.Type == TransactionType.Income;
-                var prefix = isIncome ? "+" : "-";
+                var prefix = tx.Type switch { TransactionType.Income => "+", TransactionType.Expense => "-", _ => "" };
+                var where = tx.Type == TransactionType.Transfer
+                    ? $"{AccountName(tx.AccountId)} → {(tx.TransferAccountId is null ? "?" : AccountName(tx.TransferAccountId))}"
+                    : AccountName(tx.AccountId);
 
                 var row = new Grid
                 {
@@ -130,7 +173,7 @@ public sealed class TransactionsPage : ContentPage
                     Children =
                     {
                         new Label { Text = tx.Description, FontFamily = "InterBold", FontSize = 14, TextColor = AppColors.Dark, LineBreakMode = LineBreakMode.TailTruncation },
-                        new Label { Text = $"{tx.OccurredAtUtc.ToLocalTime():dd MMM yyyy} · {tx.Type}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
+                        new Label { Text = $"{tx.OccurredAtUtc.ToLocalTime():dd MMM yyyy} · {tx.Type} · {where}", FontSize = 11, TextColor = AppColors.Muted, FontFamily = "InterRegular" }
                     }
                 };
 

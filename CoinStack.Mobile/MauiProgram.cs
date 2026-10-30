@@ -44,6 +44,7 @@ public static class MauiProgram
 		builder.Services.AddTransient<GoalsHubPage>();
 		builder.Services.AddTransient<GrowthHubPage>();
 		builder.Services.AddTransient<MoreHubPage>();
+		builder.Services.AddTransient<AccountsPage>();
 		builder.Services.AddTransient<TransactionsPage>();
 		builder.Services.AddTransient<IncomePage>();
 		builder.Services.AddTransient<BucketsPage>();

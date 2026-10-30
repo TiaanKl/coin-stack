@@ -61,7 +61,7 @@ public sealed class MobileFinanceService : IMobileFinanceService, IDisposable
     public async Task<IReadOnlyList<Transaction>> GetTransactionsAsync(CancellationToken cancellationToken = default)
         => await Get<ITransactionService>().GetAllAsync(cancellationToken);
 
-    public async Task AddTransactionAsync(decimal amount, TransactionType type, string description, int? bucketId = null, CancellationToken cancellationToken = default)
+    public async Task AddTransactionAsync(decimal amount, TransactionType type, string description, int? bucketId = null, int? accountId = null, CancellationToken cancellationToken = default)
     {
         if (amount <= 0)
         {
@@ -74,10 +74,23 @@ public sealed class MobileFinanceService : IMobileFinanceService, IDisposable
             Type = type,
             Description = description?.Trim() ?? string.Empty,
             BucketId = bucketId,
+            AccountId = accountId,
             OccurredAtUtc = DateTime.UtcNow,
             ExpenseKind = type == TransactionType.Expense ? ExpenseKind.Discretionary : ExpenseKind.Mandatory
         }, 0, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<AccountBalance>> GetAccountsAsync(CancellationToken cancellationToken = default)
+        => await Get<IAccountService>().GetBalancesAsync(cancellationToken: cancellationToken);
+
+    public Task<decimal> GetSpendableBalanceAsync(CancellationToken cancellationToken = default)
+        => Get<IAccountService>().GetSpendableBalanceAsync(cancellationToken);
+
+    public async Task TransferAsync(int fromAccountId, int toAccountId, decimal amount, string? note = null, CancellationToken cancellationToken = default)
+        => await Get<IAccountService>().TransferAsync(fromAccountId, toAccountId, amount, DateTime.UtcNow, note, cancellationToken);
+
+    public Task SetAccountBalanceAsync(int accountId, decimal balance, CancellationToken cancellationToken = default)
+        => Get<IAccountService>().SetBalanceAsync(accountId, balance, DateTime.UtcNow, cancellationToken);
 
     public async Task<IReadOnlyList<Bucket>> GetBucketsAsync(CancellationToken cancellationToken = default)
         => await Get<IBucketService>().GetAllAsync(cancellationToken);

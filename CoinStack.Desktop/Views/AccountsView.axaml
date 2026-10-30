@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:CoinStack.Desktop.ViewModels"
+             x:Class="CoinStack.Desktop.Views.AccountsView"
+             x:DataType="vm:AccountsViewModel">
+    <StackPanel Spacing="24">
+        <TextBlock Text="Accounts" Classes="PageTitle" />
+
+        <TextBlock Text="{Binding StatusMessage}" Classes="body"
+                   IsVisible="{Binding StatusMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+            <Border Classes="StatCard">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Money to spend" Classes="body" />
+                    <TextBlock Text="{Binding SpendableText}" Classes="Money" />
+                    <TextBlock Text="Your cheque accounts" Classes="body" FontSize="12" />
+                </StackPanel>
+            </Border>
+            <Border Classes="StatCard" Grid.Column="1">
+                <StackPanel Spacing="6">
+                    <TextBlock Text="All accounts" Classes="body" />
+                    <TextBlock Text="{Binding TotalText}" Classes="Money" />
+                    <TextBlock Text="Less what you owe on cards" Classes="body" FontSize="12" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Your accounts" Classes="h2" />
+                <ItemsControl ItemsSource="{Binding Accounts}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:AccountRow">
+                            <Border Padding="0,12" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding Name}" FontWeight="Medium"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}" />
+                                        <TextBlock Text="{Binding Details}" Classes="body" FontSize="12" />
+                                        <TextBlock Text="{Binding AsOfText}" Classes="body" FontSize="11" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{Binding BalanceText}" Classes="MoneySm"
+                                               VerticalAlignment="Center"
+                                               Foreground="{Binding IsNegative, Converter={StaticResource BoolToStatusBrushConverter}, ConverterParameter=invert}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <Border Classes="Card">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Transfer" Classes="h2" />
+                <TextBlock Text="Move money between your own accounts. It isn't spending or income." Classes="body" />
+                <Grid ColumnDefinitions="*,*,Auto,Auto" ColumnSpacing="12">
+                    <ComboBox PlaceholderText="From" HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding AccountOptions}" SelectedItem="{Binding TransferFrom}" />
+                    <ComboBox Grid.Column="1" PlaceholderText="To" HorizontalAlignment="Stretch"
+                              ItemsSource="{Binding AccountOptions}" SelectedItem="{Binding TransferTo}" />
+                    <NumericUpDown Grid.Column="2" Width="168" Minimum="0" FormatString="0.00" Value="{Binding TransferAmount}" />
+                    <Button Grid.Column="3" Classes="primary" Command="{Binding TransferCommand}" Content="Transfer" />
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+            <Border Classes="Card">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Update balance" Classes="h2" />
+                    <TextBlock Text="Enter what the bank shows today. Use a negative amount for an overdraft or money owed on a card." Classes="body" TextWrapping="Wrap" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding AccountOptions}" SelectedItem="{Binding BalanceAccount}" />
+                    <NumericUpDown FormatString="0.00" Value="{Binding NewBalance}" />
+                    <Button Classes="secondary" Command="{Binding UpdateBalanceCommand}" Content="Save balance" />
+                </StackPanel>
+            </Border>
+
+            <Border Classes="Card" Grid.Column="1">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Add account" Classes="h2" />
+                    <TextBox PlaceholderText="Name" Text="{Binding NewAccountName}" />
+                    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding TypeOptions}" SelectedItem="{Binding NewAccountType}" />
+                    <NumericUpDown FormatString="0.00" Value="{Binding NewAccountBalance}" />
+                    <Button Classes="secondary" Command="{Binding AddAccountCommand}" Content="Add account" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+</UserControl>

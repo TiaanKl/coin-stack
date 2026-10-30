@@ -39,16 +39,21 @@
         <Border Classes="Card">
             <StackPanel Spacing="12">
                 <TextBlock Text="New transaction" Classes="h2" />
-                <Grid ColumnDefinitions="2*,*,Auto,Auto,Auto" ColumnSpacing="12">
+                <Grid ColumnDefinitions="2*,*,Auto,Auto,Auto,Auto" ColumnSpacing="12">
                     <TextBox PlaceholderText="Description" Text="{Binding NewDescription}" />
                     <NumericUpDown Grid.Column="1" Width="168" Minimum="0"
                                    FormatString="0.00"
                                    Value="{Binding NewAmount}" />
                     <ComboBox Grid.Column="2" MinWidth="120"
                               ItemsSource="{Binding TypeOptions}"
-                              SelectedItem="{Binding NewType}" />
+                              SelectedItem="{Binding NewTypeChoice}" />
                     <ComboBox Grid.Column="3" MinWidth="150"
+                              PlaceholderText="Account"
+                              ItemsSource="{Binding AccountOptions}"
+                              SelectedItem="{Binding SelectedAccount}" />
+                    <ComboBox Grid.Column="4" MinWidth="150"
                               PlaceholderText="Category"
+                              IsVisible="{Binding !IsTransfer}"
                               ItemsSource="{Binding CategoryOptions}"
                               SelectedItem="{Binding SelectedCategory}">
                         <ComboBox.ItemTemplate>
@@ -57,7 +62,12 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <Button Grid.Column="4" Classes="secondary"
+                    <ComboBox Grid.Column="4" MinWidth="150"
+                              PlaceholderText="To account"
+                              IsVisible="{Binding IsTransfer}"
+                              ItemsSource="{Binding AccountOptions}"
+                              SelectedItem="{Binding TransferToAccount}" />
+                    <Button Grid.Column="5" Classes="secondary"
                             Command="{Binding AddTransactionCommand}"
                             Content="Create" />
                 </Grid>

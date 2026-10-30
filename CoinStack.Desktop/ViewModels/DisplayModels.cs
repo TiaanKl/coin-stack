@@ -84,6 +84,21 @@ public sealed class SubscriptionRow
     public string DebitDayText { get; init; } = "";
 }
 
+public sealed record AccountOption(int Id, string Name)
+{
+    public override string ToString() => Name;
+}
+
+public sealed class AccountRow
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = "";
+    public string Details { get; init; } = "";
+    public string BalanceText { get; init; } = "";
+    public bool IsNegative { get; init; }
+    public string AsOfText { get; init; } = "";
+}
+
 public sealed record CategoryOption(int Id, string Name)
 {
     public override string ToString() => Name;
