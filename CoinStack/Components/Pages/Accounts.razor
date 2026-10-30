@@ -335,7 +335,7 @@
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 @if (account.BalanceAsOfUtc is { } asOf)
                 {
-                    <text>From @FormatC(account.Balance) on @asOf.ToLocalTime().ToString("dd MMM yyyy"), plus everything since</text>
+                    <text>From @FormatC(account.Balance) on @asOf.ToString("dd MMM yyyy"), plus everything since</text>
                 }
                 else
                 {

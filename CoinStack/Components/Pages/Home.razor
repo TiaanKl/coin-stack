@@ -40,7 +40,7 @@
                         @if (_mainAccount?.BalanceAsOfUtc is { } mainAsOf)
                         {
                             var daysSince = (DateTime.UtcNow - mainAsOf).TotalDays;
-                            <text>@_mainAccount.Name as of @mainAsOf.ToLocalTime().ToString("dd MMM yyyy") · from your statement or last update</text>
+                            <text>@_mainAccount.Name as of @mainAsOf.ToString("dd MMM yyyy") · from your statement or last update</text>
                             @if (daysSince > 21)
                             {
                                 <span class="ml-1 text-xs font-medium text-amber-600 dark:text-amber-400">

@@ -3,6 +3,7 @@
 @using CoinStack.Data.Entities
 @using CoinStack.Services
 @using CoinStack.Services.Import
+@inject IAccountService AccountService
 @inject IBankStatementImportService ImportService
 @inject IProjectionService ProjectionService
 @inject ISettingsService SettingsService
@@ -59,17 +60,21 @@
                 {
                     <text> · @_result.DuplicateCount duplicates skipped</text>
                 }
+                @if (_result.TransfersRecorded > 0)
+                {
+                    <text> · @_result.TransfersRecorded transfers between your accounts recorded</text>
+                }
                 @if (_result.TransferCount > 0)
                 {
-                    <text> · @_result.TransferCount internal transfers excluded</text>
+                    <text> · @_result.TransferCount transfers left out</text>
                 }
                 @if (_result.BalanceUpdated && _result.ClosingBalance is { } closingBalance)
                 {
-                    <text> · Bank balance set to @Money(closingBalance)</text>
+                    <text> · Account balance set to @Money(closingBalance)</text>
                 }
                 else if (_result.ClosingBalance is not null)
                 {
-                    <text> · Bank balance kept — a newer balance is already on file</text>
+                    <text> · Account balance kept — a newer balance is already on file</text>
                 }
                 @if (!_result.SettingsUpdated)
                 {
@@ -333,7 +338,7 @@
                                             @(import.PeriodStartUtc?.ToString("dd MMM yyyy") ?? "—") – @(import.PeriodEndUtc?.ToString("dd MMM yyyy") ?? "—")
                                         </p>
                                         <p class="text-xs text-gray-500 dark:text-gray-400">
-                                            Account @import.AccountNumber · @import.TransactionsImported transactions
+                                            @AccountName(import.AccountId) · @import.TransactionsImported transactions
                                             @if (import.DuplicatesSkipped > 0)
                                             {
                                                 <text> · @import.DuplicatesSkipped duplicates</text>
@@ -347,6 +352,17 @@
                                     @if (import.Status == StatementImportStatus.Imported)
                                     {
                                         <span class="rounded-full bg-success-50 px-2.5 py-0.5 text-[11px] font-medium text-success-600 dark:bg-success-500/10 dark:text-success-400">Imported</span>
+                                        @if (_accounts.Count > 1)
+                                        {
+                                            <select value="" @onchange="e => MoveImportAsync(import.Id, e.Value?.ToString())" title="Put this statement's transactions on another account"
+                                                    class="rounded-full border border-gray-200 bg-white py-1 pl-3 pr-8 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+                                                <option value="">Move to…</option>
+                                                @foreach (var account in _accounts.Where(a => a.Id != (import.AccountId ?? MainAccountId)))
+                                                {
+                                                    <option value="@account.Id">@account.Name</option>
+                                                }
+                                            </select>
+                                        }
                                         <button type="button" @onclick="() => RevertImportAsync(import.Id)"
                                                 class="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.04]">
                                             Revert
@@ -377,9 +393,22 @@
                         @(_preview.PeriodStartUtc?.ToString("dd MMM yyyy") ?? "—") – @(_preview.PeriodEndUtc?.ToString("dd MMM yyyy") ?? "—")
                         @if (_preview.AccountNumber is not null)
                         {
-                            <text> · Account @(_preview.AccountNumber)</text>
+                            <text> · Account @(AccountDisplay.MaskedNumber(_preview.AccountNumber) ?? _preview.AccountNumber)</text>
                         }
                     </p>
+                    @if (_preview.AccountId is not null)
+                    {
+                        <label class="mt-2 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                            Import into
+                            <select value="@_preview.AccountId" @onchange="e => ChangePreviewAccountAsync(e.Value?.ToString())"
+                                    class="rounded-lg border border-gray-200 bg-white py-1 pl-2.5 pr-8 text-xs text-gray-700 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                @foreach (var account in _accounts)
+                                {
+                                    <option value="@account.Id">@account.Name</option>
+                                }
+                            </select>
+                        </label>
+                    }
                 </div>
 
                 <div class="flex flex-wrap items-center gap-2">
@@ -387,7 +416,7 @@
                             class="rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-white/[0.04]">
                         Discard
                     </button>
-                    <button type="button" disabled="@(_isImporting || SelectedCount == 0)" @onclick="ImportAsync"
+                    <button type="button" disabled="@(_isImporting || SelectedCount == 0 || _preview.AccountId is null)" @onclick="ImportAsync"
                             class="inline-flex items-center gap-2 rounded-full bg-brand-500 px-6 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">
                         @if (_isImporting)
                         {
@@ -401,6 +430,37 @@
                     </button>
                 </div>
             </div>
+
+            @if (_preview.AccountId is null)
+            {
+                <div class="border-b border-gray-100 bg-warning-50/60 px-6 py-4 dark:border-gray-800 dark:bg-warning-500/5">
+                    <p class="text-sm font-medium text-warning-800 dark:text-warning-300">
+                        This statement is for account @(AccountDisplay.MaskedNumber(_preview.AccountNumber) ?? _preview.AccountNumber), which isn't set up in CoinStack yet.
+                    </p>
+                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                        <select value="" @onchange="e => ChangePreviewAccountAsync(e.Value?.ToString())"
+                                class="rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-8 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                            <option value="">It's one of my accounts…</option>
+                            @foreach (var account in _accounts)
+                            {
+                                <option value="@account.Id">@account.Name</option>
+                            }
+                        </select>
+                        <span class="text-gray-500 dark:text-gray-400">or add it as a</span>
+                        <select @bind="_newAccountType"
+                                class="rounded-lg border border-gray-200 bg-white py-1.5 pl-2.5 pr-8 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                            @foreach (var type in Enum.GetValues<AccountType>())
+                            {
+                                <option value="@type">@AccountDisplay.Label(type)</option>
+                            }
+                        </select>
+                        <button type="button" @onclick="AddStatementAccountAsync"
+                                class="rounded-full bg-brand-500 px-4 py-1.5 font-medium text-white hover:bg-brand-600">
+                            Add account
+                        </button>
+                    </div>
+                </div>
+            }
 
             <!-- Smart Bank Fee & Overdraft Insights -->
             @if (_preview.TotalAvoidableBankFees > 0 || _preview.PeakOverdraft < 0)
@@ -466,6 +526,10 @@
                 <div>
                     <p class="text-[11px] text-gray-400 uppercase">Transfers</p>
                     <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">@_preview.TransferCount</p>
+                    @if (_preview.TransfersToRecord > 0)
+                    {
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">@_preview.TransfersToRecord will be recorded</p>
+                    }
                 </div>
                 <div>
                     <p class="text-[11px] text-gray-400 uppercase">Duplicates</p>
@@ -606,7 +670,7 @@
 
                                     <div class="text-right">
                                         <p class="text-sm font-bold @(group.Type == TransactionType.Income ? "text-success-600 dark:text-success-400" : "text-gray-900 dark:text-white")">
-                                            @(group.Type == TransactionType.Income ? "+" : "-")@Money(group.TotalAmount)
+                                            @Sign(group.Type)@Money(group.TotalAmount)
                                         </p>
                                         @if (_preview.MonthsCovered > 1)
                                         {
@@ -655,6 +719,12 @@
                                                         }
                                                     </td>
                                                     <td class="py-2">
+                                                        @if (item.Type == TransactionType.Transfer)
+                                                        {
+                                                            @TransferPicker(item)
+                                                        }
+                                                        else
+                                                        {
                                                         <select value="@(item.CategoryName ?? "")" @onchange="(e) => item.CategoryName = string.IsNullOrEmpty(e.Value?.ToString()) ? null : e.Value.ToString()"
                                                                 class="rounded border border-gray-200 bg-white py-0.5 pl-2 pr-7 text-[11px] text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                                                             <option value="">None</option>
@@ -663,6 +733,7 @@
                                                                 <option value="@cat.Name">@cat.Name</option>
                                                             }
                                                         </select>
+                                                        }
                                                     </td>
                                                     <td class="py-2 text-right font-medium">@Money(item.Amount)</td>
                                                 </tr>
@@ -727,9 +798,18 @@
                                             <span class="rounded-full bg-error-50 px-2 py-0.5 text-[11px] font-medium text-error-600 dark:bg-error-500/10 dark:text-error-400">Expense</span>
                                         }
                                     </td>
-                                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">@(candidate.CategoryName ?? "—")</td>
+                                    <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                                        @if (candidate.Type == TransactionType.Transfer)
+                                        {
+                                            @TransferPicker(candidate)
+                                        }
+                                        else
+                                        {
+                                            @(candidate.CategoryName ?? "—")
+                                        }
+                                    </td>
                                     <td class="px-4 py-3 text-right text-sm font-medium @(candidate.Type == TransactionType.Income ? "text-success-600 dark:text-success-400" : "text-gray-800 dark:text-white/90")">
-                                        @(candidate.Type == TransactionType.Income ? "+" : "-")@Money(candidate.Amount)
+                                        @Sign(candidate.Type)@Money(candidate.Amount)
                                     </td>
                                 </tr>
                             }
@@ -772,6 +852,8 @@
     private StatementImportPreview? _preview;
     private StatementImportResult? _result;
     private readonly List<StatementImport> _history = [];
+    private List<Account> _accounts = [];
+    private AccountType _newAccountType = AccountType.Cheque;
     private readonly List<Category> _availableCategories = [];
     private readonly HashSet<string> _expandedGroups = [];
     private CashFlowProjection? _projection;
@@ -787,8 +869,12 @@
     private int SelectedCount => _preview?.Candidates.Count(c => c.Include) ?? 0;
 
     private bool AllNewSelected => _preview is not null
-        && _preview.Candidates.Any(c => !c.AlreadyExists && c.Type != TransactionType.Transfer)
-        && _preview.Candidates.All(c => c.Include || c.AlreadyExists || c.Type == TransactionType.Transfer);
+        && _preview.Candidates.Any(CanInclude)
+        && _preview.Candidates.All(c => c.Include || !CanInclude(c));
+
+    /// <summary>A row can be ticked unless it's already in the app, or it's a transfer with no other account yet.</summary>
+    private static bool CanInclude(ImportCandidate candidate)
+        => !candidate.AlreadyExists && (candidate.Type != TransactionType.Transfer || candidate.CounterAccountId is not null);
 
     private IEnumerable<GroupedMerchantCandidate> FilteredGroups
     {
@@ -878,6 +964,7 @@
     private async Task ReloadDataAsync()
     {
         await ImportService.ReconcileAppWithBankDataAsync();
+        _accounts = (await AccountService.GetBalancesAsync()).Select(b => b.Account).ToList();
 
         _history.Clear();
         _history.AddRange(await ImportService.GetImportHistoryAsync());
@@ -967,6 +1054,10 @@
                 _error = string.Join(" ", skipped);
             }
         }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
         catch (Exception ex)
         {
             _error = $"Failed to read the file: {ex.Message}";
@@ -993,12 +1084,9 @@
     private void ToggleGroup(GroupedMerchantCandidate group)
     {
         var targetValue = !group.AllIncluded;
-        foreach (var item in group.Items)
+        foreach (var item in group.Items.Where(CanInclude))
         {
-            if (!item.AlreadyExists && item.Type != TransactionType.Transfer)
-            {
-                item.Include = targetValue;
-            }
+            item.Include = targetValue;
         }
     }
 
@@ -1014,7 +1102,7 @@
 
     private void ToggleCandidate(ImportCandidate candidate)
     {
-        if (candidate.AlreadyExists || candidate.Type == TransactionType.Transfer)
+        if (!CanInclude(candidate))
         {
             return;
         }
@@ -1031,14 +1119,118 @@
 
         var newValue = !AllNewSelected;
 
-        foreach (var candidate in _preview.Candidates)
+        foreach (var candidate in _preview.Candidates.Where(CanInclude))
         {
-            if (!candidate.AlreadyExists && candidate.Type != TransactionType.Transfer)
-            {
-                candidate.Include = newValue;
-            }
+            candidate.Include = newValue;
         }
     }
+
+    private int? MainAccountId => _accounts.FirstOrDefault(a => a.IsDefault)?.Id;
+
+    private string AccountName(int? accountId)
+        => _accounts.FirstOrDefault(a => a.Id == (accountId ?? MainAccountId))?.Name ?? "Archived account";
+
+    private static string Sign(TransactionType type) => type switch
+    {
+        TransactionType.Income => "+",
+        TransactionType.Expense => "-",
+        _ => ""
+    };
+
+    private async Task ChangePreviewAccountAsync(string? value)
+    {
+        if (_preview is null || !int.TryParse(value, out var accountId))
+        {
+            return;
+        }
+
+        _preview.AccountId = accountId;
+
+        // A transfer can't go to the account it comes from.
+        foreach (var candidate in _preview.Candidates.Where(c => c.CounterAccountId == accountId))
+        {
+            candidate.CounterAccountId = null;
+        }
+
+        await ImportService.RefreshAsync(_preview);
+    }
+
+    /// <summary>Adds the statement's account, holding its closing balance as of the statement's end.</summary>
+    private async Task AddStatementAccountAsync()
+    {
+        if (_preview is null)
+        {
+            return;
+        }
+
+        var number = AccountDisplay.MaskedNumber(_preview.AccountNumber);
+        var asOf = _preview.ClosingBalance is not null && _preview.PeriodEndUtc is { } end
+            ? end.Date.AddDays(1).AddTicks(-1)
+            : _preview.PeriodStartUtc?.Date.AddTicks(-1) ?? DateTime.UtcNow;
+
+        try
+        {
+            var account = await AccountService.CreateAsync(new Account
+            {
+                Name = number is null ? AccountDisplay.Label(_newAccountType) : $"{AccountDisplay.Label(_newAccountType)} {number}",
+                Type = _newAccountType,
+                AccountNumber = _preview.AccountNumber,
+                Balance = _preview.ClosingBalance ?? 0m,
+                BalanceAsOfUtc = asOf
+            });
+
+            _accounts = (await AccountService.GetBalancesAsync()).Select(b => b.Account).ToList();
+            await ChangePreviewAccountAsync(account.Id.ToString());
+        }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task ChangeTransferAccountAsync(ImportCandidate candidate, string? value)
+    {
+        if (_preview is null)
+        {
+            return;
+        }
+
+        candidate.CounterAccountId = int.TryParse(value, out var accountId) ? accountId : null;
+        candidate.Include = candidate.CounterAccountId is not null;
+        await ImportService.RefreshAsync(_preview);
+    }
+
+    private async Task MoveImportAsync(int importId, string? value)
+    {
+        if (!int.TryParse(value, out var accountId))
+        {
+            return;
+        }
+
+        try
+        {
+            await ImportService.MoveImportAsync(importId, accountId);
+            await ReloadDataAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    /// <summary>The person's other account for a transfer: where money out of this account went, or where money in came from.</summary>
+    private RenderFragment TransferPicker(ImportCandidate candidate) => __builder =>
+    {
+        <select value="@(candidate.CounterAccountId?.ToString() ?? "")" @onchange="e => ChangeTransferAccountAsync(candidate, e.Value?.ToString())"
+                disabled="@candidate.AlreadyExists"
+                class="rounded border border-gray-200 bg-white py-0.5 pl-2 pr-7 text-[11px] text-gray-700 disabled:opacity-60 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+            <option value="">@(candidate.IsCredit ? "From which account?" : "To which account?")</option>
+            @foreach (var account in _accounts.Where(a => a.Id != _preview?.AccountId))
+            {
+                <option value="@account.Id">@(candidate.IsCredit ? "From" : "To") @account.Name</option>
+            }
+        </select>
+    };
 
     private async Task ImportAsync()
     {

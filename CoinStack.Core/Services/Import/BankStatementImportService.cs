@@ -52,6 +52,18 @@ public sealed class ImportCandidate
 
     /// <summary>The category is the one the person chose for this merchant before.</summary>
     public bool CategoryRemembered { get; set; }
+
+    /// <summary>
+    /// For a transfer, the person's other account: where a payment out of this account went, or where money
+    /// coming in came from. A transfer without one can't be imported, because it would have nowhere to go.
+    /// </summary>
+    public int? CounterAccountId { get; set; }
+
+    /// <summary>An automatic monthly-savings transfer that this real debit order takes the place of.</summary>
+    public int? ReplacesTransactionId { get; set; }
+
+    /// <summary>The same row was in another file uploaded at the same time.</summary>
+    public bool DuplicateInUpload { get; set; }
 }
 
 /// <summary>Everything the UI needs to review one statement before committing.</summary>
@@ -60,6 +72,12 @@ public sealed class StatementImportPreview
     public string BankFormat { get; set; } = "";
     public string? FileName { get; set; }
     public string? AccountNumber { get; set; }
+
+    /// <summary>
+    /// The account the statement is for: the one with its account number, or the main account when the file
+    /// has none. Null when no account has the number yet, so the person has to choose or add one.
+    /// </summary>
+    public int? AccountId { get; set; }
 
     public DateTime? PeriodStartUtc { get; set; }
     public DateTime? PeriodEndUtc { get; set; }
@@ -88,6 +106,7 @@ public sealed class StatementImportPreview
     public decimal TotalExpenses => Candidates.Where(c => c.Type == TransactionType.Expense).Sum(c => c.Amount);
     public decimal TotalTransfers => Candidates.Where(c => c.Type == TransactionType.Transfer).Sum(c => c.Amount);
     public int TransferCount => Candidates.Count(c => c.Type == TransactionType.Transfer);
+    public int TransfersToRecord => Candidates.Count(c => c.Type == TransactionType.Transfer && c.Include && !c.AlreadyExists);
     public int IncomeCount => Candidates.Count(c => c.Type == TransactionType.Income);
     public int ExpenseCount => Candidates.Count(c => c.Type == TransactionType.Expense);
     public int NewCount => Candidates.Count(c => !c.AlreadyExists);
@@ -113,7 +132,12 @@ public sealed class StatementImportResult
     public int ImportId { get; set; }
     public int ImportedCount { get; set; }
     public int DuplicateCount { get; set; }
+
+    /// <summary>Transfers between the person's own accounts that were left out.</summary>
     public int TransferCount { get; set; }
+
+    /// <summary>Transfers between the person's own accounts that were recorded.</summary>
+    public int TransfersRecorded { get; set; }
     public decimal? ClosingBalance { get; set; }
     public DateTime? BalanceAsOfUtc { get; set; }
 
@@ -140,9 +164,20 @@ public interface IBankStatementImportService
 
     /// <summary>
     /// Combines several uploaded files into one preview: rows found in more than one file are kept once,
-    /// and recurring payments are detected across all of them.
+    /// and recurring payments are detected across all of them. Files from different accounts are refused
+    /// with an <see cref="InvalidOperationException"/>.
     /// </summary>
     Task<StatementImportPreview> MergePreviewsAsync(IReadOnlyList<StatementImportPreview> previews, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Checks the preview again after its account (<see cref="StatementImportPreview.AccountId"/>) or a
+    /// transfer's other account (<see cref="ImportCandidate.CounterAccountId"/>) was changed: which rows are
+    /// already on that account, and which transfers the other account's statement already recorded.
+    /// </summary>
+    Task RefreshAsync(StatementImportPreview preview, CancellationToken cancellationToken = default);
+
+    /// <summary>Puts an earlier import, and the transactions it created, on another account.</summary>
+    Task MoveImportAsync(int importId, int accountId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Commits the selected candidates as transactions, grouped under a statement import record.
@@ -159,9 +194,8 @@ public interface IBankStatementImportService
     Task<StatementRevertResult> RevertImportAsync(int importId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// After a statement has been imported: drop the app-generated "Monthly Income" rows,
-    /// and if the user has never set a bank snapshot, copy the latest statement closing balance
-    /// into settings so the dashboard matches the bank.
+    /// After a statement has been imported: an account with no balance entered yet takes the closing
+    /// balance of its latest statement, and income is detected from salary rows when none is set.
     /// </summary>
     Task ReconcileAppWithBankDataAsync(CancellationToken cancellationToken = default);
 
@@ -260,36 +294,12 @@ public sealed class BankStatementImportService : IBankStatementImportService
             preview.DetectedSalaryPayday = BudgetPeriod.DetectPayday(salaryCandidates.Select(c => c.DateUtc));
         }
 
-        // 6. Check existing fingerprints in DB (current scheme, plus the legacy scheme for older imports)
-        var fingerprints = preview.Candidates
-            .Select(c => c.Fingerprint)
-            .Concat(preview.Candidates.SelectMany(LegacyFingerprints))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
-        var existingFingerprints = await db.Transactions
-            .AsNoTracking()
-            .Where(t => t.ImportFingerprint != null && fingerprints.Contains(t.ImportFingerprint!))
-            .Select(t => t.ImportFingerprint!)
-            .ToListAsync(cancellationToken);
-
-        MarkExisting(preview.Candidates, existingFingerprints);
-
-        foreach (var candidate in preview.Candidates)
-        {
-            if (candidate.AlreadyExists)
-            {
-                candidate.Include = false;
-                candidate.SkipReason = "Already imported";
-            }
-            else if (candidate.Type == TransactionType.Transfer)
-            {
-                candidate.Include = false;
-                candidate.SkipReason = "Transfer between own accounts";
-            }
-        }
+        // 6. Which account the statement is for, where its transfers go, and what that account already has.
+        preview.AccountId = await ResolveAccountAsync(db, preview.AccountNumber, cancellationToken);
+        await GuessTransferAccountsAsync(db, preview, cancellationToken);
+        await MarkDuplicatesAsync(db, preview, cancellationToken);
 
         // The person's own categories for merchants they moved before win over the defaults.
         var rules = await MerchantRuleBook.LoadAsync(db, cancellationToken);
@@ -360,6 +370,18 @@ public sealed class BankStatementImportService : IBankStatementImportService
             return previews[0];
         }
 
+        // Statements from two accounts can't share one import: their balances and rows belong apart.
+        var numbers = previews
+            .Select(p => AccountService.AccountNumberDigits(p.AccountNumber))
+            .Where(n => n is not null)
+            .Distinct()
+            .ToList();
+        if (numbers.Count > 1)
+        {
+            throw new InvalidOperationException(
+                $"These files are from different accounts ({string.Join(" and ", numbers.Select(n => AccountDisplay.MaskedNumber(n)))}). Import one account at a time.");
+        }
+
         var byStart = previews.OrderBy(p => p.PeriodStartUtc ?? DateTime.MaxValue).ToList();
         var byEnd = previews.OrderByDescending(p => p.PeriodEndUtc ?? DateTime.MinValue).ToList();
 
@@ -367,7 +389,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
         {
             BankFormat = previews[0].BankFormat,
             FileName = string.Join(", ", previews.Select(p => p.FileName ?? "Statement").Distinct()),
-            AccountNumber = previews[0].AccountNumber,
+            AccountNumber = previews.Select(p => p.AccountNumber).FirstOrDefault(n => n is not null),
+            AccountId = previews.Select(p => p.AccountId).FirstOrDefault(id => id is not null),
             PeriodStartUtc = previews.Min(p => p.PeriodStartUtc),
             PeriodEndUtc = previews.Max(p => p.PeriodEndUtc),
             OpeningBalance = byStart[0].OpeningBalance,
@@ -392,6 +415,7 @@ public sealed class BankStatementImportService : IBankStatementImportService
             {
                 candidate.Include = false;
                 candidate.AlreadyExists = true;
+                candidate.DuplicateInUpload = true;
                 candidate.SkipReason = "Duplicate of another uploaded statement";
             }
 
@@ -403,9 +427,190 @@ public sealed class BankStatementImportService : IBankStatementImportService
         // Detect across every file together: a monthly debit order seen once per statement only looks
         // recurring when the statements are combined.
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await MarkDuplicatesAsync(db, merged, cancellationToken);
         await DetectRecurringProposalsAsync(db, merged, cancellationToken);
 
         return merged;
+    }
+
+    public async Task RefreshAsync(StatementImportPreview preview, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        await GuessTransferAccountsAsync(db, preview, cancellationToken);
+        await MarkDuplicatesAsync(db, preview, cancellationToken);
+        BuildGroupedMerchants(preview);
+        await DetectRecurringProposalsAsync(db, preview, cancellationToken);
+    }
+
+    /// <summary>
+    /// The account with the statement's number. A file without a number goes to the main account. The first
+    /// statement while the main account is the only cheque account, with no number yet, is the main account's.
+    /// Otherwise there is no match, and the person chooses.
+    /// </summary>
+    private static async Task<int?> ResolveAccountAsync(CoinStackDbContext db, string? accountNumber, CancellationToken cancellationToken)
+    {
+        var main = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
+        var digits = AccountService.AccountNumberDigits(accountNumber);
+        if (digits is null)
+        {
+            return main.Id;
+        }
+
+        var accounts = await db.Accounts.AsNoTracking().ToListAsync(cancellationToken);
+        var match = accounts
+            .Where(a => AccountService.AccountNumberDigits(a.AccountNumber) == digits)
+            .OrderBy(a => a.IsArchived)
+            .ThenBy(a => a.Id)
+            .FirstOrDefault();
+        if (match is not null)
+        {
+            return match.Id;
+        }
+
+        var cheques = accounts.Where(a => a.Type == AccountType.Cheque && !a.IsArchived).ToList();
+        return cheques is [{ AccountNumber: null } only] ? only.Id : null;
+    }
+
+    /// <summary>
+    /// Guesses the other account of a transfer the person hasn't placed yet: a payment to savings goes to
+    /// the savings account, when there is just one.
+    /// </summary>
+    private static async Task GuessTransferAccountsAsync(CoinStackDbContext db, StatementImportPreview preview, CancellationToken cancellationToken)
+    {
+        var accounts = await db.Accounts.AsNoTracking().Where(a => !a.IsArchived).ToListAsync(cancellationToken);
+        var savings = accounts.Where(a => a.Type == AccountType.Savings && a.Id != preview.AccountId).ToList();
+
+        foreach (var candidate in preview.Candidates.Where(c => c.Type == TransactionType.Transfer && c.CounterAccountId is null))
+        {
+            var upper = (candidate.RawDescription ?? candidate.Description).ToUpperInvariant();
+            if (!candidate.IsCredit && LooksLikeSavingsTransfer(upper) && savings is [var only])
+            {
+                candidate.CounterAccountId = only.Id;
+            }
+        }
+    }
+
+    private static bool LooksLikeSavingsTransfer(string upper)
+        => upper.Contains("TO INVEST")
+           || upper.Contains("INVEST SAVINGS")
+           || upper.Contains("INVESTMENT SAVINGS")
+           || (upper.Contains("PAYMENT TO SAVINGS") && !upper.Contains("PAYMENT TO PA"));
+
+    /// <summary>
+    /// Marks the rows that are already in the app, so they aren't added twice:
+    /// rows imported before onto this account (by fingerprint), and transfers already recorded from the
+    /// other account's side or entered by hand (same two accounts and amount, within three days). A real
+    /// payment to savings takes the place of the automatic monthly-savings transfer for the same amount
+    /// that month. A transfer with no other account is left out. Rows the person ticked or unticked keep
+    /// their choice; rows skipped earlier for a reason that no longer holds are ticked again.
+    /// </summary>
+    private static async Task MarkDuplicatesAsync(CoinStackDbContext db, StatementImportPreview preview, CancellationToken cancellationToken)
+    {
+        var candidates = preview.Candidates.Where(c => !c.DuplicateInUpload).ToList();
+        var skippedBefore = candidates.Where(c => c.SkipReason.Length > 0).ToHashSet();
+        foreach (var candidate in candidates)
+        {
+            candidate.AlreadyExists = false;
+            candidate.ReplacesTransactionId = null;
+            candidate.SkipReason = "";
+        }
+
+        var fingerprints = candidates
+            .Select(c => c.Fingerprint)
+            .Concat(candidates.SelectMany(LegacyFingerprints))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        var mainId = (await AccountService.GetOrCreateDefaultAsync(db, cancellationToken)).Id;
+        var query = db.Transactions
+            .AsNoTracking()
+            .Where(t => t.ImportFingerprint != null && fingerprints.Contains(t.ImportFingerprint!));
+
+        // Only rows on this account count: the same purchase on two different accounts is two purchases.
+        if (preview.AccountId is { } accountId)
+        {
+            query = query.Where(t => t.AccountId == accountId
+                                     || t.TransferAccountId == accountId
+                                     || (t.AccountId == null && accountId == mainId));
+        }
+
+        MarkExisting(candidates, await query.Select(t => t.ImportFingerprint!).ToListAsync(cancellationToken));
+
+        var recordedElsewhere = new HashSet<ImportCandidate>();
+        if (preview.AccountId is { } statementAccountId)
+        {
+            var transfers = candidates
+                .Where(c => c.Type == TransactionType.Transfer && !c.AlreadyExists && c.CounterAccountId is not null)
+                .OrderBy(c => c.DateUtc)
+                .ToList();
+
+            if (transfers.Count > 0)
+            {
+                var from = transfers.Min(c => c.DateUtc).AddDays(-31);
+                var to = transfers.Max(c => c.DateUtc).AddDays(31);
+                var others = transfers.Select(c => c.CounterAccountId!.Value).Distinct().ToList();
+                var existing = await db.Transactions
+                    .AsNoTracking()
+                    .Where(t => t.Type == TransactionType.Transfer
+                                && t.TransferAccountId != null
+                                && t.OccurredAtUtc >= from && t.OccurredAtUtc <= to
+                                && (t.AccountId == statementAccountId || others.Contains(t.AccountId!.Value)))
+                    .ToListAsync(cancellationToken);
+
+                var used = new HashSet<int>();
+                foreach (var candidate in transfers)
+                {
+                    var (source, target) = candidate.IsCredit
+                        ? (candidate.CounterAccountId, (int?)statementAccountId)
+                        : (statementAccountId, candidate.CounterAccountId);
+
+                    var same = existing.FirstOrDefault(t => !used.Contains(t.Id)
+                                                            && t.AccountId == source && t.TransferAccountId == target
+                                                            && t.Amount == candidate.Amount
+                                                            && t.Source != TransactionConventions.AutoSource
+                                                            && Math.Abs((t.OccurredAtUtc - candidate.DateUtc).TotalDays) <= 3);
+                    if (same is not null)
+                    {
+                        used.Add(same.Id);
+                        candidate.AlreadyExists = true;
+                        recordedElsewhere.Add(candidate);
+                        continue;
+                    }
+
+                    var planned = existing.FirstOrDefault(t => !used.Contains(t.Id)
+                                                               && t.AccountId == source && t.TransferAccountId == target
+                                                               && t.Amount == candidate.Amount
+                                                               && t.Source == TransactionConventions.AutoSource
+                                                               && t.OccurredAtUtc.Year == candidate.DateUtc.Year
+                                                               && t.OccurredAtUtc.Month == candidate.DateUtc.Month);
+                    if (planned is not null)
+                    {
+                        used.Add(planned.Id);
+                        candidate.ReplacesTransactionId = planned.Id;
+                    }
+                }
+            }
+        }
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate.AlreadyExists)
+            {
+                candidate.Include = false;
+                candidate.SkipReason = recordedElsewhere.Contains(candidate)
+                    ? "Already recorded from the other account"
+                    : "Already imported";
+            }
+            else if (candidate.Type == TransactionType.Transfer && candidate.CounterAccountId is null)
+            {
+                candidate.Include = false;
+                candidate.SkipReason = "Transfer between your own accounts. Choose the other account to include it.";
+            }
+            else if (skippedBefore.Contains(candidate))
+            {
+                candidate.Include = true;
+            }
+        }
     }
 
     private static void DetectPassThroughs(List<ImportCandidate> candidates)
@@ -493,7 +698,21 @@ public sealed class BankStatementImportService : IBankStatementImportService
             .ToListAsync(cancellationToken);
 
         var categoryByName = categories.ToDictionary(c => c.Name, c => c.Id, StringComparer.OrdinalIgnoreCase);
-        var account = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
+        // A preview built without one gets its account the same way a statement's preview does.
+        var accountId = preview.AccountId ?? await ResolveAccountAsync(db, preview.AccountNumber, cancellationToken);
+        var account = accountId is { } id
+            ? await db.Accounts.FirstOrDefaultAsync(a => a.Id == id, cancellationToken)
+            : null;
+        if (account is null)
+        {
+            throw new InvalidOperationException("Choose the account this statement belongs to.");
+        }
+
+        // The account learns its number from its first statement, so the next one finds it.
+        if (account.AccountNumber is null && AccountService.AccountNumberDigits(preview.AccountNumber) is not null)
+        {
+            account.AccountNumber = preview.AccountNumber!.Trim();
+        }
 
         var import = new StatementImport
         {
@@ -512,16 +731,32 @@ public sealed class BankStatementImportService : IBankStatementImportService
         db.StatementImports.Add(import);
         await db.SaveChangesAsync(cancellationToken);
 
-        var toImport = preview.Candidates.Where(c => c.Include && !c.AlreadyExists).ToList();
+        // A transfer can only be imported with its other account; without one it would have nowhere to go.
+        var toImport = preview.Candidates
+            .Where(c => c.Include && !c.AlreadyExists && (c.Type != TransactionType.Transfer || c.CounterAccountId is not null))
+            .ToList();
 
         foreach (var candidate in toImport)
         {
+            // Money out of this account goes to the other one; money in came from it.
+            var isTransfer = candidate.Type == TransactionType.Transfer;
+            var fromAccount = isTransfer && candidate.IsCredit ? candidate.CounterAccountId : account.Id;
+            var toAccount = !isTransfer ? null : candidate.IsCredit ? account.Id : candidate.CounterAccountId;
+
+            // A real payment to savings takes the place of the automatic one for the same month.
+            if (candidate.ReplacesTransactionId is { } plannedId
+                && await db.Transactions.FirstOrDefaultAsync(t => t.Id == plannedId, cancellationToken) is { } planned)
+            {
+                db.Transactions.Remove(planned);
+            }
+
             db.Transactions.Add(new Transaction
             {
                 OccurredAtUtc = candidate.DateUtc,
                 Amount = candidate.Amount,
                 Type = candidate.Type,
-                AccountId = account.Id,
+                AccountId = fromAccount,
+                TransferAccountId = toAccount,
                 Description = candidate.Description,
                 Notes = candidate.RawDescription != candidate.Description ? candidate.RawDescription : null,
                 CategoryId = candidate.CategoryName is not null && categoryByName.TryGetValue(candidate.CategoryName, out var categoryId)
@@ -534,9 +769,10 @@ public sealed class BankStatementImportService : IBankStatementImportService
             });
         }
 
-        import.TransactionsImported = toImport.Count(c => c.Type != TransactionType.Transfer);
+        var transfersRecorded = toImport.Count(c => c.Type == TransactionType.Transfer);
+        import.TransactionsImported = toImport.Count - transfersRecorded;
         import.DuplicatesSkipped = preview.DuplicateCount;
-        import.TransfersSkipped = preview.TransferCount;
+        import.TransfersSkipped = preview.TransferCount - transfersRecorded;
 
         // A merchant moved to another category as a whole is remembered for the next import. Changing
         // one row of a merchant is treated as a one-off.
@@ -574,12 +810,14 @@ public sealed class BankStatementImportService : IBankStatementImportService
                            ?? (preview.Candidates.Count > 0 ? preview.Candidates.Max(c => c.DateUtc) : (DateTime?)null);
         var balanceAsOf = statementEnd?.Date.AddDays(1).AddTicks(-1);
 
-        // Only the most recent statement may drive income and payday; an older one fills in history.
+        // Only the most recent statement of a cheque account may drive income and payday; an older one fills
+        // in history, and savings or card statements don't carry the salary.
         var newestOtherEnd = await db.StatementImports
             .AsNoTracking()
-            .Where(i => i.Id != import.Id && i.Status == StatementImportStatus.Imported && i.PeriodEndUtc != null)
+            .Where(i => i.Id != import.Id && i.AccountId == account.Id && i.Status == StatementImportStatus.Imported && i.PeriodEndUtc != null)
             .MaxAsync(i => i.PeriodEndUtc, cancellationToken);
-        var isNewestStatement = newestOtherEnd is null || statementEnd is null || statementEnd.Value >= newestOtherEnd.Value;
+        var isNewestStatement = account.Type == AccountType.Cheque
+                                && (newestOtherEnd is null || statementEnd is null || statementEnd.Value >= newestOtherEnd.Value);
 
         var syntheticsRemoved = await RemoveSyntheticMonthlyIncomeAsync(db, cancellationToken);
         var balanceUpdated = await SyncSettingsFromStatementAsync(
@@ -596,7 +834,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
             ImportId = import.Id,
             ImportedCount = import.TransactionsImported,
             DuplicateCount = preview.DuplicateCount,
-            TransferCount = preview.TransferCount,
+            TransferCount = import.TransfersSkipped,
+            TransfersRecorded = transfersRecorded,
             ClosingBalance = import.ClosingBalance,
             BalanceAsOfUtc = balanceAsOf,
             BalanceUpdated = balanceUpdated,
@@ -648,27 +887,71 @@ public sealed class BankStatementImportService : IBankStatementImportService
         return new StatementRevertResult(transactions.Count, subscriptions.Count, buckets.Count);
     }
 
+    public async Task MoveImportAsync(int importId, int accountId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+
+        var import = await db.StatementImports.FirstOrDefaultAsync(i => i.Id == importId, cancellationToken)
+                     ?? throw new InvalidOperationException("That import no longer exists.");
+        if (!await db.Accounts.AnyAsync(a => a.Id == accountId, cancellationToken))
+        {
+            throw new InvalidOperationException("That account no longer exists.");
+        }
+
+        var oldId = import.AccountId ?? (await AccountService.GetOrCreateDefaultAsync(db, cancellationToken)).Id;
+        if (oldId == accountId)
+        {
+            return;
+        }
+
+        var rows = await db.Transactions.Where(t => t.StatementImportId == importId).ToListAsync(cancellationToken);
+        foreach (var row in rows)
+        {
+            if (row.AccountId == oldId || row.AccountId == null)
+            {
+                row.AccountId = accountId;
+            }
+
+            if (row.TransferAccountId == oldId)
+            {
+                row.TransferAccountId = accountId;
+            }
+
+            if (row.Type == TransactionType.Transfer && row.AccountId == row.TransferAccountId)
+            {
+                throw new InvalidOperationException("Some transfers in this statement go to or come from that account already. Choose a different one.");
+            }
+        }
+
+        import.AccountId = accountId;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task ReconcileAppWithBankDataAsync(CancellationToken cancellationToken = default)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
 
         // Legacy placeholder income is cleaned up once at startup (DatabaseInitializer), not per page view.
         var settings = await db.AppSettings.FirstOrDefaultAsync(cancellationToken);
-        var account = await AccountService.GetOrCreateDefaultAsync(db, cancellationToken);
+        var mainId = (await AccountService.GetOrCreateDefaultAsync(db, cancellationToken)).Id;
 
-        // Files without a running balance store null; never turn that into an R0 bank balance.
-        var latestImport = await db.StatementImports
-            .AsNoTracking()
-            .Where(i => i.Status == StatementImportStatus.Imported
-                        && i.ClosingBalance != null
-                        && (i.AccountId == null || i.AccountId == account.Id))
-            .OrderByDescending(i => i.PeriodEndUtc ?? i.CreatedAtUtc)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (account.BalanceAsOfUtc is null && latestImport?.ClosingBalance is { } closing)
+        // An account with no balance entered yet takes its latest statement's closing balance. Files without
+        // a running balance store null; never turn that into an R0 balance.
+        foreach (var account in await db.Accounts.Where(a => a.BalanceAsOfUtc == null).ToListAsync(cancellationToken))
         {
-            account.Balance = closing;
-            account.BalanceAsOfUtc = latestImport.PeriodEndUtc?.Date.AddDays(1).AddTicks(-1) ?? latestImport.CreatedAtUtc;
+            var latestImport = await db.StatementImports
+                .AsNoTracking()
+                .Where(i => i.Status == StatementImportStatus.Imported
+                            && i.ClosingBalance != null
+                            && (i.AccountId == account.Id || (i.AccountId == null && account.Id == mainId)))
+                .OrderByDescending(i => i.PeriodEndUtc ?? i.CreatedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (latestImport?.ClosingBalance is { } closing)
+            {
+                account.Balance = closing;
+                account.BalanceAsOfUtc = latestImport.PeriodEndUtc?.Date.AddDays(1).AddTicks(-1) ?? latestImport.CreatedAtUtc;
+            }
         }
 
         if (settings is not null && settings.MonthlyIncome <= 0m)
@@ -732,7 +1015,8 @@ public sealed class BankStatementImportService : IBankStatementImportService
         if (closingBalance is not null)
         {
             var asOf = balanceAsOfUtc ?? DateTime.UtcNow;
-            if (account.BalanceAsOfUtc is null || asOf > account.BalanceAsOfUtc.Value)
+            // Not older than the balance on file: an account added from this statement has the same date.
+            if (account.BalanceAsOfUtc is null || asOf >= account.BalanceAsOfUtc.Value)
             {
                 account.Balance = closingBalance.Value;
                 account.BalanceAsOfUtc = asOf;

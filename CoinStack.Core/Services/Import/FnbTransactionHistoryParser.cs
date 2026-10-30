@@ -24,6 +24,12 @@ public static partial class FnbTransactionHistoryParser
     [GeneratedRegex(@"<(DTPOSTED|TRNAMT|MEMO|NAME|TRNTYPE)>([^<\r\n]+)", RegexOptions.IgnoreCase)]
     private static partial Regex OfxFieldRegex();
 
+    [GeneratedRegex(@"<ACCTID>([^<\r\n]+)", RegexOptions.IgnoreCase)]
+    private static partial Regex OfxAccountRegex();
+
+    [GeneratedRegex(@"<LEDGERBAL>.*?<BALAMT>([^<\r\n]+)", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
+    private static partial Regex OfxLedgerBalanceRegex();
+
     [GeneratedRegex(@"(?<sfx>CR|DR)\.?$", RegexOptions.IgnoreCase)]
     private static partial Regex MoneySuffixRegex();
 
@@ -205,6 +211,22 @@ public static partial class FnbTransactionHistoryParser
         }
 
         FinalizeStatement(statement);
+
+        // The account number lets the import find the account; the ledger balance is the closing balance.
+        if (OfxAccountRegex().Match(text) is { Success: true } account)
+        {
+            statement.AccountNumber = account.Groups[1].Value.Trim();
+        }
+
+        if (statement.ClosingBalance is null
+            && statement.Transactions.Count > 0
+            && OfxLedgerBalanceRegex().Match(text) is { Success: true } ledger
+            && TryParseMoney(ledger.Groups[1].Value.Trim(), out var closing, out _))
+        {
+            statement.ClosingBalance = closing;
+            statement.OpeningBalance = closing - statement.Transactions.Sum(t => t.IsCredit ? t.Amount : -t.Amount);
+        }
+
         return statement;
     }
 
