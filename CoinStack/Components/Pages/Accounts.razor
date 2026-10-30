@@ -3,6 +3,7 @@
 @using CoinStack.Data.Entities
 @using CoinStack.Services
 @inject IAccountService AccountService
+@inject IDebtService DebtService
 @inject ISettingsService SettingsService
 @inject TimeProvider Clock
 
@@ -105,6 +106,23 @@
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Lets imported statements find this account.</p>
                     </div>
 
+                    @if (_formType == AccountType.CreditCard && _debts.Count > 0)
+                    {
+                        <div>
+                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">The debt it is (optional)</label>
+                            <select @bind="_formDebtId" class="@InputClass">
+                                <option value="">— Not linked —</option>
+                                @foreach (var debt in _debts)
+                                {
+                                    <option value="@debt.Id">@debt.Name</option>
+                                }
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Linking starts the card at what the debt owes. From then on the debt follows the card: log card purchases here, and paying the card is a transfer.
+                            </p>
+                        </div>
+                    }
+
                     @if (!_editingId.HasValue)
                     {
                         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -164,6 +182,8 @@
     private string _formName = "";
     private AccountType _formType = AccountType.Cheque;
     private string? _formNumber;
+    private int? _formDebtId;
+    private List<DebtAccount> _debts = [];
     private decimal _formBalance;
     private DateTime _formAsOf;
     private string? _formError;
@@ -187,6 +207,7 @@
         _archived = all.Where(a => a.Account.IsArchived).ToList();
         _spendable = _open.Where(a => a.Account.Type == AccountType.Cheque).Sum(a => a.Balance);
         _total = _open.Sum(a => a.Balance);
+        _debts = await DebtService.GetAllAsync();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -197,6 +218,7 @@
         _formName = "";
         _formType = AccountType.Cheque;
         _formNumber = null;
+        _formDebtId = null;
         _formBalance = 0m;
         _formAsOf = Clock.Today();
         _formError = null;
@@ -210,6 +232,7 @@
         _formName = account.Name;
         _formType = account.Type;
         _formNumber = account.AccountNumber;
+        _formDebtId = account.DebtAccountId;
         _formError = null;
         _showForm = true;
     }
@@ -233,6 +256,11 @@
                     AccountNumber = _formNumber,
                     SortOrder = existing.SortOrder
                 });
+
+                if (_formType == AccountType.CreditCard && existing.DebtAccountId != _formDebtId)
+                {
+                    await AccountService.LinkDebtAsync(id, _formDebtId);
+                }
             }
             else
             {
@@ -247,7 +275,7 @@
                     ? Clock.GetUtcNow().UtcDateTime
                     : Clock.StartOfDayUtc(_formAsOf.AddDays(1)).AddTicks(-1);
 
-                await AccountService.CreateAsync(new Account
+                var created = await AccountService.CreateAsync(new Account
                 {
                     Name = _formName,
                     Type = _formType,
@@ -255,6 +283,11 @@
                     Balance = _formBalance,
                     BalanceAsOfUtc = asOfUtc
                 });
+
+                if (_formType == AccountType.CreditCard && _formDebtId is not null)
+                {
+                    await AccountService.LinkDebtAsync(created.Id, _formDebtId);
+                }
             }
 
             _showForm = false;
@@ -319,6 +352,10 @@
                         <p class="text-xs text-gray-500 dark:text-gray-400">
                             @AccountDisplay.Label(account.Type)@(number is null ? "" : $" · {number}")
                         </p>
+                        @if (account.DebtAccountId is { } debtId && _debts.FirstOrDefault(d => d.Id == debtId) is { } linkedDebt)
+                        {
+                            <p class="text-xs text-gray-500 dark:text-gray-400"><i class="fa-solid fa-link text-[10px]"></i> @linkedDebt.Name follows this card</p>
+                        }
                     </div>
                 </div>
                 @if (account.IsDefault)

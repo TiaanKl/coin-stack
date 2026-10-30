@@ -116,6 +116,13 @@ public sealed class AccountService : IAccountService
         existing.Type = account.Type;
         existing.AccountNumber = NormalizeAccountNumberText(account.AccountNumber);
         existing.SortOrder = account.SortOrder;
+
+        // Only a card is a debt.
+        if (existing.Type != AccountType.CreditCard)
+        {
+            existing.DebtAccountId = null;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -161,6 +168,51 @@ public sealed class AccountService : IAccountService
         }
 
         account.IsDefault = true;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task LinkDebtAsync(int cardAccountId, int? debtId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var card = await db.Accounts.FirstOrDefaultAsync(a => a.Id == cardAccountId, cancellationToken)
+                   ?? throw new InvalidOperationException("That account no longer exists.");
+
+        if (card.DebtAccountId == debtId)
+        {
+            return;
+        }
+
+        // Unlinking keeps the debt where the card left it, rather than at the figure from before the link.
+        if (card.DebtAccountId is { } previousDebtId
+            && await db.DebtAccounts.FirstOrDefaultAsync(d => d.Id == previousDebtId, cancellationToken) is { } previous)
+        {
+            var cardBalance = (await GetBalancesAsync(db, cancellationToken)).Single(b => b.Account.Id == card.Id).Balance;
+            previous.CurrentBalance = -cardBalance;
+            previous.InterestAccruedThroughUtc = _clock.GetUtcNow().UtcDateTime.Date;
+        }
+
+        card.DebtAccountId = null;
+
+        if (debtId is { } id)
+        {
+            if (card.Type != AccountType.CreditCard)
+            {
+                throw new InvalidOperationException("Only a credit-card account can be linked to a debt.");
+            }
+
+            var debt = await db.DebtAccounts.FirstOrDefaultAsync(d => d.Id == id, cancellationToken)
+                       ?? throw new InvalidOperationException("That debt no longer exists.");
+            if (await db.Accounts.AnyAsync(a => a.DebtAccountId == id && a.Id != card.Id, cancellationToken))
+            {
+                throw new InvalidOperationException("That debt is already linked to another card.");
+            }
+
+            // The card starts at what the debt owes now; the card's own transactions move it from here.
+            card.DebtAccountId = id;
+            card.Balance = -debt.CurrentBalance;
+            card.BalanceAsOfUtc = _clock.GetUtcNow().UtcDateTime;
+        }
+
         await db.SaveChangesAsync(cancellationToken);
     }
 

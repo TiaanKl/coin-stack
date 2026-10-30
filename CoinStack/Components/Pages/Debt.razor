@@ -5,6 +5,7 @@
 @inject IDebtCalculatorEngine Calculator
 @inject IDailyCatchUpService CatchUp
 @inject IDebtService DebtService
+@inject IAccountService AccountService
 @inject ISettingsService SettingsService
 @inject ITransactionService TransactionService
 @inject ICategoryService CategoryService
@@ -341,6 +342,10 @@
                                                                                                     <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">@debt.Name</h4>
                                                                                                     <p class="text-xs text-gray-500 dark:text-gray-400">@(string.IsNullOrWhiteSpace(debt.Provider) ?
                                                                                                                              "No provider" : debt.Provider)</p>
+                                                                                                    @if (_cardByDebt.TryGetValue(debt.Id, out var linkedCard))
+                                                                                                    {
+                                                                                                        <a href="/accounts" class="text-xs text-brand-600 hover:underline dark:text-brand-400"><i class="fa-solid fa-credit-card text-[10px]"></i> Follows @linkedCard.Name</a>
+                                                                                                    }
                                                                                                     </div>
                                                                                                     <span
                                                                                                         class="rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">@debt.InterestRatePercent.ToString("0.##")%
@@ -372,7 +377,11 @@
                                                                                                                 <label class="block text-xs font-medium text-gray-700 dark:text-gray-400">Payment amount</label>
                                                                                                                 <InputNumber TValue="decimal?" @bind-Value="_paymentAmount" min="0.01" step="0.01"
                                                                                                                              class="block w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white" />
-                                                                                                                <p class="text-xs text-gray-500 dark:text-gray-400">Logged as a Debt expense today and taken off this balance.</p>
+                                                                                                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                                                                                                    @(_cardByDebt.ContainsKey(debt.Id)
+                                                                                                                        ? "Moved from your main account to the card today, which lowers this balance."
+                                                                                                                        : "Logged as a Debt expense today and taken off this balance.")
+                                                                                                                </p>
                                                                                                                 @if (!string.IsNullOrEmpty(_paymentError))
                                                                                                                 {
                                                                                                                     <p class="text-xs text-error-600 dark:text-error-400">@_paymentError</p>
@@ -490,7 +499,7 @@
                                                                                                                 <div>
                                                                                                                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Current
                                                                                                                         Balance</label>
-                                                                                                                        <InputNumber TValue="decimal?" @bind-Value="_debtFormCurrentBalance"
+                                                                                                                        <InputNumber TValue="decimal?" @bind-Value="_debtFormCurrentBalance" disabled="@EditingLinkedDebt"
                                                                                                                                      class="peer block w-full rounded-md border border-gray-300 bg-transparent px-4 py-3 text-sm text-gray-900 focus:border-brand-600 focus:outline-none focus:ring-0 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:focus:border-brand-400" />
                                                                                                                     </div>
                                                                                                                 </div>
@@ -584,6 +593,11 @@
 
     private int? _paymentDebtId;
     private decimal? _paymentAmount;
+
+    /// <summary>Debts linked to a credit-card account, by debt: their balance follows the card.</summary>
+    private Dictionary<int, Account> _cardByDebt = [];
+
+    private bool EditingLinkedDebt => _editingDebtId is { } id && _cardByDebt.ContainsKey(id);
     private string _paymentError = "";
 
     protected override async Task OnInitializedAsync()
@@ -631,6 +645,15 @@
         if (_paymentAmount is not > 0m)
         {
             _paymentError = "Enter an amount greater than zero.";
+            return;
+        }
+
+        // Paying a card moves money from the main account to the card, which is what the debt follows.
+        if (_cardByDebt.ContainsKey(debt.Id))
+        {
+            await DebtService.RecordPaymentAsync(debt.Id, decimal.Round(_paymentAmount.Value, 2));
+            _paymentDebtId = null;
+            await LoadSavedDebtsAsync();
             return;
         }
 
@@ -787,6 +810,10 @@
 
         await CatchUp.RunIfDueAsync();
         var debts = await DebtService.GetAllAsync();
+        _cardByDebt = (await AccountService.GetBalancesAsync())
+            .Select(b => b.Account)
+            .Where(a => a.DebtAccountId is not null)
+            .ToDictionary(a => a.DebtAccountId!.Value);
         _savedDebts.Clear();
         _savedDebts.AddRange(debts.OrderByDescending(x => x.CreatedAtUtc));
 

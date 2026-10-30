@@ -473,12 +473,30 @@ public sealed class BankStatementImportService : IBankStatementImportService
 
     /// <summary>
     /// Guesses the other account of a transfer the person hasn't placed yet: a payment to savings goes to
-    /// the savings account, when there is just one.
+    /// the savings account, when there is just one. With a card account, paying the card is a transfer to it
+    /// rather than spending (the purchases on the card are the spending), and on the card's own statement a
+    /// payment received came from the main account.
     /// </summary>
     private static async Task GuessTransferAccountsAsync(CoinStackDbContext db, StatementImportPreview preview, CancellationToken cancellationToken)
     {
+        var mainId = (await AccountService.GetOrCreateDefaultAsync(db, cancellationToken)).Id;
         var accounts = await db.Accounts.AsNoTracking().Where(a => !a.IsArchived).ToListAsync(cancellationToken);
         var savings = accounts.Where(a => a.Type == AccountType.Savings && a.Id != preview.AccountId).ToList();
+        var cards = accounts.Where(a => a.Type == AccountType.CreditCard && a.Id != preview.AccountId).ToList();
+        var statementIsCard = accounts.Any(a => a.Id == preview.AccountId && a.Type == AccountType.CreditCard);
+
+        foreach (var candidate in preview.Candidates.Where(c => c.Type != TransactionType.Transfer && c.CounterAccountId is null))
+        {
+            var upper = (candidate.RawDescription ?? candidate.Description).ToUpperInvariant();
+            if (!candidate.IsCredit && LooksLikeCardPayment(upper) && cards is [var card])
+            {
+                MakeTransfer(candidate, card.Id);
+            }
+            else if (candidate.IsCredit && statementIsCard && upper.Contains("PAYMENT") && preview.AccountId != mainId)
+            {
+                MakeTransfer(candidate, mainId);
+            }
+        }
 
         foreach (var candidate in preview.Candidates.Where(c => c.Type == TransactionType.Transfer && c.CounterAccountId is null))
         {
@@ -488,6 +506,18 @@ public sealed class BankStatementImportService : IBankStatementImportService
                 candidate.CounterAccountId = only.Id;
             }
         }
+    }
+
+    private static bool LooksLikeCardPayment(string upper)
+        => upper.Contains("TRANSFER TO CREDIT") || upper.Contains("FNBCC") || upper.Contains("CREDIT CARD");
+
+    private static void MakeTransfer(ImportCandidate candidate, int otherAccountId)
+    {
+        candidate.Type = TransactionType.Transfer;
+        candidate.CounterAccountId = otherAccountId;
+        candidate.CategoryName = null;
+        candidate.SuggestedCategoryName = null;
+        candidate.ExpenseKind = ExpenseKind.Discretionary;
     }
 
     private static bool LooksLikeSavingsTransfer(string upper)

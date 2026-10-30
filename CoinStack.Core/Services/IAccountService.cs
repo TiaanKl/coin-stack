@@ -30,6 +30,12 @@ public interface IAccountService
 
     Task SetDefaultAsync(int accountId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Links a credit-card account to the debt it is, or unlinks it with a null <paramref name="debtId"/>.
+    /// Linking starts the card at what the debt owes; from then on the debt follows the card.
+    /// </summary>
+    Task LinkDebtAsync(int cardAccountId, int? debtId, CancellationToken cancellationToken = default);
+
     /// <summary>"Update balance": the account held <paramref name="balance"/> at <paramref name="asOfUtc"/>.</summary>
     Task SetBalanceAsync(int accountId, decimal balance, DateTime asOfUtc, CancellationToken cancellationToken = default);
 

@@ -354,6 +354,20 @@ public sealed class TransactionService : ITransactionService
                 AutoDeductTemplateId = template.Id,
             };
 
+            // A monthly payment to a debt that is now a card account moves money to the card instead.
+            if (template.DebtAccountId is { } debtId
+                && await db.Accounts.FirstOrDefaultAsync(a => a.DebtAccountId == debtId, cancellationToken) is { } card)
+            {
+                autoTx.Type = TransactionType.Transfer;
+                autoTx.AccountId ??= (await AccountService.GetOrCreateDefaultAsync(db, cancellationToken)).Id;
+                autoTx.TransferAccountId = card.Id;
+                autoTx.CategoryId = null;
+                autoTx.SubscriptionId = null;
+                autoTx.BucketId = null;
+                autoTx.DebtAccountId = null;
+                autoTx.ExpenseKind = ExpenseKind.Discretionary;
+            }
+
             db.Transactions.Add(autoTx);
 
             var createDebtImpact = GetDebtPaymentImpact(autoTx);
@@ -394,6 +408,12 @@ public sealed class TransactionService : ITransactionService
     {
         var debt = await db.DebtAccounts.FirstOrDefaultAsync(x => x.Id == debtId, cancellationToken);
         if (debt is null)
+        {
+            return;
+        }
+
+        // A debt linked to a card follows the card account; its payments are transfers to the card.
+        if (await db.Accounts.AnyAsync(a => a.DebtAccountId == debtId, cancellationToken))
         {
             return;
         }
